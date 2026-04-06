@@ -142,10 +142,11 @@ export default function OnboardingModule() {
   const [tenantChecking, setTenantChecking] = useState(false);
   const [tenantResolved, setTenantResolved] = useState(() => {
     // Skip tenant selection only if:
-    // 1. URL contains tenant subdomain (e.g. illizeo.illizeo.com)
+    // 1. URL contains tenant subdomain (e.g. acme.illizeo.com) but NOT product subdomains like onboarding.illizeo.com
     const host = window.location.hostname;
     const parts = host.split(".");
-    if (parts.length >= 3 && parts[1] === "illizeo") {
+    const productSubdomains = ["onboarding", "www", "api", "app"];
+    if (parts.length >= 3 && parts[1] === "illizeo" && !productSubdomains.includes(parts[0])) {
       localStorage.setItem("illizeo_tenant_id", parts[0]);
       return true;
     }
@@ -1149,9 +1150,9 @@ export default function OnboardingModule() {
               <div style={{ display: "flex", alignItems: "center", borderRadius: 8, border: `1px solid ${C.border}`, overflow: "hidden", background: C.bg }}>
                 <input value={tenantInput} onChange={e => { setTenantInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")); setTenantError(""); }} placeholder="mon-entreprise" required
                   style={{ flex: 1, padding: "12px 14px", border: "none", outline: "none", background: "transparent", fontSize: 15, fontFamily: font, color: C.text, fontWeight: 600 }} />
-                <span style={{ padding: "12px 14px", fontSize: 13, color: C.textMuted, background: C.white, borderLeft: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>.illizeo.com</span>
+                <span style={{ padding: "12px 14px", fontSize: 13, color: C.textMuted, background: C.white, borderLeft: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>.onboarding.illizeo.com</span>
               </div>
-              {tenantInput && !tenantError && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>Vous serez connecté à <span style={{ fontWeight: 600, color: C.pink }}>{tenantInput}.illizeo.com</span></div>}
+              {tenantInput && !tenantError && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>Vous serez connecté à <span style={{ fontWeight: 600, color: C.pink }}>{tenantInput}.onboarding.illizeo.com</span></div>}
               {tenantError && <div style={{ fontSize: 12, color: C.red, marginTop: 8, padding: "8px 12px", background: C.redLight, borderRadius: 8 }}>{tenantError}</div>}
             </div>
             <button type="submit" disabled={!tenantInput.trim() || tenantChecking} className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", padding: "12px 0", fontSize: 15, opacity: !tenantInput.trim() || tenantChecking ? 0.5 : 1 }}>
@@ -1213,7 +1214,7 @@ export default function OnboardingModule() {
                 const slug = v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
                 setRegTenantSlug(slug);
               }} placeholder="Ex: Acme Corp" required style={sInput} />
-              {regTenantSlug && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Votre espace : <span style={{ fontWeight: 600, color: C.pink }}>{regTenantSlug}</span>.illizeo.com</div>}
+              {regTenantSlug && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Votre espace : <span style={{ fontWeight: 600, color: C.pink }}>{regTenantSlug}</span>.onboarding.illizeo.com</div>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
               <div>
@@ -1268,7 +1269,7 @@ export default function OnboardingModule() {
             <h1 style={{ fontSize: 22, fontWeight: 700, color: C.dark, margin: 0 }}>{t('login.title')}</h1>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 6 }}>
               <span style={{ fontSize: 12, color: C.textMuted }}>{t('login.space')}</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: C.pink }}>{localStorage.getItem("illizeo_tenant_id") || "illizeo"}.illizeo.com</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: C.pink }}>{localStorage.getItem("illizeo_tenant_id") || "illizeo"}</span>
               <button onClick={() => { localStorage.removeItem("illizeo_tenant_id"); setTenantResolved(false); }} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font, textDecoration: "underline" }}>{t('login.change')}</button>
             </div>
           </div>
@@ -4405,7 +4406,7 @@ export default function OnboardingModule() {
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.email_templates')}</h1>
-          <button onClick={() => { setTplPanelData({ nom: "", sujet: "", declencheur: TPL_TRIGGERS[0], variables: [], actif: true, contenu: "" }); resetTr(); setTplPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Nouveau template</button>
+          <button onClick={() => { setTplPanelData({ nom: "", sujet: "", declencheur: TPL_TRIGGERS[0], variables: [], actif: true, contenu: "" }); resetTr(); setTplPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('doc.new_template')}</button>
         </div>
 
         {/* Email config banner */}
@@ -4462,7 +4463,7 @@ export default function OnboardingModule() {
             <div onClick={() => setTplPanelMode("closed")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
             <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 680, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "20px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{tplPanelMode === "create" ? "Nouveau template" : "Modifier le template"}</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{tplPanelMode === "create" ? t('doc.new_template') : t('doc.edit_template')}</h2>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {tplPanelMode === "edit" && (
                     <div style={{ display: "flex", gap: 4, padding: 2, background: C.bg, borderRadius: 6 }}>
@@ -4701,7 +4702,7 @@ export default function OnboardingModule() {
     const renderNotifications_admin = () => (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Configuration des notifications</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.notif_config')}</h1>
         </div>
         <p style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Choisissez quelles notifications sont envoyées et par quel canal.</p>
 
@@ -4748,7 +4749,7 @@ export default function OnboardingModule() {
       return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Page entreprise</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.company_page')}</h1>
           <div style={{ display: "flex", gap: 8 }}>
             <select onChange={async e => {
               if (!e.target.value) return;
@@ -4847,7 +4848,7 @@ export default function OnboardingModule() {
       return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>NPS & Satisfaction</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.nps')}</h1>
           <button onClick={() => { setNpsPanelData({ titre: "", description: "", type: "nps", declencheur: "fin_parcours", questions: [{ text: "Sur une échelle de 0 à 10, recommanderiez-vous notre processus d'onboarding ?", type: "nps" }], actif: true }); resetTr(); setNpsPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau questionnaire</button>
         </div>
 
@@ -5064,7 +5065,7 @@ export default function OnboardingModule() {
             <div onClick={() => setContratPanelMode("closed")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
             <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: "65vw", maxWidth: 1100, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "24px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{contratPanelMode === "create" ? "Nouveau contrat" : "Modifier le contrat"}</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{contratPanelMode === "create" ? t('contrat.new') : t('contrat.edit')}</h2>
                 <button onClick={() => setContratPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
               </div>
               <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
@@ -5299,7 +5300,7 @@ export default function OnboardingModule() {
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('coopt.title')}</h1>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => setCooptSettingsOpen(true)} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6 }}><Zap size={14} /> Paramètres</button>
-            {cooptTab === "cooptations" && <button onClick={() => { setCooptPanelData({ referrer_name: "", referrer_email: "", candidate_name: "", candidate_email: "", candidate_poste: "", type_recompense: cooptSettings?.type_recompense_defaut || "prime", montant_recompense: cooptSettings?.montant_defaut || 500, mois_requis: cooptSettings?.mois_requis_defaut || 6, notes: "", campaign_id: null }); setCooptPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouvelle cooptation</button>}
+            {cooptTab === "cooptations" && <button onClick={() => { setCooptPanelData({ referrer_name: "", referrer_email: "", candidate_name: "", candidate_email: "", candidate_poste: "", type_recompense: cooptSettings?.type_recompense_defaut || "prime", montant_recompense: cooptSettings?.montant_defaut || 500, mois_requis: cooptSettings?.mois_requis_defaut || 6, notes: "", campaign_id: null }); setCooptPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('coopt.new')}</button>}
             {cooptTab === "campagnes" && <button onClick={() => { setCampaignPanelData({ titre: "", description: "", departement: "", site: "", type_contrat: "CDI", type_recompense: "prime", montant_recompense: cooptSettings?.montant_defaut || 500, mois_requis: cooptSettings?.mois_requis_defaut || 6, nombre_postes: 1, priorite: "normale", date_limite: "" }); setCampaignPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouvelle campagne</button>}
           </div>
         </div>
@@ -5509,7 +5510,7 @@ export default function OnboardingModule() {
         {cooptPanelMode !== "closed" && (
           <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 520, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{cooptPanelMode === "create" ? "Nouvelle cooptation" : "Modifier la cooptation"}</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{cooptPanelMode === "create" ? t('coopt.new') : t('coopt.edit')}</h2>
               <button onClick={() => setCooptPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} /></button>
             </div>
             <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
@@ -7239,8 +7240,8 @@ export default function OnboardingModule() {
           return isInTrial ? (
             <div style={{ padding: "10px 24px", background: `linear-gradient(90deg, ${C.blue}, #4A90D9)`, color: C.white, display: "flex", alignItems: "center", justifyContent: "center", gap: 16, fontSize: 13, fontWeight: 500, flexShrink: 0 }}>
               <Sparkles size={16} />
-              <span>Période d'essai — <b>{trialDaysLeft} jour{trialDaysLeft > 1 ? "s" : ""} restant{trialDaysLeft > 1 ? "s" : ""}</b>. Toutes les fonctionnalités sont accessibles.</span>
-              <button onClick={() => { setAdminPage("admin_abonnement" as any); setSubView("change"); }} style={{ padding: "4px 16px", borderRadius: 6, background: C.white, color: C.blue, border: "none", cursor: "pointer", fontFamily: font, fontSize: 12, fontWeight: 600 }}>Souscrire maintenant</button>
+              <span>{t('trial.banner')} — <b>{trialDaysLeft} {t('trial.days_left')}</b>. {t('trial.all_features')}</span>
+              <button onClick={() => { setAdminPage("admin_abonnement" as any); setSubView("change"); }} style={{ padding: "4px 16px", borderRadius: 6, background: C.white, color: C.blue, border: "none", cursor: "pointer", fontFamily: font, fontSize: 12, fontWeight: 600 }}>{t('trial.subscribe')}</button>
             </div>
           ) : trialExpired ? (
             <div style={{ padding: "10px 24px", background: C.red, color: C.white, display: "flex", alignItems: "center", justifyContent: "center", gap: 16, fontSize: 13, fontWeight: 500, flexShrink: 0 }}>
@@ -7290,19 +7291,19 @@ export default function OnboardingModule() {
           <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <div>
-                <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.gamification')} & Badges</h1>
+                <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.gamification')}</h1>
                 <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Motivez vos collaborateurs avec un système de récompenses visuelles. Les badges s'affichent dans le tableau de bord de chaque collaborateur.</p>
               </div>
-              <button onClick={() => { resetTr(); setBadgeTplPanel({ mode: "create", data: { nom: "", description: "", icon: "trophy", color: "#F9A825", critere: "manual", actif: true } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau badge</button>
+              <button onClick={() => { resetTr(); setBadgeTplPanel({ mode: "create", data: { nom: "", description: "", icon: "trophy", color: "#F9A825", critere: "manual", actif: true } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('badge.new')}</button>
             </div>
 
             {/* How it works */}
-            <div className="iz-card" style={{ ...sCard, padding: "16px 20px", marginBottom: 20, background: `linear-gradient(135deg, ${C.pinkBg} 0%, ${C.amberLight} 100%)`, border: `1px solid ${C.pink}20` }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} color={C.pink} /> Comment ça marche ?</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, fontSize: 12, color: C.textLight, lineHeight: 1.6 }}>
-                <div><span style={{ fontWeight: 600, color: C.text }}>1. Créez des modèles</span> — Définissez les badges avec un nom, une icône, une couleur et un critère d'attribution (manuel ou automatique).</div>
-                <div><span style={{ fontWeight: 600, color: C.text }}>2. Attribution</span> — Les badges sont attribués manuellement ci-dessous, ou automatiquement via les <strong>Workflows</strong> (action "Attribuer un badge") et les critères automatiques.</div>
-                <div><span style={{ fontWeight: 600, color: C.text }}>3. Visibilité</span> — Les collaborateurs voient leurs badges dans leur tableau de bord. Cela renforce l'engagement et valorise les étapes franchies.</div>
+            <div style={{ padding: "16px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20, fontSize: 12, color: C.blue, lineHeight: 1.7 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} /> Comment ça marche ?</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                <div><strong>1. Créez des modèles</strong> — Définissez les badges avec un nom, une icône, une couleur et un critère d'attribution (manuel ou automatique).</div>
+                <div><strong>2. Attribution</strong> — Les badges sont attribués manuellement ci-dessous, ou automatiquement via les <strong>Workflows</strong> (action "Attribuer un badge") et les critères automatiques.</div>
+                <div><strong>3. Visibilité</strong> — Les collaborateurs voient leurs badges dans leur tableau de bord. Cela renforce l'engagement et valorise les étapes franchises.</div>
               </div>
             </div>
 
@@ -8289,7 +8290,7 @@ export default function OnboardingModule() {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <Sparkles size={18} color={C.blue} />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: C.blue }}>Période d'essai gratuite — {Math.max(0, 14 - Math.floor((new Date().getTime() - new Date(trialStart!).getTime()) / (24 * 60 * 60 * 1000)))} jours restants</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.blue }}>{t('trial.banner')} — {Math.max(0, 14 - Math.floor((new Date().getTime() - new Date(trialStart!).getTime()) / (24 * 60 * 60 * 1000)))} {t('trial.days_left')}</div>
                         <div style={{ fontSize: 11, color: C.textLight }}>Toutes les fonctionnalités sont accessibles pendant l'essai. Souscrivez avant la fin pour continuer.</div>
                       </div>
                     </div>
@@ -9374,7 +9375,7 @@ export default function OnboardingModule() {
               <div onClick={() => setEquipPanel({ mode: "closed", data: {} })} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
               <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 480, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
                 <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{equipPanel.mode === "create" ? "Ajouter du matériel" : "Modifier"}</h2>
+                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{equipPanel.mode === "create" ? t('equip.add') : t('common.edit')}</h2>
                   <button onClick={() => setEquipPanel({ mode: "closed", data: {} })} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
                 </div>
                 <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
@@ -9487,10 +9488,10 @@ export default function OnboardingModule() {
             </div>
 
             {/* How it works */}
-            <div className="iz-card" style={{ ...sCard, padding: "14px 20px", marginBottom: 20, background: `${C.pinkBg}`, border: `1px solid ${C.pink}20` }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, fontSize: 12, color: C.textLight, lineHeight: 1.6 }}>
-                <div><strong style={{ color: C.text }}>Type "Lecture"</strong> — Le collaborateur lit le document et confirme "J'ai lu et j'accepte". Parfait pour le règlement intérieur, la charte IT, la politique RGPD.</div>
-                <div><strong style={{ color: C.text }}>Type "Signature"</strong> — Le collaborateur signe électroniquement. Pour le droit à l'image, les NDA, les avenants au contrat. Intégrable avec DocuSign/UgoSign.</div>
+            <div style={{ padding: "16px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20, fontSize: 12, color: C.blue, lineHeight: 1.7 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div><strong>Type "Lecture"</strong> — Le collaborateur lit le document et confirme "J'ai lu et j'accepte". Parfait pour le règlement intérieur, la charte IT, la politique RGPD.</div>
+                <div><strong>Type "Signature"</strong> — Le collaborateur signe électroniquement. Pour le droit à l'image, les NDA, les avenants au contrat. Intégrable avec DocuSign/UgoSign.</div>
               </div>
             </div>
 
@@ -9830,7 +9831,7 @@ export default function OnboardingModule() {
           );
         })()}
         {toast && (
-          <div className="iz-fade-up" style={{ position: "fixed", bottom: 24, right: 24, zIndex: 2000, padding: "12px 20px", borderRadius: 10, background: C.dark, color: C.white, fontSize: 13, fontWeight: 500, boxShadow: "0 6px 20px rgba(0,0,0,.2)", display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="iz-fade-up" style={{ position: "fixed", bottom: 24, right: 24, zIndex: 2000, padding: "12px 20px", borderRadius: 10, background: darkMode ? C.white : C.dark, color: darkMode ? C.dark : C.white, fontSize: 13, fontWeight: 500, boxShadow: "0 6px 20px rgba(0,0,0,.3)", display: "flex", alignItems: "center", gap: 8 }}>
             <CheckCircle size={16} /> {toast}
           </div>
         )}

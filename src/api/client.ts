@@ -1,4 +1,21 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+
+// Resolve tenant from URL param FIRST (overrides localStorage), then localStorage, then env
+(() => {
+  const params = new URLSearchParams(window.location.search);
+  const tenantParam = params.get('tenant');
+  if (tenantParam) {
+    const current = localStorage.getItem('illizeo_tenant_id');
+    if (current && current !== tenantParam) {
+      // Switching tenant — clear token from previous tenant
+      localStorage.removeItem('illizeo_token');
+      localStorage.removeItem('illizeo_trial_start');
+      localStorage.removeItem('illizeo_needs_plan');
+    }
+    localStorage.setItem('illizeo_tenant_id', tenantParam);
+  }
+})();
+
 const getTenantId = () => localStorage.getItem('illizeo_tenant_id') || import.meta.env.VITE_TENANT_ID || 'illizeo';
 const TIMEOUT_MS = 5000;
 const TOKEN_KEY = 'illizeo_token';
