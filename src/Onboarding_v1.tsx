@@ -82,6 +82,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode } from './constants';
 import type { OnboardingStep, DashboardPage, DashboardTab, UserRole, AdminPage, AdminModal, Collaborateur, ParcoursCategorie, ParcourTemplate, ActionTemplate, ActionType, AssignTarget, GroupePersonnes, DocCategory, WorkflowRule, EmailTemplate, TeamMember } from './types';
 import RichEditor from './components/RichEditor';
+import TranslatableField, { type Translations } from './components/TranslatableField';
 import { DOC_CATEGORIES, ACTIONS, _MOCK_NOTIFICATIONS_LIST, NOTIF_RESOURCES, TEAM_MEMBERS, ACTION_TYPE_META, PHASE_ICONS, SITES, DEPARTEMENTS, TYPES_CONTRAT, _MOCK_COLLABORATEURS, _MOCK_PARCOURS_TEMPLATES, _MOCK_ACTION_TEMPLATES, _MOCK_ADMIN_DOC_CATEGORIES, _MOCK_WORKFLOW_RULES, _MOCK_EMAIL_TEMPLATES, _MOCK_PHASE_DEFAULTS, _MOCK_GROUPES, EQUIPE_ROLES, TPL_CATEGORIES, guessTplCategory } from './mockData';
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────
@@ -347,6 +348,19 @@ export default function OnboardingModule() {
   const [activeLanguages, setActiveLanguages] = useState<Lang[]>(() => {
     try { const saved = localStorage.getItem("illizeo_active_languages"); return saved ? JSON.parse(saved) : ["fr", "en"]; } catch { return ["fr", "en"]; }
   });
+  // Content translations (per-entity: { fieldName: { en: "...", de: "..." } })
+  const [contentTranslations, setContentTranslations] = useState<Record<string, Translations>>({});
+  const setTr = (field: string, tr: Translations) => setContentTranslations(prev => ({ ...prev, [field]: tr }));
+  const resetTr = () => setContentTranslations({});
+  const buildTranslationsPayload = () => {
+    const result: Record<string, Record<string, string>> = {};
+    for (const [field, tr] of Object.entries(contentTranslations)) {
+      for (const [lang, val] of Object.entries(tr)) {
+        if (val?.trim()) { if (!result[field]) result[field] = {}; result[field][lang] = val; }
+      }
+    }
+    return Object.keys(result).length > 0 ? result : undefined;
+  };
   // Field config
   const [fieldConfig, setFieldConfig] = useState<any[]>([]);
   const [translateFieldId, setTranslateFieldId] = useState<number | null>(null);
@@ -3789,10 +3803,10 @@ export default function OnboardingModule() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('parcours.title')}</h1>
           <div style={{ display: "flex", gap: 8 }}>
-            {parcoursTab === "parcours" && <button onClick={() => { setParcoursPanelData({ nom: "", categorie: "onboarding", status: "brouillon" }); setParcoursPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new')}</button>}
-            {parcoursTab === "phases" && <button onClick={() => { setPhasePanelData({ nom: "", delaiDebut: "J-7", delaiFin: "J-1", couleur: "#4CAF50", parcours_id: null }); setPhasePanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> Nouvelle phase</button>}
-            {parcoursTab === "actions" && <button onClick={() => { setActionPanelData({ titre: "", type: "tache", phaseIds: [], delaiRelatif: "J+0", obligatoire: false, description: "", lienExterne: "", dureeEstimee: "", options: {} }); setActionPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new_action')}</button>}
-            {parcoursTab === "groupes" && <button onClick={() => { setGroupePanelData({ nom: "", description: "", couleur: "#C2185B", critereType: "", critereValeur: "", membres: [] }); setGroupePanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new_group')}</button>}
+            {parcoursTab === "parcours" && <button onClick={() => { setParcoursPanelData({ nom: "", categorie: "onboarding", status: "brouillon" }); resetTr(); setParcoursPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new')}</button>}
+            {parcoursTab === "phases" && <button onClick={() => { setPhasePanelData({ nom: "", delaiDebut: "J-7", delaiFin: "J-1", couleur: "#4CAF50", parcours_id: null }); resetTr(); setPhasePanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> Nouvelle phase</button>}
+            {parcoursTab === "actions" && <button onClick={() => { setActionPanelData({ titre: "", type: "tache", phaseIds: [], delaiRelatif: "J+0", obligatoire: false, description: "", lienExterne: "", dureeEstimee: "", options: {} }); resetTr(); setActionPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new_action')}</button>}
+            {parcoursTab === "groupes" && <button onClick={() => { setGroupePanelData({ nom: "", description: "", couleur: "#C2185B", critereType: "", critereValeur: "", membres: [] }); resetTr(); setGroupePanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new_group')}</button>}
           </div>
         </div>
         {/* Tabs */}
@@ -3844,7 +3858,7 @@ export default function OnboardingModule() {
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 12 }}>{p.phases.map((ph, i) => <span key={i} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, background: C.bg, color: C.textLight }}>{ph}</span>)}</div>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button onClick={() => { setActionFilter(p.nom); setParcoursTab("actions"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 11, padding: "5px 14px", display: "flex", alignItems: "center", gap: 4 }}><Eye size={12} /> {t('misc.view_actions')}</button>
-                    <button onClick={() => { setParcoursPanelData({ id: p.id, nom: p.nom, categorie: p.categorie, status: p.status }); setParcoursPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
+                    <button onClick={() => { setParcoursPanelData({ id: p.id, nom: p.nom, categorie: p.categorie, status: p.status }); setContentTranslations(p.translations || {}); setParcoursPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
                     <button onClick={async () => { try { await apiDuplicateParcours(p.id); refetchParcours(); addToast_admin("Parcours dupliqué"); } catch { addToast_admin("Erreur lors de la duplication"); } }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.duplicate')}</button>
                     {p.status === "actif" && (
                       <button onClick={() => showConfirm(
@@ -3885,7 +3899,7 @@ export default function OnboardingModule() {
                     <div style={{ fontSize: 15, fontWeight: 600 }}>{ph.nom}</div>
                     <div style={{ fontSize: 12, color: C.textLight }}>{ph.delaiDebut} → {ph.delaiFin} · {phActions.length} actions</div>
                   </div>
-                  <button onClick={() => { setPhasePanelData({ id: ph.id, nom: ph.nom, delaiDebut: ph.delaiDebut, delaiFin: ph.delaiFin, couleur: ph.couleur, parcoursIds: ph.parcoursIds || [] }); setPhasePanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
+                  <button onClick={() => { setPhasePanelData({ id: ph.id, nom: ph.nom, delaiDebut: ph.delaiDebut, delaiFin: ph.delaiFin, couleur: ph.couleur, parcoursIds: ph.parcoursIds || [] }); setContentTranslations(ph.translations || {}); setPhasePanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
                   {phActions.length > 0 ? (
                     <span title={`Impossible de supprimer : ${phActions.length} action(s) associée(s)`} style={{ padding: 4, cursor: "not-allowed", opacity: 0.3 }}><Trash size={14} color={C.textMuted} /></span>
                   ) : (
@@ -3894,7 +3908,7 @@ export default function OnboardingModule() {
                 </div>
               );
             })}
-            <button onClick={() => { setPhasePanelData({ nom: "", delaiDebut: "J-30", delaiFin: "J-1", couleur: "#4CAF50", parcoursIds: [] }); setPhasePanelMode("create"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}><Plus size={14} /> {t('parcours.new_phase')}</button>
+            <button onClick={() => { setPhasePanelData({ nom: "", delaiDebut: "J-30", delaiFin: "J-1", couleur: "#4CAF50", parcoursIds: [] }); resetTr(); setPhasePanelMode("create"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6, marginTop: 8 }}><Plus size={14} /> {t('parcours.new_phase')}</button>
           </div>
         )}
 
@@ -3920,7 +3934,7 @@ export default function OnboardingModule() {
                 {filteredActions.map((a, i) => {
                   const meta = ACTION_TYPE_META[a.type] || ACTION_TYPE_META.tache;
                   return (
-                    <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }} onClick={() => { const phId = PHASE_DEFAULTS.find(ph => ph.nom === a.phase)?.id; setActionPanelData({ id: a.id, titre: a.titre, type: a.type, phaseIds: phId ? [phId] : [], delaiRelatif: a.delaiRelatif, obligatoire: a.obligatoire, description: a.description || "", lienExterne: (a as any).lienExterne || "", dureeEstimee: (a as any).dureeEstimee || "", options: (a as any).options || {} }); setActionPanelMode("edit"); }}>
+                    <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }} onClick={() => { const phId = PHASE_DEFAULTS.find(ph => ph.nom === a.phase)?.id; setActionPanelData({ id: a.id, titre: a.titre, type: a.type, phaseIds: phId ? [phId] : [], delaiRelatif: a.delaiRelatif, obligatoire: a.obligatoire, description: a.description || "", lienExterne: (a as any).lienExterne || "", dureeEstimee: (a as any).dureeEstimee || "", options: (a as any).options || {} }); setContentTranslations((a as any).translations || {}); setActionPanelMode("edit"); }}>
                       <td style={{ padding: "10px 14px", width: 36 }}><div style={{ width: 28, height: 28, borderRadius: 6, background: meta.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><meta.Icon size={13} color={meta.color} /></div></td>
                       <td style={{ padding: "10px 14px" }}><div style={{ fontWeight: 500 }}>{a.titre}</div><div style={{ fontSize: 11, color: C.textLight }}>{a.description?.substring(0, 60) || ""}...</div></td>
                       <td style={{ padding: "10px 14px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: meta.bg, color: meta.color }}>{meta.label}</span></td>
@@ -3954,7 +3968,7 @@ export default function OnboardingModule() {
                       <div style={{ fontSize: 14, fontWeight: 600 }}>{g.nom}</div>
                       <div style={{ fontSize: 11, color: C.textLight }}>{g.description}</div>
                     </div>
-                    <button onClick={() => { setGroupePanelData({ id: g.id, nom: g.nom, description: g.description, couleur: g.couleur, critereType: (g.critereAuto as any)?.type || "", critereValeur: (g.critereAuto as any)?.valeur || "", membres: g.membres || [] }); setGroupePanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
+                    <button onClick={() => { setGroupePanelData({ id: g.id, nom: g.nom, description: g.description, couleur: g.couleur, critereType: (g.critereAuto as any)?.type || "", critereValeur: (g.critereAuto as any)?.valeur || "", membres: g.membres || [] }); setContentTranslations((g as any).translations || {}); setGroupePanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
                     <button onClick={() => showConfirm(`Supprimer le groupe "${g.nom}" ?`, async () => { try { await apiDeleteGroupe(g.id); refetchGroupes(); addToast_admin("Groupe supprimé"); } catch { addToast_admin(t('toast.error')); } })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={14} color={C.red} /></button>
                   </div>
                   <div style={{ fontSize: 12, color: C.textLight, marginBottom: 8 }}>{(g.membres || []).length} membres{g.critereAuto && <span style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 4, fontSize: 10, background: C.blueLight, color: C.blue }}>Auto: {(g.critereAuto as any).type} = {(g.critereAuto as any).valeur}</span>}</div>
@@ -4014,7 +4028,7 @@ export default function OnboardingModule() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('doc.title')}</h1>
           <div style={{ display: "flex", gap: 8 }}>
-            {gedTab === "templates" && <button onClick={() => { setTplPanelDoc({ nom: "", categorie: ADMIN_DOC_CATEGORIES[0]?.id || "", obligatoire: false, type: "upload", description: "", fichier_modele: "" }); setTplPanelOpen("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('doc.new_template')}</button>}
+            {gedTab === "templates" && <button onClick={() => { setTplPanelDoc({ nom: "", categorie: ADMIN_DOC_CATEGORIES[0]?.id || "", obligatoire: false, type: "upload", description: "", fichier_modele: "" }); resetTr(); setTplPanelOpen("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('doc.new_template')}</button>}
             {gedTab === "validation" && selectedDocsForValidation.size > 0 && (
               <button onClick={async () => {
                 const ids = Array.from(selectedDocsForValidation);
@@ -4093,7 +4107,7 @@ export default function OnboardingModule() {
                       </div>
                       <div style={{ display: "flex", gap: 6 }}>
                         <button onClick={() => addToast_admin(`Modèle "${piece.nom}" téléchargé`)} title="Télécharger le modèle" className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Download size={12} /> {t('misc.template')}</button>
-                        <button onClick={() => { setTplPanelDoc({ nom: piece.nom, categorie: cat.id, obligatoire: piece.obligatoire, type: piece.type, description: "", fichier_modele: "" }); setTplPanelOpen("edit"); }} style={{ background: C.bg, border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer" }}><FilePen size={14} color={C.textMuted} /></button>
+                        <button onClick={() => { setTplPanelDoc({ nom: piece.nom, categorie: cat.id, obligatoire: piece.obligatoire, type: piece.type, description: "", fichier_modele: "" }); setContentTranslations((piece as any).translations || {}); setTplPanelOpen("edit"); }} style={{ background: C.bg, border: "none", borderRadius: 6, padding: "5px 8px", cursor: "pointer" }}><FilePen size={14} color={C.textMuted} /></button>
                       </div>
                     </div>
                   ))}
@@ -4197,7 +4211,7 @@ export default function OnboardingModule() {
               <button onClick={() => setTplPanelOpen("closed")} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} /></button>
             </div>
             <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
-              <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom du document *</label><input value={tplPanelDoc.nom} onChange={e => setTplPanelDoc({ ...tplPanelDoc, nom: e.target.value })} style={sInput} placeholder="Ex: Pièce d'identité / Passeport" /></div>
+              <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom du document *</label><TranslatableField value={tplPanelDoc.nom} onChange={v => setTplPanelDoc({ ...tplPanelDoc, nom: v })} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder="Ex: Pièce d'identité / Passeport" /></div>
               <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Catégorie</label>
                 <select value={tplPanelDoc.categorie} onChange={e => setTplPanelDoc({ ...tplPanelDoc, categorie: e.target.value })} style={sInput}>
                   {ADMIN_DOC_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.titre}</option>)}
@@ -4217,7 +4231,7 @@ export default function OnboardingModule() {
                   </label>
                 </div>
               </div>
-              <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description / Instructions</label><textarea value={tplPanelDoc.description || ""} onChange={e => setTplPanelDoc({ ...tplPanelDoc, description: e.target.value })} style={{ ...sInput, minHeight: 80, resize: "vertical" }} placeholder="Instructions pour le collaborateur..." /></div>
+              <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description / Instructions</label><TranslatableField multiline rows={4} value={tplPanelDoc.description || ""} onChange={v => setTplPanelDoc({ ...tplPanelDoc, description: v })} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ ...sInput, minHeight: 80, resize: "vertical" }} placeholder="Instructions pour le collaborateur..." /></div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Fichier modèle (optionnel)</label>
                 <div style={{ padding: "20px 16px", borderRadius: 10, border: `2px dashed ${C.border}`, textAlign: "center", cursor: "pointer", fontSize: 13, color: C.textLight }} className="iz-upload-zone">
@@ -4263,12 +4277,12 @@ export default function OnboardingModule() {
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.workflows')}</h1>
-          <button onClick={() => { setWfPanelData({ nom: "", declencheur: WF_TRIGGERS[0], action: WF_ACTIONS[0], destinataire: WF_RECIPIENTS[0], actif: true, email_subject: "", email_body: "", bot_message: "", badge_name: "", badge_icon: "trophy", badge_color: "#F9A825", target_user_id: "", target_group_id: "" }); setWfPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('wf.new')}</button>
+          <button onClick={() => { setWfPanelData({ nom: "", declencheur: WF_TRIGGERS[0], action: WF_ACTIONS[0], destinataire: WF_RECIPIENTS[0], actif: true, email_subject: "", email_body: "", bot_message: "", badge_name: "", badge_icon: "trophy", badge_color: "#F9A825", target_user_id: "", target_group_id: "" }); resetTr(); setWfPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('wf.new')}</button>
         </div>
         {WORKFLOW_RULES.map((w: any) => (
           <div key={w.id} className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 12, display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: w.actif ? C.greenLight : C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><Zap size={18} color={w.actif ? C.green : C.textMuted} /></div>
-            <div style={{ flex: 1, cursor: "pointer" }} onClick={() => { setWfPanelData({ id: w.id, nom: w.nom, declencheur: w.declencheur, action: w.action, destinataire: w.destinataire, actif: w.actif, email_subject: w.email_subject || "", email_body: w.email_body || "", bot_message: w.bot_message || "", badge_name: w.badge_name || "", badge_icon: w.badge_icon || "trophy", badge_color: w.badge_color || "#F9A825", target_user_id: w.target_user_id || "", target_group_id: w.target_group_id || "" }); setWfPanelMode("edit"); }}>
+            <div style={{ flex: 1, cursor: "pointer" }} onClick={() => { setWfPanelData({ id: w.id, nom: w.nom, declencheur: w.declencheur, action: w.action, destinataire: w.destinataire, actif: w.actif, email_subject: w.email_subject || "", email_body: w.email_body || "", bot_message: w.bot_message || "", badge_name: w.badge_name || "", badge_icon: w.badge_icon || "trophy", badge_color: w.badge_color || "#F9A825", target_user_id: w.target_user_id || "", target_group_id: w.target_group_id || "" }); setContentTranslations(w.translations || {}); setWfPanelMode("edit"); }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{w.nom}</div>
               <div style={{ fontSize: 12, color: C.textLight }}>Déclencheur: {w.declencheur} → {w.action} → {w.destinataire}</div>
             </div>
@@ -4289,7 +4303,7 @@ export default function OnboardingModule() {
                 <button onClick={() => setWfPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
               </div>
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom *</label><input value={wfPanelData.nom} onChange={e => setWfPanelData((p: any) => ({ ...p, nom: e.target.value }))} style={sInput} /></div>
+                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom *</label><TranslatableField value={wfPanelData.nom} onChange={v => setWfPanelData((p: any) => ({ ...p, nom: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
                 <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Déclencheur</label><select value={wfPanelData.declencheur} onChange={e => setWfPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_TRIGGERS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                 <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Action</label><select value={wfPanelData.action} onChange={e => setWfPanelData((p: any) => ({ ...p, action: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
                 <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Destinataire</label><select value={wfPanelData.destinataire} onChange={e => setWfPanelData((p: any) => ({ ...p, destinataire: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_RECIPIENTS.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
@@ -4367,8 +4381,9 @@ export default function OnboardingModule() {
                   <button onClick={() => setWfPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button onClick={async () => {
                     try {
-                      if (wfPanelMode === "create") { await apiCreateWorkflow(wfPanelData); addToast_admin("Workflow créé"); }
-                      else { await apiUpdateWorkflow(wfPanelData.id, wfPanelData); addToast_admin("Workflow modifié"); }
+                      const wfPayload = { ...wfPanelData, translations: buildTranslationsPayload() };
+                      if (wfPanelMode === "create") { await apiCreateWorkflow(wfPayload); addToast_admin("Workflow créé"); }
+                      else { await apiUpdateWorkflow(wfPanelData.id, wfPayload); addToast_admin("Workflow modifié"); }
                       setWfPanelMode("closed"); refetchActions();
                     } catch { addToast_admin(t('toast.error')); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13 }}>{wfPanelMode === "create" ? t('common.create') : t('common.save')}</button>
@@ -4390,7 +4405,7 @@ export default function OnboardingModule() {
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.email_templates')}</h1>
-          <button onClick={() => { setTplPanelData({ nom: "", sujet: "", declencheur: TPL_TRIGGERS[0], variables: [], actif: true, contenu: "" }); setTplPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Nouveau template</button>
+          <button onClick={() => { setTplPanelData({ nom: "", sujet: "", declencheur: TPL_TRIGGERS[0], variables: [], actif: true, contenu: "" }); resetTr(); setTplPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Nouveau template</button>
         </div>
 
         {/* Email config banner */}
@@ -4422,7 +4437,7 @@ export default function OnboardingModule() {
           {filteredTpls.map((tpl: any) => {
             const cat = TPL_CATEGORIES[guessTplCategory(tpl.nom)];
             return (
-            <div key={tpl.id} className="iz-card iz-fade-up" style={{ ...sCard, cursor: "pointer", position: "relative" }} onClick={() => { setTplPanelData({ id: tpl.id, nom: tpl.nom, sujet: tpl.sujet, declencheur: tpl.declencheur, variables: tpl.variables || [], actif: tpl.actif, contenu: tpl.contenu || "" }); setTplPanelMode("edit"); setTplPreview(false); }}>
+            <div key={tpl.id} className="iz-card iz-fade-up" style={{ ...sCard, cursor: "pointer", position: "relative" }} onClick={() => { setTplPanelData({ id: tpl.id, nom: tpl.nom, sujet: tpl.sujet, declencheur: tpl.declencheur, variables: tpl.variables || [], actif: tpl.actif, contenu: tpl.contenu || "" }); setContentTranslations(tpl.translations || {}); setTplPanelMode("edit"); setTplPreview(false); }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                 <Mail size={18} color={tpl.actif ? C.pink : C.textMuted} />
                 <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{tpl.nom}</div>
@@ -4460,8 +4475,8 @@ export default function OnboardingModule() {
               </div>
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
                 {!tplPreview ? (<>
-                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom *</label><input value={tplPanelData.nom} onChange={e => setTplPanelData((p: any) => ({ ...p, nom: e.target.value }))} style={sInput} /></div>
-                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Sujet de l'email *</label><input value={tplPanelData.sujet} onChange={e => setTplPanelData((p: any) => ({ ...p, sujet: e.target.value }))} placeholder="Bienvenue chez Illizeo — {{prenom}}" style={sInput} /></div>
+                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom *</label><TranslatableField value={tplPanelData.nom} onChange={v => setTplPanelData((p: any) => ({ ...p, nom: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
+                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Sujet de l'email *</label><TranslatableField value={tplPanelData.sujet} onChange={v => setTplPanelData((p: any) => ({ ...p, sujet: v }))} placeholder="Bienvenue chez Illizeo — {{prenom}}" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.sujet} onTranslationsChange={tr => setTr("sujet", tr)} /></div>
                   <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Déclencheur</label><select value={tplPanelData.declencheur} onChange={e => setTplPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TPL_TRIGGERS.map(tr => <option key={tr} value={tr}>{tr}</option>)}</select></div>
                   <div style={{ marginBottom: 16 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Corps de l'email</label>
@@ -4524,7 +4539,7 @@ export default function OnboardingModule() {
                   <button onClick={() => setTplPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button onClick={async () => {
                     try {
-                      const payload = { nom: tplPanelData.nom, sujet: tplPanelData.sujet, declencheur: tplPanelData.declencheur, variables: tplPanelData.variables, actif: tplPanelData.actif, contenu: tplPanelData.contenu };
+                      const payload: Record<string, any> = { nom: tplPanelData.nom, sujet: tplPanelData.sujet, declencheur: tplPanelData.declencheur, variables: tplPanelData.variables, actif: tplPanelData.actif, contenu: tplPanelData.contenu, translations: buildTranslationsPayload() };
                       if (tplPanelMode === "create") { await apiCreateEmailTpl(payload); addToast_admin("Template créé"); }
                       else { await apiUpdateEmailTpl(tplPanelData.id, payload); addToast_admin("Template modifié"); }
                       setTplPanelMode("closed"); refetchActions();
@@ -4555,7 +4570,7 @@ export default function OnboardingModule() {
             <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.teams_groups')}</h1>
             <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Gérez les équipes d'accompagnement des onboardees</p>
           </div>
-          <button onClick={() => { setTeamPanelData({ nom: "", description: "", site: "", members: [] }); setTeamPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Nouvelle équipe</button>
+          <button onClick={() => { setTeamPanelData({ nom: "", description: "", site: "", members: [] }); resetTr(); setTeamPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Nouvelle équipe</button>
         </div>
 
         {/* Workload overview */}
@@ -4581,7 +4596,7 @@ export default function OnboardingModule() {
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{team.nom}</div>
                   <div style={{ fontSize: 11, color: C.textLight }}>{team.description}{team.site ? ` · ${team.site}` : ""}</div>
                 </div>
-                <button onClick={() => { setTeamPanelData({ id: team.id, nom: team.nom, description: team.description || "", site: team.site || "", members: (team.members || []).map((m: any) => ({ user_id: m.user_id, role: m.role, name: m.user?.name })) }); setTeamPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
+                <button onClick={() => { setTeamPanelData({ id: team.id, nom: team.nom, description: team.description || "", site: team.site || "", members: (team.members || []).map((m: any) => ({ user_id: m.user_id, role: m.role, name: m.user?.name })) }); setContentTranslations(team.translations || {}); setTeamPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {(team.members || []).map((m: any) => {
@@ -4615,8 +4630,8 @@ export default function OnboardingModule() {
                 <button onClick={() => setTeamPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
               </div>
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom de l'équipe *</label><input value={teamPanelData.nom} onChange={e => setTeamPanelData((p: any) => ({ ...p, nom: e.target.value }))} placeholder="Ex: Team Genève" style={sInput} /></div>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label><textarea value={teamPanelData.description} onChange={e => setTeamPanelData((p: any) => ({ ...p, description: e.target.value }))} rows={2} style={{ ...sInput, resize: "vertical" }} /></div>
+                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom de l'équipe *</label><TranslatableField value={teamPanelData.nom} onChange={v => setTeamPanelData((p: any) => ({ ...p, nom: v }))} placeholder="Ex: Team Genève" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
+                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label><TranslatableField multiline rows={2} value={teamPanelData.description} onChange={v => setTeamPanelData((p: any) => ({ ...p, description: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} /></div>
                 <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Site (auto-assignation)</label><select value={teamPanelData.site} onChange={e => setTeamPanelData((p: any) => ({ ...p, site: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}><option value="">Aucun</option>{SITES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
 
                 {/* Members */}
@@ -4642,7 +4657,7 @@ export default function OnboardingModule() {
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setTeamPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button onClick={async () => {
-                    const payload = { nom: teamPanelData.nom, description: teamPanelData.description, site: teamPanelData.site, members: teamPanelData.members.filter((m: any) => m.user_id) };
+                    const payload: Record<string, any> = { nom: teamPanelData.nom, description: teamPanelData.description, site: teamPanelData.site, members: teamPanelData.members.filter((m: any) => m.user_id), translations: buildTranslationsPayload() };
                     try {
                       if (teamPanelMode === "create") { await apiCreateTeam(payload); addToast_admin("Équipe créée"); }
                       else { await apiUpdateTeam(teamPanelData.id, payload); addToast_admin("Équipe modifiée"); }
@@ -4833,7 +4848,7 @@ export default function OnboardingModule() {
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>NPS & Satisfaction</h1>
-          <button onClick={() => { setNpsPanelData({ titre: "", description: "", type: "nps", declencheur: "fin_parcours", questions: [{ text: "Sur une échelle de 0 à 10, recommanderiez-vous notre processus d'onboarding ?", type: "nps" }], actif: true }); setNpsPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau questionnaire</button>
+          <button onClick={() => { setNpsPanelData({ titre: "", description: "", type: "nps", declencheur: "fin_parcours", questions: [{ text: "Sur une échelle de 0 à 10, recommanderiez-vous notre processus d'onboarding ?", type: "nps" }], actif: true }); resetTr(); setNpsPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau questionnaire</button>
         </div>
 
         {/* Explanation */}
@@ -4924,7 +4939,7 @@ export default function OnboardingModule() {
                   </div>
                 </div>
                 <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
-                  <button onClick={() => { setNpsPanelData({ id: s.id, titre: s.titre, description: s.description || "", type: s.type, declencheur: s.declencheur, questions: s.questions || [], actif: s.actif }); setNpsPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11 }}>{t('common.edit')}</button>
+                  <button onClick={() => { setNpsPanelData({ id: s.id, titre: s.titre, description: s.description || "", type: s.type, declencheur: s.declencheur, questions: s.questions || [], actif: s.actif }); setContentTranslations((s as any).translations || {}); setNpsPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11 }}>{t('common.edit')}</button>
                   <button onClick={async () => { try { await apiSendNpsAll(s.id); addToast_admin("Questionnaire envoyé à tous les collaborateurs"); } catch { addToast_admin(t('toast.error')); } }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Send size={11} /> Envoyer à tous</button>
                 </div>
               </div>
@@ -4971,8 +4986,8 @@ export default function OnboardingModule() {
                 <button onClick={() => setNpsPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
               </div>
               <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
-                <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Titre *</label><input value={npsPanelData.titre} onChange={e => setNpsPanelData((p: any) => ({ ...p, titre: e.target.value }))} style={sInput} placeholder="Ex: NPS Onboarding" /></div>
-                <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label><textarea value={npsPanelData.description || ""} onChange={e => setNpsPanelData((p: any) => ({ ...p, description: e.target.value }))} style={{ ...sInput, minHeight: 60, resize: "vertical" }} /></div>
+                <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Titre *</label><TranslatableField value={npsPanelData.titre} onChange={v => setNpsPanelData((p: any) => ({ ...p, titre: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.titre} onTranslationsChange={tr => setTr("titre", tr)} style={sInput} placeholder="Ex: NPS Onboarding" /></div>
+                <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label><TranslatableField multiline rows={3} value={npsPanelData.description || ""} onChange={v => setNpsPanelData((p: any) => ({ ...p, description: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ ...sInput, minHeight: 60, resize: "vertical" }} /></div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Type</label>
                     <select value={npsPanelData.type} onChange={e => setNpsPanelData((p: any) => ({ ...p, type: e.target.value }))} style={sInput}>
@@ -5005,7 +5020,7 @@ export default function OnboardingModule() {
                   <button onClick={() => setNpsPanelMode("closed")} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
                   <button onClick={async () => {
                     try {
-                      const payload = { titre: npsPanelData.titre, description: npsPanelData.description, type: npsPanelData.type, declencheur: npsPanelData.declencheur, questions: npsPanelData.questions, actif: npsPanelData.actif };
+                      const payload = { titre: npsPanelData.titre, description: npsPanelData.description, type: npsPanelData.type, declencheur: npsPanelData.declencheur, questions: npsPanelData.questions, actif: npsPanelData.actif, translations: buildTranslationsPayload() };
                       if (npsPanelMode === "edit" && npsPanelData.id) await apiUpdateNps(npsPanelData.id, payload);
                       else await apiCreateNps(payload);
                       reloadNps(); setNpsPanelMode("closed"); addToast_admin(npsPanelMode === "create" ? "Questionnaire créé" : "Questionnaire modifié");
@@ -5025,14 +5040,14 @@ export default function OnboardingModule() {
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.contracts')}</h1>
-          <button onClick={() => { setContratPanelData({ nom: "", type: "CDI", juridiction: "Suisse", actif: true }); setContratPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('contrat.new')}</button>
+          <button onClick={() => { setContratPanelData({ nom: "", type: "CDI", juridiction: "Suisse", actif: true }); resetTr(); setContratPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('contrat.new')}</button>
         </div>
         <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead><tr style={{ background: C.bg }}>{["Nom","Type","Juridiction","Statut",""].map(h => <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
             <tbody>
               {contrats.map((c: any) => (
-                <tr key={c.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }} onClick={() => { setContratPanelData({ id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction, actif: c.actif, fichier: c.fichier || "" }); setContratPanelMode("edit"); }}>
+                <tr key={c.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }} onClick={() => { setContratPanelData({ id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction, actif: c.actif, fichier: c.fichier || "" }); setContentTranslations((c as any).translations || {}); setContratPanelMode("edit"); }}>
                   <td style={{ padding: "10px 14px", fontWeight: 500 }}>{c.nom}</td>
                   <td style={{ padding: "10px 14px" }}>{c.type}</td>
                   <td style={{ padding: "10px 14px" }}>{c.juridiction}</td>
@@ -5055,7 +5070,7 @@ export default function OnboardingModule() {
               <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
                 {/* Left: form */}
                 <div style={{ width: 300, flexShrink: 0, padding: "20px 24px", overflow: "auto", borderRight: `1px solid ${C.border}` }}>
-                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom du contrat *</label><input value={contratPanelData.nom} onChange={e => setContratPanelData((p: any) => ({ ...p, nom: e.target.value }))} placeholder="Ex: CDI — Droit Suisse" style={sInput} /></div>
+                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom du contrat *</label><TranslatableField value={contratPanelData.nom} onChange={v => setContratPanelData((p: any) => ({ ...p, nom: v }))} placeholder="Ex: CDI — Droit Suisse" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                     <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Type</label><select value={contratPanelData.type} onChange={e => setContratPanelData((p: any) => ({ ...p, type: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TYPES_CONTRAT.map(t => <option key={t} value={t}>{t}</option>)}<option value="Avenant">Avenant</option></select></div>
                     <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Juridiction</label><select value={contratPanelData.juridiction} onChange={e => setContratPanelData((p: any) => ({ ...p, juridiction: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}><option value="Suisse">Suisse</option><option value="France">France</option><option value="Multi">Multi</option></select></div>
@@ -5125,7 +5140,7 @@ export default function OnboardingModule() {
                   <button onClick={() => setContratPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button onClick={async () => {
                     try {
-                      const payload = { nom: contratPanelData.nom, type: contratPanelData.type, juridiction: contratPanelData.juridiction, actif: contratPanelData.actif, fichier: contratPanelData.fichier };
+                      const payload: Record<string, any> = { nom: contratPanelData.nom, type: contratPanelData.type, juridiction: contratPanelData.juridiction, actif: contratPanelData.actif, fichier: contratPanelData.fichier, translations: buildTranslationsPayload() };
                       if (contratPanelMode === "create") { await apiCreateContrat(payload); addToast_admin("Contrat créé"); }
                       else { await apiUpdateContrat(contratPanelData.id, payload); addToast_admin("Contrat modifié"); }
                       setContratPanelMode("closed");
@@ -7278,7 +7293,7 @@ export default function OnboardingModule() {
                 <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.gamification')} & Badges</h1>
                 <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Motivez vos collaborateurs avec un système de récompenses visuelles. Les badges s'affichent dans le tableau de bord de chaque collaborateur.</p>
               </div>
-              <button onClick={() => setBadgeTplPanel({ mode: "create", data: { nom: "", description: "", icon: "trophy", color: "#F9A825", critere: "manual", actif: true } })} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau badge</button>
+              <button onClick={() => { resetTr(); setBadgeTplPanel({ mode: "create", data: { nom: "", description: "", icon: "trophy", color: "#F9A825", critere: "manual", actif: true } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau badge</button>
             </div>
 
             {/* How it works */}
@@ -7323,7 +7338,7 @@ export default function OnboardingModule() {
                 const critMeta = BADGE_CRITERE_META[bt.critere || "manual"] || BADGE_CRITERE_META.manual;
                 return (
                 <div key={bt.id} className="iz-card iz-sidebar-item" style={{ ...sCard, textAlign: "center", padding: "20px 16px", opacity: bt.actif ? 1 : 0.45, cursor: "pointer", transition: "all .15s" }}
-                  onClick={() => setBadgeTplPanel({ mode: "edit", data: { ...bt } })}>
+                  onClick={() => { setContentTranslations((bt as any).translations || {}); setBadgeTplPanel({ mode: "edit", data: { ...bt } }); }}>
                   <div style={{ width: 52, height: 52, borderRadius: "50%", background: bt.color + "20", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", border: `2px solid ${bt.color}40` }}>
                     <IconComp size={24} color={bt.color} />
                   </div>
@@ -7405,10 +7420,10 @@ export default function OnboardingModule() {
                   </div>
 
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Nom du badge *</label>
-                    <input value={badgeTplPanel.data.nom || ""} onChange={e => setBadgeTplPanel(p => ({ ...p, data: { ...p.data, nom: e.target.value } }))} style={sInput} placeholder="Ex: Super Coopteur" />
+                    <TranslatableField value={badgeTplPanel.data.nom || ""} onChange={v => setBadgeTplPanel(p => ({ ...p, data: { ...p.data, nom: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder="Ex: Super Coopteur" />
                   </div>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Description</label>
-                    <textarea value={badgeTplPanel.data.description || ""} onChange={e => setBadgeTplPanel(p => ({ ...p, data: { ...p.data, description: e.target.value } }))} style={{ ...sInput, minHeight: 60, resize: "vertical" }} placeholder="Ex: Attribué quand un collaborateur termine son parcours" />
+                    <TranslatableField multiline rows={3} value={badgeTplPanel.data.description || ""} onChange={v => setBadgeTplPanel(p => ({ ...p, data: { ...p.data, description: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ ...sInput, minHeight: 60, resize: "vertical" }} placeholder="Ex: Attribué quand un collaborateur termine son parcours" />
                   </div>
 
                   {/* Icon picker */}
@@ -7462,7 +7477,7 @@ export default function OnboardingModule() {
                   <button onClick={async () => {
                     if (!badgeTplPanel.data.nom?.trim()) { addToast_admin("Le nom est requis"); return; }
                     try {
-                      const payload = { nom: badgeTplPanel.data.nom, description: badgeTplPanel.data.description || "", icon: badgeTplPanel.data.icon || "trophy", color: badgeTplPanel.data.color || "#F9A825", critere: badgeTplPanel.data.critere || "manual", actif: badgeTplPanel.data.actif !== false };
+                      const payload = { nom: badgeTplPanel.data.nom, description: badgeTplPanel.data.description || "", icon: badgeTplPanel.data.icon || "trophy", color: badgeTplPanel.data.color || "#F9A825", critere: badgeTplPanel.data.critere || "manual", actif: badgeTplPanel.data.actif !== false, translations: buildTranslationsPayload() };
                       if (badgeTplPanel.mode === "edit" && badgeTplPanel.data.id) await apiUpdateBadgeTpl(badgeTplPanel.data.id, payload);
                       else await apiCreateBadgeTpl(payload);
                       reloadGamif(); setBadgeTplPanel({ mode: "closed", data: {} }); addToast_admin(badgeTplPanel.mode === "create" ? "Badge créé" : "Badge modifié");
@@ -7667,11 +7682,11 @@ export default function OnboardingModule() {
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom du groupe *</label>
-                  <input value={groupePanelData.nom} onChange={e => setGroupePanelData(prev => ({ ...prev, nom: e.target.value }))} placeholder="Ex: Nouveaux arrivants Paris" style={sInput} />
+                  <TranslatableField value={groupePanelData.nom} onChange={v => setGroupePanelData(prev => ({ ...prev, nom: v }))} placeholder="Ex: Nouveaux arrivants Paris" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} />
                 </div>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label>
-                  <textarea value={groupePanelData.description} onChange={e => setGroupePanelData(prev => ({ ...prev, description: e.target.value }))} placeholder="Description du groupe..." rows={2} style={{ ...sInput, resize: "vertical" }} />
+                  <TranslatableField multiline rows={2} value={groupePanelData.description} onChange={v => setGroupePanelData(prev => ({ ...prev, description: v }))} placeholder="Description du groupe..." currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} />
                 </div>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Couleur</label>
@@ -7750,7 +7765,7 @@ export default function OnboardingModule() {
                   <button onClick={() => setGroupePanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button disabled={groupePanelLoading || !groupePanelData.nom.trim()} onClick={async () => {
                     setGroupePanelLoading(true);
-                    const payload: Record<string, any> = { nom: groupePanelData.nom.trim(), description: groupePanelData.description, couleur: groupePanelData.couleur };
+                    const payload: Record<string, any> = { nom: groupePanelData.nom.trim(), description: groupePanelData.description, couleur: groupePanelData.couleur, translations: buildTranslationsPayload() };
                     if (groupePanelData.critereType) { payload.critere_type = groupePanelData.critereType; payload.critere_valeur = groupePanelData.critereValeur; }
                     else { payload.critere_type = null; payload.critere_valeur = null; }
                     try {
@@ -7779,7 +7794,7 @@ export default function OnboardingModule() {
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Titre de l'action *</label>
-                  <input value={actionPanelData.titre} onChange={e => setActionPanelData(prev => ({ ...prev, titre: e.target.value }))} placeholder="Ex: Signer la charte informatique" style={sInput} />
+                  <TranslatableField value={actionPanelData.titre} onChange={v => setActionPanelData(prev => ({ ...prev, titre: v }))} placeholder="Ex: Signer la charte informatique" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.titre} onTranslationsChange={tr => setTr("titre", tr)} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
                   <div>
@@ -7833,8 +7848,7 @@ export default function OnboardingModule() {
                 </div>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label>
-                  <textarea value={actionPanelData.description} onChange={e => setActionPanelData(prev => ({ ...prev, description: e.target.value }))} placeholder="Décrivez l'action..." rows={3}
-                    style={{ ...sInput, resize: "vertical", minHeight: 80 }} />
+                  <TranslatableField multiline rows={3} value={actionPanelData.description} onChange={v => setActionPanelData(prev => ({ ...prev, description: v }))} placeholder="Décrivez l'action..." currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ minHeight: 80 }} />
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, padding: "12px 14px", background: C.bg, borderRadius: 10, cursor: "pointer" }}
                   onClick={() => setActionPanelData(prev => ({ ...prev, obligatoire: !prev.obligatoire }))}>
@@ -8193,6 +8207,7 @@ export default function OnboardingModule() {
                     if (actionPanelData.lienExterne) payload.lien_externe = actionPanelData.lienExterne;
                     if (actionPanelData.dureeEstimee) payload.duree_estimee = actionPanelData.dureeEstimee;
                     if (Object.keys(actionPanelData.options).length > 0) payload.options = actionPanelData.options;
+                    const tr = buildTranslationsPayload(); if (tr) payload.translations = tr;
                     try {
                       if (actionPanelMode === "create") {
                         await apiCreateAction(payload);
@@ -9178,8 +9193,8 @@ export default function OnboardingModule() {
                 <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Suivez l'attribution et la restitution du matériel mis à disposition de vos collaborateurs.</p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                {equipTab === "inventaire" && <button onClick={() => setEquipPanel({ mode: "create", data: { equipment_type_id: equipTypes[0]?.id || "", nom: "", numero_serie: "", marque: "", modele: "", etat: "disponible", date_achat: "", valeur: "", notes: "" } })} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.add')}</button>}
-                {equipTab === "packages" && <button onClick={() => setPkgPanel({ mode: "create", data: { nom: "", description: "", icon: "package", couleur: "#C2185B", items: [{ equipment_type_id: equipTypes[0]?.id || "", quantite: 1, notes: "" }] } })} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau package</button>}
+                {equipTab === "inventaire" && <button onClick={() => { resetTr(); setEquipPanel({ mode: "create", data: { equipment_type_id: equipTypes[0]?.id || "", nom: "", numero_serie: "", marque: "", modele: "", etat: "disponible", date_achat: "", valeur: "", notes: "" } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.add')}</button>}
+                {equipTab === "packages" && <button onClick={() => { resetTr(); setPkgPanel({ mode: "create", data: { nom: "", description: "", icon: "package", couleur: "#C2185B", items: [{ equipment_type_id: equipTypes[0]?.id || "", quantite: 1, notes: "" }] } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau package</button>}
                 {equipTab === "types" && <button onClick={async () => {
                   const nom = prompt("Nom du type d'équipement :");
                   if (!nom) return;
@@ -9266,7 +9281,7 @@ export default function OnboardingModule() {
                       {eq.etat === "attribue" && (
                         <button onClick={() => apiUnassignEquip(eq.id).then(reloadEquip).catch(() => addToast_admin(t('toast.error')))} title="Restituer" style={{ background: C.amberLight, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><RotateCcw size={12} color={C.amber} /></button>
                       )}
-                      <button onClick={() => setEquipPanel({ mode: "edit", data: { ...eq, equipment_type_id: eq.equipment_type_id } })} title="Modifier" style={{ background: C.bg, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
+                      <button onClick={() => { setContentTranslations((eq as any).translations || {}); setEquipPanel({ mode: "edit", data: { ...eq, equipment_type_id: eq.equipment_type_id } }); }} title="Modifier" style={{ background: C.bg, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
                       <button onClick={() => showConfirm(`Supprimer "${eq.nom}" ?`, async () => { try { await apiDeleteEquip(eq.id); reloadEquip(); addToast_admin(t('toast.deleted')); } catch {} })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={12} color={C.red} /></button>
                     </div>
                   </div>
@@ -9293,7 +9308,7 @@ export default function OnboardingModule() {
                           </div>
                         </div>
                         <div style={{ display: "flex", gap: 4 }}>
-                          <button onClick={() => setPkgPanel({ mode: "edit", data: { ...pkg, items: pkg.items.map(i => ({ equipment_type_id: i.equipment_type_id, quantite: i.quantite, notes: i.notes || "" })) } })} style={{ background: C.bg, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
+                          <button onClick={() => { setContentTranslations((pkg as any).translations || {}); setPkgPanel({ mode: "edit", data: { ...pkg, items: pkg.items.map(i => ({ equipment_type_id: i.equipment_type_id, quantite: i.quantite, notes: i.notes || "" })) } }); }} style={{ background: C.bg, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
                           <button onClick={() => showConfirm(`Supprimer le package "${pkg.nom}" ?`, async () => { try { await apiDeletePkg(pkg.id); reloadEquip(); addToast_admin("Package supprimé"); } catch {} })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={12} color={C.red} /></button>
                         </div>
                       </div>
@@ -9369,7 +9384,7 @@ export default function OnboardingModule() {
                     </select>
                   </div>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Nom / Description *</label>
-                    <input value={equipPanel.data.nom || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, nom: e.target.value } }))} style={sInput} placeholder="Ex: MacBook Pro 14 pouces" />
+                    <TranslatableField value={equipPanel.data.nom || ""} onChange={v => setEquipPanel(p => ({ ...p, data: { ...p.data, nom: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder="Ex: MacBook Pro 14 pouces" />
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Marque</label>
@@ -9400,7 +9415,7 @@ export default function OnboardingModule() {
                   <button onClick={async () => {
                     if (!equipPanel.data.nom?.trim()) { addToast_admin("Le nom est requis"); return; }
                     try {
-                      const payload = { equipment_type_id: equipPanel.data.equipment_type_id, nom: equipPanel.data.nom, numero_serie: equipPanel.data.numero_serie || null, marque: equipPanel.data.marque || null, modele: equipPanel.data.modele || null, etat: equipPanel.data.etat || "disponible", date_achat: equipPanel.data.date_achat || null, valeur: equipPanel.data.valeur ? Number(equipPanel.data.valeur) : null, notes: equipPanel.data.notes || null };
+                      const payload = { equipment_type_id: equipPanel.data.equipment_type_id, nom: equipPanel.data.nom, numero_serie: equipPanel.data.numero_serie || null, marque: equipPanel.data.marque || null, modele: equipPanel.data.modele || null, etat: equipPanel.data.etat || "disponible", date_achat: equipPanel.data.date_achat || null, valeur: equipPanel.data.valeur ? Number(equipPanel.data.valeur) : null, notes: equipPanel.data.notes || null, translations: buildTranslationsPayload() };
                       if (equipPanel.mode === "edit" && equipPanel.data.id) await apiUpdateEquip(equipPanel.data.id, payload);
                       else await apiCreateEquip(payload);
                       reloadEquip(); setEquipPanel({ mode: "closed", data: {} }); addToast_admin(equipPanel.mode === "create" ? "Matériel ajouté" : "Matériel modifié");
@@ -9419,9 +9434,9 @@ export default function OnboardingModule() {
                 </div>
                 <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Nom du package *</label>
-                    <input value={pkgPanel.data.nom || ""} onChange={e => setPkgPanel(p => ({ ...p, data: { ...p.data, nom: e.target.value } }))} style={sInput} placeholder="Ex: Package IT Développeur" /></div>
+                    <TranslatableField value={pkgPanel.data.nom || ""} onChange={v => setPkgPanel(p => ({ ...p, data: { ...p.data, nom: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder="Ex: Package IT Développeur" /></div>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Description</label>
-                    <textarea value={pkgPanel.data.description || ""} onChange={e => setPkgPanel(p => ({ ...p, data: { ...p.data, description: e.target.value } }))} style={{ ...sInput, minHeight: 50, resize: "vertical" }} /></div>
+                    <TranslatableField multiline rows={3} value={pkgPanel.data.description || ""} onChange={v => setPkgPanel(p => ({ ...p, data: { ...p.data, description: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ ...sInput, minHeight: 50, resize: "vertical" }} /></div>
 
                   <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 4 }}>Contenu du package</div>
                   {(pkgPanel.data.items || []).map((item: any, i: number) => (
@@ -9445,7 +9460,7 @@ export default function OnboardingModule() {
                     const validItems = (pkgPanel.data.items || []).filter((i: any) => i.equipment_type_id);
                     if (validItems.length === 0) { addToast_admin("Ajoutez au moins un élément"); return; }
                     try {
-                      const payload = { nom: pkgPanel.data.nom, description: pkgPanel.data.description || null, icon: pkgPanel.data.icon || "package", couleur: pkgPanel.data.couleur || "#C2185B", items: validItems };
+                      const payload = { nom: pkgPanel.data.nom, description: pkgPanel.data.description || null, icon: pkgPanel.data.icon || "package", couleur: pkgPanel.data.couleur || "#C2185B", items: validItems, translations: buildTranslationsPayload() };
                       if (pkgPanel.mode === "edit" && pkgPanel.data.id) await apiUpdatePkg(pkgPanel.data.id, payload);
                       else await apiCreatePkg(payload);
                       reloadEquip(); setPkgPanel({ mode: "closed", data: {} }); addToast_admin(pkgPanel.mode === "create" ? "Package créé" : "Package modifié");
@@ -9468,7 +9483,7 @@ export default function OnboardingModule() {
                 <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.signatures')}</h1>
                 <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Gérez les documents que vos collaborateurs doivent lire, accepter ou signer (règlement intérieur, droit à l'image, NDA...).</p>
               </div>
-              <button onClick={() => setSignPanel({ mode: "create", data: { titre: "", description: "", type: "lecture", obligatoire: true, actif: true } })} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('doc.new_template')}</button>
+              <button onClick={() => { resetTr(); setSignPanel({ mode: "create", data: { titre: "", description: "", type: "lecture", obligatoire: true, actif: true } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('doc.new_template')}</button>
             </div>
 
             {/* How it works */}
@@ -9503,7 +9518,7 @@ export default function OnboardingModule() {
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
                       <button onClick={async () => { try { await sendSignatureDocToAll(doc.id); reloadSign(); addToast_admin("Document envoyé à tous"); } catch { addToast_admin(t('toast.error')); } }} title="Envoyer à tous" className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 10px", fontSize: 10, display: "flex", alignItems: "center", gap: 4 }}><Send size={10} /> Envoyer à tous</button>
-                      <button onClick={() => setSignPanel({ mode: "edit", data: { ...doc } })} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
+                      <button onClick={() => { setContentTranslations((doc as any).translations || {}); setSignPanel({ mode: "edit", data: { ...doc } }); }} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
                       <button onClick={() => showConfirm(`Supprimer "${doc.titre}" ?`, async () => { try { await apiDeleteSignDoc(doc.id); reloadSign(); addToast_admin(t('toast.deleted')); } catch {} })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={12} color={C.red} /></button>
                     </div>
                   </div>
@@ -9522,9 +9537,9 @@ export default function OnboardingModule() {
                 </div>
                 <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Titre *</label>
-                    <input value={signPanel.data.titre || ""} onChange={e => setSignPanel(p => ({ ...p, data: { ...p.data, titre: e.target.value } }))} style={sInput} placeholder="Ex: Règlement intérieur" /></div>
+                    <TranslatableField value={signPanel.data.titre || ""} onChange={v => setSignPanel(p => ({ ...p, data: { ...p.data, titre: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.titre} onTranslationsChange={tr => setTr("titre", tr)} style={sInput} placeholder="Ex: Règlement intérieur" /></div>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Description</label>
-                    <textarea value={signPanel.data.description || ""} onChange={e => setSignPanel(p => ({ ...p, data: { ...p.data, description: e.target.value } }))} style={{ ...sInput, minHeight: 60, resize: "vertical" }} placeholder="Décrivez le contenu du document..." /></div>
+                    <TranslatableField multiline rows={3} value={signPanel.data.description || ""} onChange={v => setSignPanel(p => ({ ...p, data: { ...p.data, description: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ ...sInput, minHeight: 60, resize: "vertical" }} placeholder="Décrivez le contenu du document..." /></div>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Type</label>
                     <div style={{ display: "flex", gap: 8 }}>
                       {[{ id: "lecture", label: "Lecture + Acceptation", icon: BookOpen, desc: "Le collaborateur confirme avoir lu" }, { id: "signature", label: "Signature électronique", icon: PenLine, desc: "Le collaborateur signe le document" }].map(t => (
@@ -9569,7 +9584,7 @@ export default function OnboardingModule() {
                   <button onClick={async () => {
                     if (!signPanel.data.titre?.trim()) { addToast_admin("Le titre est requis"); return; }
                     try {
-                      const payload = { titre: signPanel.data.titre, description: signPanel.data.description || null, type: signPanel.data.type || "lecture", obligatoire: signPanel.data.obligatoire !== false, actif: signPanel.data.actif !== false };
+                      const payload = { titre: signPanel.data.titre, description: signPanel.data.description || null, type: signPanel.data.type || "lecture", obligatoire: signPanel.data.obligatoire !== false, actif: signPanel.data.actif !== false, translations: buildTranslationsPayload() };
                       let created: any;
                       if (signPanel.mode === "edit" && signPanel.data.id) await apiUpdateSignDoc(signPanel.data.id, payload);
                       else created = await apiCreateSignDoc(payload);
@@ -10008,7 +10023,7 @@ export default function OnboardingModule() {
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('panel.path_name')}</label>
-                  <input value={parcoursPanelData.nom} onChange={e => setParcoursPanelData(prev => ({ ...prev, nom: e.target.value }))} placeholder="Ex: Onboarding Développeurs" style={sInput} />
+                  <TranslatableField value={parcoursPanelData.nom} onChange={v => setParcoursPanelData(prev => ({ ...prev, nom: v }))} placeholder="Ex: Onboarding Développeurs" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} />
                 </div>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('panel.category')}</label>
@@ -10062,7 +10077,7 @@ export default function OnboardingModule() {
                   <button disabled={parcoursPanelLoading || !parcoursPanelData.nom.trim()} onClick={async () => {
                     setParcoursPanelLoading(true);
                     const catIdMap: Record<string, number> = { onboarding: 1, offboarding: 2, crossboarding: 3, reboarding: 4 };
-                    const payload = { nom: parcoursPanelData.nom.trim(), categorie_id: catIdMap[parcoursPanelData.categorie], status: parcoursPanelData.status };
+                    const payload: Record<string, any> = { nom: parcoursPanelData.nom.trim(), categorie_id: catIdMap[parcoursPanelData.categorie], status: parcoursPanelData.status, translations: buildTranslationsPayload() };
                     try {
                       if (parcoursPanelMode === "create") {
                         await apiCreateParcours(payload);
@@ -10095,7 +10110,7 @@ export default function OnboardingModule() {
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom de la phase *</label>
-                  <input value={phasePanelData.nom} onChange={e => setPhasePanelData(prev => ({ ...prev, nom: e.target.value }))} placeholder="Ex: Première semaine" style={sInput} />
+                  <TranslatableField value={phasePanelData.nom} onChange={v => setPhasePanelData(prev => ({ ...prev, nom: v }))} placeholder="Ex: Première semaine" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
                   <div>
@@ -10176,7 +10191,7 @@ export default function OnboardingModule() {
                   <button onClick={() => setPhasePanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button disabled={phasePanelLoading || !phasePanelData.nom.trim()} onClick={async () => {
                     setPhasePanelLoading(true);
-                    const payload = { nom: phasePanelData.nom.trim(), delai_debut: phasePanelData.delaiDebut, delai_fin: phasePanelData.delaiFin, couleur: phasePanelData.couleur, parcours_ids: phasePanelData.parcoursIds };
+                    const payload: Record<string, any> = { nom: phasePanelData.nom.trim(), delai_debut: phasePanelData.delaiDebut, delai_fin: phasePanelData.delaiFin, couleur: phasePanelData.couleur, parcours_ids: phasePanelData.parcoursIds, translations: buildTranslationsPayload() };
                     try {
                       if (phasePanelMode === "create") {
                         await apiCreatePhase(payload);
