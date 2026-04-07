@@ -4043,7 +4043,7 @@ export default function OnboardingModule() {
         {/* Stats */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
           {[
-            { label: "{t('doc.templates_count')}", value: totalTemplates, icon: FileText, color: C.blue, bg: C.blueLight },
+            { label: t('doc.templates_count'), value: totalTemplates, icon: FileText, color: C.blue, bg: C.blueLight },
             { label: t('doc.pending_validation'), value: pendingValidation.length, icon: Clock, color: C.amber, bg: C.amberLight },
             { label: t('doc.missing'), value: missing.length, icon: AlertTriangle, color: C.red, bg: C.redLight },
             { label: t('doc.refused'), value: refused.length, icon: XCircle, color: "#7B5EA7", bg: C.purple + "15" },
@@ -4073,7 +4073,7 @@ export default function OnboardingModule() {
           <div className="iz-card" style={{ ...sCard, display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", marginBottom: 16 }}>
             <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: C.bg, borderRadius: 8, padding: "8px 12px" }}>
               <Search size={16} color={C.textLight} />
-              <input value={gedSearch} onChange={e => setGedSearch(e.target.value)} placeholder="{t('doc.search_placeholder')}" style={{ border: "none", outline: "none", background: "transparent", flex: 1, fontSize: 13, fontFamily: font, color: C.text }} />
+              <input value={gedSearch} onChange={e => setGedSearch(e.target.value)} placeholder={t('doc.search_placeholder')} style={{ border: "none", outline: "none", background: "transparent", flex: 1, fontSize: 13, fontFamily: font, color: C.text }} />
             </div>
             <select value={gedCatFilter} onChange={e => setGedCatFilter(e.target.value)} style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: font, color: C.text, cursor: "pointer" }}>
               <option value="all">{t('misc.all_categories')}</option>
@@ -4102,7 +4102,7 @@ export default function OnboardingModule() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{piece.nom}</div>
                         <div style={{ fontSize: 11, color: C.textMuted, display: "flex", alignItems: "center", gap: 8 }}>
-                          <span>{piece.type === "formulaire" ? "{t('misc.form_to_fill')}" : "{t('misc.upload_required')}"}</span>
+                          <span>{piece.type === "formulaire" ? t('misc.form_to_fill') : t('misc.upload_required')}</span>
                           {piece.obligatoire && <span style={{ color: C.red, fontWeight: 600 }}>{t('dash.obligatory')}</span>}
                         </div>
                       </div>

@@ -209,6 +209,7 @@ export const _MOCK_EMAIL_TEMPLATES: EmailTemplate[] = [
   { id: 13, nom: "Offboarding — Checklist IT", sujet: "Checklist IT — Désactivation des accès de {{prenom}}", declencheur: "Action assignée", variables: ["{{prenom}}", "{{email}}", "{{date_depart}}"], actif: true },
   { id: 14, nom: "Cooptation — Récompense", sujet: "Votre cooptation a été validée !", declencheur: "Tous documents validés", variables: ["{{prenom}}", "{{candidat_nom}}", "{{montant}}"], actif: false },
   { id: 15, nom: "NPS — Enquête satisfaction", sujet: "Comment s'est passé votre onboarding ?", declencheur: "Parcours complété à 100%", variables: ["{{prenom}}", "{{parcours_nom}}", "{{lien}}"], actif: true },
+  { id: 16, nom: "Badge obtenu", sujet: "Vous avez obtenu un nouveau badge ! 🏅", declencheur: "Attribution de badge", variables: ["{{prenom}}", "{{badge_nom}}"], actif: true },
 ];
 export const TPL_CATEGORIES: Record<string, { label: string; color: string; bg: string }> = {
   onboarding: { label: "Onboarding", color: "#4CAF50", bg: "#E8F5E9" },
