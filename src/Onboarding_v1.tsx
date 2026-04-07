@@ -5168,15 +5168,15 @@ export default function OnboardingModule() {
   
     // ─── INTÉGRATIONS ──────────────────────────────────────────
     const INTEGRATION_META: Record<string, { desc: string; Icon: React.FC<any>; color: string; oauth?: boolean; apiKey?: boolean; sapConnect?: boolean; teamsConnect?: boolean; fields: { key: string; label: string; type: "text" | "password" | "select"; options?: string[] }[] }> = {
-      docusign: { desc: "Signature électronique certifiée", Icon: FileSignature, color: "#FFD700", oauth: true, fields: [
+      docusign: { desc: t('integ.desc_docusign'), Icon: FileSignature, color: "#FFD700", oauth: true, fields: [
         { key: "integration_key", label: "Integration Key (Client ID)", type: "text" },
         { key: "secret_key", label: "Secret Key", type: "password" },
         { key: "account_id", label: "Account ID (optionnel — récupéré auto)", type: "text" },
         { key: "environment", label: "Environnement", type: "select", options: ["demo", "production_na", "production_eu"] },
       ] },
-      ugosign: { desc: "Signature électronique française — eIDAS & RGPD", Icon: PenTool, color: "#1A73E8", apiKey: true, fields: [] },
-      native: { desc: "Signature intégrée à Illizeo", Icon: ShieldCheck, color: "#4CAF50", fields: [] },
-      entra_id: { desc: "SSO, sync utilisateurs, groupes de sécurité", Icon: ShieldCheck, color: "#0078D4", apiKey: true, fields: [],
+      ugosign: { desc: t('integ.desc_ugosign'), Icon: PenTool, color: "#1A73E8", apiKey: true, fields: [] },
+      native: { desc: t('integ.desc_native'), Icon: ShieldCheck, color: "#4CAF50", fields: [] },
+      entra_id: { desc: t('integ.desc_entra'), Icon: ShieldCheck, color: "#0078D4", apiKey: true, fields: [],
         connectEndpoint: "entra/connect", disconnectEndpoint: "entra/disconnect",
         configFields: [
           { key: "tenant_id", label: "Tenant ID (Directory ID)", type: "text" },
@@ -5191,8 +5191,8 @@ export default function OnboardingModule() {
           { title: "5. Redirect URI", text: "Ajoutez le redirect URI affiché ci-dessous dans l'app Azure" },
         ],
       } as any,
-      teams: { desc: "Notifications, bienvenue, réunions", Icon: Users, color: "#6264A7", teamsConnect: true, fields: [] },
-      slack: { desc: "Notifications & messagerie d'équipe", Icon: MessageSquare, color: "#611F69", apiKey: true, fields: [],
+      teams: { desc: t('integ.desc_teams'), Icon: Users, color: "#6264A7", teamsConnect: true, fields: [] },
+      slack: { desc: t('integ.desc_slack'), Icon: MessageSquare, color: "#611F69", apiKey: true, fields: [],
         connectEndpoint: "ugosign/connect", disconnectEndpoint: "ugosign/disconnect",
         configFields: [
           { key: "webhook_url", label: "Webhook URL", type: "text" },
@@ -5203,7 +5203,7 @@ export default function OnboardingModule() {
           { title: "3. Copier l'URL", text: "Collez l'URL du webhook ci-dessus" },
         ],
       } as any,
-      teamtailor: { desc: "ATS — Recrutement européen", Icon: UserPlus, color: "#4834D4", apiKey: true, fields: [],
+      teamtailor: { desc: t('integ.desc_teamtailor'), Icon: UserPlus, color: "#4834D4", apiKey: true, fields: [],
         connectEndpoint: "teamtailor/connect", disconnectEndpoint: "teamtailor/disconnect",
         configFields: [
           { key: "api_key", label: "Clé API", type: "password" },
@@ -5214,12 +5214,12 @@ export default function OnboardingModule() {
           { title: "3. Fonctionnalité", text: "Import automatique des candidats embauchés (statut 'Hired') pour déclencher l'onboarding" },
         ],
       } as any,
-      smartrecruiters: { desc: "ATS — Import candidats automatique", Icon: ClipboardList, color: "#FF6B35", fields: [
+      smartrecruiters: { desc: t('integ.desc_smartrecruiters'), Icon: ClipboardList, color: "#FF6B35", fields: [
         { key: "api_key", label: "Clé API", type: "password" },
         { key: "company_id", label: "Company ID", type: "text" },
       ]},
-      sap: { desc: "SIRH — Synchronisation employés", Icon: Building2, color: "#0FAAFF", sapConnect: true, fields: [] },
-      personio: { desc: "SIRH — Gestion RH européenne", Icon: Users, color: "#4CAF50", apiKey: true, fields: [],
+      sap: { desc: t('integ.desc_sap'), Icon: Building2, color: "#0FAAFF", sapConnect: true, fields: [] },
+      personio: { desc: t('integ.desc_personio'), Icon: Users, color: "#4CAF50", apiKey: true, fields: [],
         connectEndpoint: "personio/connect", disconnectEndpoint: "personio/disconnect",
         configFields: [
           { key: "client_id", label: "Client ID", type: "text" },
@@ -5231,7 +5231,7 @@ export default function OnboardingModule() {
           { title: "3. Copier Client ID et Client Secret", text: "Copiez les deux valeurs générées et collez-les ci-dessus" },
         ],
       } as any,
-      bamboohr: { desc: "SIRH — Gestion RH pour PME", Icon: Users, color: "#73C41D", apiKey: true, fields: [],
+      bamboohr: { desc: t('integ.desc_bamboohr'), Icon: Users, color: "#73C41D", apiKey: true, fields: [],
         connectEndpoint: "bamboohr/connect", disconnectEndpoint: "bamboohr/disconnect",
         configFields: [
           { key: "company_domain", label: "Sous-domaine entreprise", type: "text" },
@@ -5243,7 +5243,7 @@ export default function OnboardingModule() {
           { title: "3. Sous-domaine", text: "C'est la partie avant .bamboohr.com (ex: si votre URL est acme.bamboohr.com, le sous-domaine est 'acme')" },
         ],
       } as any,
-      workday: { desc: "SIRH — HCM grands comptes", Icon: Building2, color: "#F68D2E", apiKey: true, fields: [],
+      workday: { desc: t('integ.desc_workday'), Icon: Building2, color: "#F68D2E", apiKey: true, fields: [],
         connectEndpoint: "workday/connect", disconnectEndpoint: "workday/disconnect",
         configFields: [
           { key: "host", label: "Hôte Workday (ex: wd5-impl-services1.workday.com)", type: "text" },
@@ -5259,7 +5259,7 @@ export default function OnboardingModule() {
           { title: "4. Permissions", text: "L'ISU (Integration System User) doit avoir les droits : Get Workers, Get Organizations" },
         ],
       } as any,
-      lucca: { desc: "SIRH — Timmi, Figgo, Poplee", Icon: Calendar, color: "#FF6B35", apiKey: true, fields: [],
+      lucca: { desc: t('integ.desc_lucca'), Icon: Calendar, color: "#FF6B35", apiKey: true, fields: [],
         connectEndpoint: "lucca/connect", disconnectEndpoint: "lucca/disconnect",
         configFields: [
           { key: "subdomain", label: "Sous-domaine (ex: mon-entreprise)", type: "text" },
@@ -5274,15 +5274,15 @@ export default function OnboardingModule() {
       } as any,
     };
 
-    const CAT_LABELS: Record<string, string> = { identity: "Identity & SSO", signature: "Signature électronique", communication: "Communication", ats: "ATS (Recrutement)", sirh: "SIRH" };
+    const CAT_LABELS: Record<string, string> = { identity: t('integ.cat_identity'), signature: t('integ.cat_signature'), communication: t('integ.cat_communication'), ats: t('integ.cat_ats'), sirh: t('integ.cat_sirh') };
 
     // ─── COOPTATION (PARRAINAGE) ───────────────────────────────
     const COOPT_STATUS_META: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-      en_attente: { label: "En attente", color: C.amber, bg: C.amberLight, icon: Hourglass },
-      embauche: { label: "Embauché", color: C.blue, bg: C.blueLight, icon: UserCheck },
-      valide: { label: "Validé", color: C.green, bg: C.greenLight, icon: CheckCircle2 },
-      recompense_versee: { label: "Récompense versée", color: "#7B5EA7", bg: C.purple + "15", icon: Gift },
-      refuse: { label: "Refusé", color: C.red, bg: C.redLight, icon: Ban },
+      en_attente: { label: t('coopt.pending'), color: C.amber, bg: C.amberLight, icon: Hourglass },
+      embauche: { label: t('coopt.hired'), color: C.blue, bg: C.blueLight, icon: UserCheck },
+      valide: { label: t('coopt.validated'), color: C.green, bg: C.greenLight, icon: CheckCircle2 },
+      recompense_versee: { label: t('coopt.rewarded'), color: "#7B5EA7", bg: C.purple + "15", icon: Gift },
+      refuse: { label: t('coopt.refused'), color: C.red, bg: C.redLight, icon: Ban },
     };
 
     const CAMP_PRIORITE_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -5689,23 +5689,23 @@ export default function OnboardingModule() {
         {cooptSettingsOpen && (
           <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 440, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Paramètres cooptation</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{t('coopt.settings_title')}</h2>
               <button onClick={() => setCooptSettingsOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} /></button>
             </div>
             <div style={{ flex: 1, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ padding: 16, background: C.pinkBg, borderRadius: 10, fontSize: 12, color: C.pink }}>
                 <Handshake size={16} style={{ marginRight: 6, verticalAlign: -3 }} />
-                Ces paramètres servent de valeurs par défaut lors de la création d'une nouvelle cooptation.
+                {t('coopt.settings_hint')}
               </div>
-              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Mois requis par défaut</label><input type="number" value={cooptSettings?.mois_requis_defaut || 6} onChange={e => setCooptSettings(s => s ? { ...s, mois_requis_defaut: Number(e.target.value) } : s)} style={sInput} /></div>
-              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Type de récompense par défaut</label>
+              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.default_months')}</label><input type="number" value={cooptSettings?.mois_requis_defaut || 6} onChange={e => setCooptSettings(s => s ? { ...s, mois_requis_defaut: Number(e.target.value) } : s)} style={sInput} /></div>
+              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.default_reward_type')}</label>
                 <select value={cooptSettings?.type_recompense_defaut || "prime"} onChange={e => setCooptSettings(s => s ? { ...s, type_recompense_defaut: e.target.value as any } : s)} style={sInput}>
                   <option value="prime">Prime (CHF)</option>
                   <option value="cadeau">Cadeau</option>
                 </select>
               </div>
-              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Montant par défaut (CHF)</label><input type="number" value={cooptSettings?.montant_defaut || 500} onChange={e => setCooptSettings(s => s ? { ...s, montant_defaut: Number(e.target.value) } : s)} style={sInput} /></div>
-              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Description cadeau par défaut</label><input value={cooptSettings?.description_recompense_defaut || ""} onChange={e => setCooptSettings(s => s ? { ...s, description_recompense_defaut: e.target.value } : s)} style={sInput} placeholder="Ex: Carte cadeau Manor 200 CHF" /></div>
+              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.default_amount')}</label><input type="number" value={cooptSettings?.montant_defaut || 500} onChange={e => setCooptSettings(s => s ? { ...s, montant_defaut: Number(e.target.value) } : s)} style={sInput} /></div>
+              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.default_gift_desc')}</label><input value={cooptSettings?.description_recompense_defaut || ""} onChange={e => setCooptSettings(s => s ? { ...s, description_recompense_defaut: e.target.value } : s)} style={sInput} placeholder="Ex: Carte cadeau Manor 200 CHF" /></div>
             </div>
             <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button onClick={() => setCooptSettingsOpen(false)} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
@@ -5734,11 +5734,11 @@ export default function OnboardingModule() {
 
         {/* How it works */}
         <div style={{ padding: "16px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20, fontSize: 12, color: C.blue, lineHeight: 1.7 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} /> Comment ça marche ?</div>
+          <div style={{ fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} /> {t('integ.how_title')}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-            <div><strong>1. Connectez vos outils</strong> — Activez les intégrations avec vos solutions existantes : signature électronique, SIRH, communication et SSO.</div>
-            <div><strong>2. Configuration</strong> — Renseignez vos clés API ou identifiants pour chaque service. Le provider par défaut est utilisé automatiquement dans les workflows.</div>
-            <div><strong>3. Automatisation</strong> — Les intégrations actives permettent d'envoyer des signatures, synchroniser les données RH et notifier via Teams ou Slack.</div>
+            <div><strong>{t('integ.step1')}</strong> — {t('integ.step1_desc')}</div>
+            <div><strong>{t('integ.step2')}</strong> — {t('integ.step2_desc')}</div>
+            <div><strong>{t('integ.step3')}</strong> — {t('integ.step3_desc')}</div>
           </div>
         </div>
 
@@ -5752,8 +5752,8 @@ export default function OnboardingModule() {
             {cat === "signature" && (
               <div className="iz-card" style={{ ...sCard, marginBottom: 12, display: "flex", alignItems: "center", gap: 16, background: C.blueLight, border: `1px solid ${C.blue}30` }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.blue }}>Provider de signature par défaut</div>
-                  <div style={{ fontSize: 11, color: C.blue, opacity: 0.7 }}>Utilisé automatiquement lors de la création d'une action de type Signature</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.blue }}>{t('integ.default_provider')}</div>
+                  <div style={{ fontSize: 11, color: C.blue, opacity: 0.7 }}>{t('integ.default_provider_desc')}</div>
                 </div>
                 <select value={defaultSignProvider} onChange={async (e) => {
                   const newDefault = e.target.value;
@@ -5787,9 +5787,9 @@ export default function OnboardingModule() {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 4, background: int.connecte ? C.greenLight : int.actif ? C.amberLight : C.bg, color: int.connecte ? C.green : int.actif ? C.amber : C.textMuted }}>
-                        {int.connecte ? "Connecté" : int.actif ? "Configuré" : "Non configuré"}
+                        {int.connecte ? t('common.connected') : int.actif ? t('common.configure') : t('common.not_configured')}
                       </span>
-                      <span style={{ fontSize: 11, color: C.pink, fontWeight: 500 }}>Configurer →</span>
+                      <span style={{ fontSize: 11, color: C.pink, fontWeight: 500 }}>{t('common.configure')} →</span>
                     </div>
                   </div>
                 );
@@ -5819,7 +5819,7 @@ export default function OnboardingModule() {
                     <div>
                       <div style={{ padding: "20px", background: C.greenLight, borderRadius: 12, textAlign: "center", marginBottom: 20 }}>
                         <CheckCircle size={28} color={C.green} style={{ marginBottom: 8 }} />
-                        <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 4 }}>Connecté</div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 4 }}>{t('common.connected')}</div>
                         <div style={{ fontSize: 12, color: C.text }}>{integrationConfig.user_name || "Utilisateur"} ({integrationConfig.user_email || ""})</div>
                       </div>
                       <div style={{ padding: "16px", background: C.bg, borderRadius: 10, marginBottom: 16 }}>
@@ -5840,7 +5840,7 @@ export default function OnboardingModule() {
                           } catch { addToast_admin(t('toast.error')); }
                           setConfirmDialog(null);
                         }});
-                      }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13, width: "100%" }}>Déconnecter</button>
+                      }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13, width: "100%" }}>{t('common.disconnect')}</button>
                     </div>
                   ) : (
                     <div>
@@ -5848,9 +5848,9 @@ export default function OnboardingModule() {
                         <div style={{ width: 64, height: 64, borderRadius: 16, background: `${selectedMeta.color}15`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                           <selectedMeta.Icon size={32} color={selectedMeta.color} />
                         </div>
-                        <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 8px" }}>Connecter {selectedIntegration.nom}</h3>
+                        <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 8px" }}>{t('integ.connect')} {selectedIntegration.nom}</h3>
                         <p style={{ fontSize: 13, color: C.textLight, margin: "0 0 20px", lineHeight: 1.5 }}>
-                          Connectez votre compte DocuSign pour activer la signature électronique dans vos parcours.
+                          {t('integ.connect_desc')}
                         </p>
                       </div>
 
@@ -5871,24 +5871,24 @@ export default function OnboardingModule() {
                           setIntegrationSaving(false);
                         }
                       }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 15, padding: "14px 0", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                        <Link size={18} /> {integrationSaving ? "Redirection..." : "Connecter à DocuSign"}
+                        <Link size={18} /> {integrationSaving ? t('integ.redirecting') : `${t('integ.connect_to')} DocuSign`}
                       </button>
 
                       <div style={{ textAlign: "center", fontSize: 12, color: C.textLight, margin: "16px 0 4px" }}>
-                        Vous serez redirigé vers DocuSign pour autoriser la connexion
+                        {t('integ.redirect_hint')}
                       </div>
 
                       {integrationConfig._oauthError && (
                         <div style={{ marginTop: 12, padding: "10px 14px", background: C.redLight, borderRadius: 8, fontSize: 12, color: C.red, display: "flex", alignItems: "center", gap: 8 }}>
-                          <AlertTriangle size={14} /> Erreur de connexion. Réessayez ou utilisez la configuration manuelle ci-dessous.
+                          <AlertTriangle size={14} /> {t('integ.oauth_error')}
                         </div>
                       )}
 
                       {/* Mode 2: Self-service — client enters own keys */}
                       {integrationConfig._needKeys && (
                         <div style={{ marginTop: 20, padding: "20px", background: C.bg, borderRadius: 12 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>Configuration manuelle</div>
-                          <div style={{ fontSize: 11, color: C.textLight, marginBottom: 16 }}>Si vous avez votre propre app DocuSign, saisissez vos clés ci-dessous.</div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>{t('integ.manual_config')}</div>
+                          <div style={{ fontSize: 11, color: C.textLight, marginBottom: 16 }}>{t('integ.manual_desc')}</div>
                           {selectedMeta.fields.map(field => (
                             <div key={field.key} style={{ marginBottom: 12 }}>
                               <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>{field.label}</label>
@@ -5917,7 +5917,7 @@ export default function OnboardingModule() {
                               setIntegrationSaving(false);
                             }
                           }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, padding: "10px 0", width: "100%", opacity: !integrationConfig.integration_key || !integrationConfig.secret_key ? 0.5 : 1 }}>
-                            {integrationSaving ? "Redirection..." : "Enregistrer et connecter"}
+                            {integrationSaving ? t('integ.redirecting') : t('integ.save_connect')}
                           </button>
                           <div style={{ marginTop: 12, fontSize: 10, color: C.textMuted }}>
                             Redirect URI à configurer dans votre app DocuSign :<br/>
@@ -5927,11 +5927,11 @@ export default function OnboardingModule() {
                       )}
 
                       <div style={{ marginTop: 20, padding: "12px 16px", background: C.bg, borderRadius: 8, fontSize: 11, color: C.textLight }}>
-                        <div style={{ fontWeight: 600, marginBottom: 4, color: C.text }}>Comment ça marche ?</div>
-                        <div>1. Cliquez sur "Connecter à DocuSign"</div>
-                        <div>2. Authentifiez-vous avec votre compte DocuSign</div>
-                        <div>3. Autorisez Illizeo à accéder à votre compte</div>
-                        <div>4. Vous êtes automatiquement redirigé ici</div>
+                        <div style={{ fontWeight: 600, marginBottom: 4, color: C.text }}>{t('integ.how_works')}</div>
+                        <div>1. {lang === 'fr' ? 'Cliquez sur "Connecter à DocuSign"' : `Click "${t('integ.connect_to')} DocuSign"`}</div>
+                        <div>2. {lang === 'fr' ? 'Authentifiez-vous avec votre compte DocuSign' : 'Authenticate with your DocuSign account'}</div>
+                        <div>3. {lang === 'fr' ? 'Autorisez Illizeo à accéder à votre compte' : 'Authorize Illizeo to access your account'}</div>
+                        <div>4. {lang === 'fr' ? 'Vous êtes automatiquement redirigé ici' : 'You are automatically redirected here'}</div>
                       </div>
                     </div>
                   )
@@ -5940,16 +5940,16 @@ export default function OnboardingModule() {
                   const connectEp = (selectedMeta as any).connectEndpoint || "ugosign/connect";
                   const disconnectEp = (selectedMeta as any).disconnectEndpoint || "ugosign/disconnect";
                   const guide = (selectedMeta as any).guide || [
-                    { title: "1. Connectez-vous", text: `Accédez à ${selectedIntegration.nom}` },
-                    { title: "2. Paramètres API", text: "Trouvez la section API / Intégrations" },
-                    { title: "3. Copiez vos identifiants", text: "Collez-les dans les champs ci-dessus" },
+                    { title: `1. ${t('integ.step_login')}`, text: `${lang === 'fr' ? 'Accédez à' : 'Access'} ${selectedIntegration.nom}` },
+                    { title: `2. ${t('integ.step_api')}`, text: t('integ.step_api_desc') },
+                    { title: `3. ${t('integ.step_copy')}`, text: t('integ.step_copy_desc') },
                   ];
                   const allFieldsFilled = cFields.every((f: any) => (integrationConfig[f.key] || "").trim());
                   if (selectedIntegration.connecte) return (
                     <div>
                       <div style={{ padding: "20px", background: C.greenLight, borderRadius: 12, textAlign: "center", marginBottom: 20 }}>
                         <CheckCircle size={28} color={C.green} style={{ marginBottom: 8 }} />
-                        <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 4 }}>Connecté</div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 4 }}>{t('common.connected')}</div>
                         <div style={{ fontSize: 12, color: C.text }}>{integrationConfig.organization_name || integrationConfig.subdomain || selectedIntegration.nom}</div>
                       </div>
                       <div style={{ padding: "16px", background: C.bg, borderRadius: 10, marginBottom: 16 }}>
@@ -5958,7 +5958,7 @@ export default function OnboardingModule() {
                           {integrationConfig.total_employees != null && <div><span style={{ color: C.textMuted }}>Employés</span><div style={{ fontWeight: 500 }}>{integrationConfig.total_employees}</div></div>}
                           {integrationConfig.members_count != null && <div><span style={{ color: C.textMuted }}>Membres</span><div style={{ fontWeight: 500 }}>{integrationConfig.members_count}</div></div>}
                           {integrationConfig.subdomain && <div><span style={{ color: C.textMuted }}>Instance</span><div style={{ fontWeight: 500 }}>{integrationConfig.subdomain}.ilucca.net</div></div>}
-                          <div><span style={{ color: C.textMuted }}>Connecté le</span><div style={{ fontWeight: 500 }}>{fmtDate(integrationConfig.connected_at)}</div></div>
+                          <div><span style={{ color: C.textMuted }}>{t('common.connected_on')}</span><div style={{ fontWeight: 500 }}>{fmtDate(integrationConfig.connected_at)}</div></div>
                         </div>
                       </div>
                       <button onClick={async () => {
@@ -5970,7 +5970,7 @@ export default function OnboardingModule() {
                           } catch { addToast_admin(t('toast.error')); }
                           setConfirmDialog(null);
                         }});
-                      }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13, width: "100%" }}>Déconnecter</button>
+                      }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13, width: "100%" }}>{t('common.disconnect')}</button>
                     </div>
                   );
                   return (
@@ -5979,8 +5979,8 @@ export default function OnboardingModule() {
                         <div style={{ width: 64, height: 64, borderRadius: 16, background: `${selectedMeta.color}15`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                           <selectedMeta.Icon size={32} color={selectedMeta.color} />
                         </div>
-                        <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px" }}>Connecter {selectedIntegration.nom}</h3>
-                        <p style={{ fontSize: 12, color: C.textLight, margin: 0 }}>Saisissez vos identifiants pour activer la connexion</p>
+                        <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px" }}>{t('integ.connect')} {selectedIntegration.nom}</h3>
+                        <p style={{ fontSize: 12, color: C.textLight, margin: 0 }}>{t('integ.connect_api_desc')}</p>
                       </div>
                       {cFields.map((f: any) => (
                         <div key={f.key} style={{ marginBottom: 16 }}>
@@ -5989,7 +5989,7 @@ export default function OnboardingModule() {
                         </div>
                       ))}
                       <div style={{ padding: "14px 16px", background: C.bg, borderRadius: 10, marginBottom: 20, fontSize: 11, color: C.textLight }}>
-                        <div style={{ fontWeight: 600, marginBottom: 6, color: C.text }}>Procédure dans {selectedIntegration.nom}</div>
+                        <div style={{ fontWeight: 600, marginBottom: 6, color: C.text }}>{t('integ.procedure')} {selectedIntegration.nom}</div>
                         {guide.map((step: any, i: number) => (
                           <div key={i} style={{ marginBottom: 8 }}>
                             <div style={{ fontWeight: 600, color: C.text, marginBottom: 2 }}>{step.title}</div>
@@ -6014,7 +6014,7 @@ export default function OnboardingModule() {
                         }
                         finally { setIntegrationSaving(false); }
                       }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 14, padding: "12px 0", width: "100%", opacity: integrationSaving || !allFieldsFilled ? 0.6 : 1 }}>
-                        {integrationSaving ? "Vérification..." : "Tester et connecter"}
+                        {integrationSaving ? t('common.checking') : t('common.test_connect')}
                       </button>
                     </div>
                   );
@@ -6023,7 +6023,7 @@ export default function OnboardingModule() {
                     <div>
                       <div style={{ padding: "20px", background: C.greenLight, borderRadius: 12, textAlign: "center", marginBottom: 20 }}>
                         <CheckCircle size={28} color={C.green} style={{ marginBottom: 8 }} />
-                        <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 4 }}>Connecté</div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 4 }}>{t('common.connected')}</div>
                         <div style={{ fontSize: 12, color: C.text }}>{integrationConfig.company_name || integrationConfig.company_id || "SAP SuccessFactors"}</div>
                       </div>
                       <div style={{ padding: "16px", background: C.bg, borderRadius: 10, marginBottom: 16 }}>
@@ -6032,7 +6032,7 @@ export default function OnboardingModule() {
                           <div><span style={{ color: C.textMuted }}>Company ID</span><div style={{ fontWeight: 500, marginTop: 2 }}>{integrationConfig.company_id || "—"}</div></div>
                           <div><span style={{ color: C.textMuted }}>Pays</span><div style={{ fontWeight: 500, marginTop: 2 }}>{integrationConfig.company_country || "—"}</div></div>
                           <div><span style={{ color: C.textMuted }}>Utilisateur</span><div style={{ fontWeight: 500, marginTop: 2 }}>{integrationConfig.username || "—"}</div></div>
-                          <div><span style={{ color: C.textMuted }}>Connecté le</span><div style={{ fontWeight: 500, marginTop: 2 }}>{fmtDate(integrationConfig.connected_at)}</div></div>
+                          <div><span style={{ color: C.textMuted }}>{t('common.connected_on')}</span><div style={{ fontWeight: 500, marginTop: 2 }}>{fmtDate(integrationConfig.connected_at)}</div></div>
                         </div>
                       </div>
                       <div style={{ padding: "12px 16px", background: C.bg, borderRadius: 8, marginBottom: 16, fontSize: 11, color: C.textLight }}>
@@ -6047,7 +6047,7 @@ export default function OnboardingModule() {
                           } catch { addToast_admin(t('toast.error')); }
                           setConfirmDialog(null);
                         }});
-                      }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13, width: "100%" }}>Déconnecter</button>
+                      }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13, width: "100%" }}>{t('common.disconnect')}</button>
                     </div>
                   ) : (
                     <div>
@@ -6100,12 +6100,12 @@ export default function OnboardingModule() {
                         }
                         finally { setIntegrationSaving(false); }
                       }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 14, padding: "12px 0", width: "100%", opacity: integrationSaving || !integrationConfig.base_url || !integrationConfig.company_id || !integrationConfig.username || !integrationConfig.password ? 0.5 : 1 }}>
-                        {integrationSaving ? "Vérification..." : "Tester et connecter"}
+                        {integrationSaving ? t('common.checking') : t('common.test_connect')}
                       </button>
 
                       {/* Setup guide */}
                       <div style={{ marginTop: 20, padding: "16px", background: C.bg, borderRadius: 10, fontSize: 11, color: C.textLight }}>
-                        <div style={{ fontWeight: 700, fontSize: 12, color: C.text, marginBottom: 4 }}>Procédure dans SuccessFactors</div>
+                        <div style={{ fontWeight: 700, fontSize: 12, color: C.text, marginBottom: 4 }}>{t('integ.procedure')} SuccessFactors</div>
                         <div style={{ padding: "6px 10px", background: C.amberLight, borderRadius: 6, marginBottom: 12, fontSize: 10, color: C.amber }}>
                           Illizeo utilise l'API <b>OData v2</b> (SFAPI est dépréciée depuis août 2018).
                         </div>
@@ -6155,7 +6155,7 @@ export default function OnboardingModule() {
                     <div>
                       <div style={{ padding: "20px", background: C.greenLight, borderRadius: 12, textAlign: "center", marginBottom: 20 }}>
                         <CheckCircle size={28} color={C.green} style={{ marginBottom: 8 }} />
-                        <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 4 }}>Connecté</div>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 4 }}>{t('common.connected')}</div>
                         <div style={{ fontSize: 12, color: C.text }}>Webhook actif{integrationConfig.graph_connected ? " + Graph API" : ""}</div>
                       </div>
                       <div style={{ padding: "16px", background: C.bg, borderRadius: 10, marginBottom: 16 }}>
@@ -6194,7 +6194,7 @@ export default function OnboardingModule() {
                           } catch { addToast_admin(t('toast.error')); }
                           setConfirmDialog(null);
                         }});
-                      }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13, width: "100%" }}>Déconnecter</button>
+                      }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13, width: "100%" }}>{t('common.disconnect')}</button>
                     </div>
                   ) : (
                     <div>
@@ -6276,7 +6276,7 @@ export default function OnboardingModule() {
                         }
                         finally { setIntegrationSaving(false); }
                       }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 14, padding: "12px 0", width: "100%", opacity: !(integrationConfig.webhook_url || "").trim() ? 0.5 : 1 }}>
-                        {integrationSaving ? "Connexion..." : "Tester et connecter"}
+                        {integrationSaving ? t('common.connecting') : t('common.test_connect')}
                       </button>
 
                       <div style={{ marginTop: 20, padding: "14px 16px", background: C.bg, borderRadius: 10, fontSize: 11, color: C.textLight }}>
@@ -6308,7 +6308,7 @@ export default function OnboardingModule() {
                 ) : selectedMeta.fields.length === 0 ? (
                   <div style={{ padding: "20px", background: C.greenLight, borderRadius: 10, textAlign: "center" }}>
                     <CheckCircle size={24} color={C.green} style={{ marginBottom: 8 }} />
-                    <div style={{ fontSize: 14, fontWeight: 500, color: C.green }}>Intégration native — aucune configuration requise</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: C.green }}>{t('integ.native_ok')}</div>
                   </div>
                 ) : (
                   <>
@@ -6347,7 +6347,7 @@ export default function OnboardingModule() {
                 )}
               </div>
               <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button onClick={() => setIntegrationPanelId(null)} style={{ ...sBtn("outline"), fontSize: 13 }}>Fermer</button>
+                <button onClick={() => setIntegrationPanelId(null)} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.close')}</button>
                 {!selectedMeta.oauth && selectedMeta.fields.length > 0 && (
                   <button disabled={integrationSaving} onClick={async () => {
                     setIntegrationSaving(true);
@@ -7316,14 +7316,14 @@ export default function OnboardingModule() {
           };
           const getBadgeIcon = (iconName: string) => BADGE_ICON_MAP[iconName] || Trophy;
           const BADGE_CRITERE_META: Record<string, { label: string; description: string }> = {
-            "manual": { label: "Manuel", description: "Attribué manuellement par un administrateur ou via un workflow" },
-            "parcours_complete": { label: "Parcours terminé", description: "Attribué automatiquement quand le collaborateur termine son parcours d'intégration" },
-            "docs_complete": { label: "Documents complets", description: "Attribué quand tous les documents administratifs sont validés" },
-            "premier_message": { label: "Premier message", description: "Attribué quand le collaborateur envoie son premier message" },
-            "first_week": { label: "Première semaine", description: "Attribué après 7 jours dans l'entreprise" },
-            "first_month": { label: "Premier mois", description: "Attribué après 30 jours dans l'entreprise" },
-            "cooptation": { label: "Cooptation validée", description: "Attribué quand une cooptation du parrain est validée" },
-            "nps_complete": { label: "NPS complété", description: "Attribué quand le collaborateur répond à une enquête de satisfaction" },
+            "manual": { label: t('badge.crit_manual'), description: t('badge.crit_manual_desc') },
+            "parcours_complete": { label: t('badge.crit_parcours'), description: t('badge.crit_parcours_desc') },
+            "docs_complete": { label: t('badge.crit_docs'), description: t('badge.crit_docs_desc') },
+            "premier_message": { label: t('badge.crit_message'), description: t('badge.crit_message_desc') },
+            "first_week": { label: t('badge.crit_week'), description: t('badge.crit_week_desc') },
+            "first_month": { label: t('badge.crit_month'), description: t('badge.crit_month_desc') },
+            "cooptation": { label: t('badge.crit_coopt'), description: t('badge.crit_coopt_desc') },
+            "nps_complete": { label: t('badge.crit_nps'), description: t('badge.crit_nps_desc') },
           };
           const BADGE_COLORS = ["#F9A825", "#C2185B", "#4CAF50", "#1A73E8", "#7B5EA7", "#E91E8C", "#00897B", "#FF6B35", "#E53935", "#FF9800"];
           const BADGE_ICONS = Object.keys(BADGE_ICON_MAP);
@@ -7332,18 +7332,18 @@ export default function OnboardingModule() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <div>
                 <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.gamification')}</h1>
-                <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Motivez vos collaborateurs avec un système de récompenses visuelles. Les badges s'affichent dans le tableau de bord de chaque collaborateur.</p>
+                <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>{t('badge.desc')}</p>
               </div>
               <button onClick={() => { resetTr(); setBadgeTplPanel({ mode: "create", data: { nom: "", description: "", icon: "trophy", color: "#F9A825", critere: "manual", actif: true } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('badge.new')}</button>
             </div>
 
             {/* How it works */}
             <div style={{ padding: "16px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20, fontSize: 12, color: C.blue, lineHeight: 1.7 }}>
-              <div style={{ fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} /> Comment ça marche ?</div>
+              <div style={{ fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} /> {t('badge.how_title')}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-                <div><strong>1. Créez des modèles</strong> — Définissez les badges avec un nom, une icône, une couleur et un critère d'attribution (manuel ou automatique).</div>
-                <div><strong>2. Attribution</strong> — Les badges sont attribués manuellement ci-dessous, ou automatiquement via les <strong>Workflows</strong> (action "Attribuer un badge") et les critères automatiques.</div>
-                <div><strong>3. Visibilité</strong> — Les collaborateurs voient leurs badges dans leur tableau de bord. Cela renforce l'engagement et valorise les étapes franchises.</div>
+                <div><strong>{t('badge.step1')}</strong> — {t('badge.step1_desc')}</div>
+                <div dangerouslySetInnerHTML={{ __html: `<strong>${t('badge.step2')}</strong> — ${t('badge.step2_desc')}` }} />
+                <div><strong>{t('badge.step3')}</strong> — {t('badge.step3_desc')}</div>
               </div>
             </div>
 
@@ -7352,27 +7352,27 @@ export default function OnboardingModule() {
               <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "16px" }}>
                 <Trophy size={24} color={C.amber} style={{ marginBottom: 6 }} />
                 <div style={{ fontSize: 24, fontWeight: 700, color: C.amber }}>{badges.length}</div>
-                <div style={{ fontSize: 11, color: C.textMuted }}>Badges attribués</div>
+                <div style={{ fontSize: 11, color: C.textMuted }}>{t('badge.awarded')}</div>
               </div>
               <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "16px" }}>
                 <Users size={24} color={C.blue} style={{ marginBottom: 6 }} />
                 <div style={{ fontSize: 24, fontWeight: 700, color: C.blue }}>{new Set(badges.map(b => b.user_id)).size}</div>
-                <div style={{ fontSize: 11, color: C.textMuted }}>Collaborateurs récompensés</div>
+                <div style={{ fontSize: 11, color: C.textMuted }}>{t('badge.rewarded_users')}</div>
               </div>
               <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "16px" }}>
                 <Award size={24} color={C.green} style={{ marginBottom: 6 }} />
                 <div style={{ fontSize: 24, fontWeight: 700, color: C.green }}>{badgeTemplates.filter(bt => bt.actif).length}</div>
-                <div style={{ fontSize: 11, color: C.textMuted }}>Modèles actifs</div>
+                <div style={{ fontSize: 11, color: C.textMuted }}>{t('badge.active_templates')}</div>
               </div>
               <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "16px" }}>
                 <Zap size={24} color="#7B5EA7" style={{ marginBottom: 6 }} />
                 <div style={{ fontSize: 24, fontWeight: 700, color: "#7B5EA7" }}>{badgeTemplates.filter(bt => bt.critere !== "manual").length}</div>
-                <div style={{ fontSize: 11, color: C.textMuted }}>Attributions auto</div>
+                <div style={{ fontSize: 11, color: C.textMuted }}>{t('badge.auto_awards')}</div>
               </div>
             </div>
 
             {/* Badge templates */}
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Modèles de badges</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>{t('badge.templates')}</h2>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
               {badgeTemplates.map(bt => {
                 const IconComp = getBadgeIcon(bt.icon);
@@ -7384,37 +7384,37 @@ export default function OnboardingModule() {
                     <IconComp size={24} color={bt.color} />
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{bt.nom}</div>
-                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6, minHeight: 30, lineHeight: 1.4 }}>{bt.description || "Pas de description"}</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6, minHeight: 30, lineHeight: 1.4 }}>{bt.description || t('badge.no_desc')}</div>
                   <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: bt.critere === "manual" ? C.bg : C.blueLight, color: bt.critere === "manual" ? C.textMuted : C.blue }}>{critMeta.label}</span>
                   {bt.earned_count !== undefined && bt.earned_count > 0 && (
-                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6 }}>{bt.earned_count} attribué{bt.earned_count > 1 ? "s" : ""}</div>
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6 }}>{bt.earned_count} {t('badge.x_awarded')}{bt.earned_count > 1 ? "s" : ""}</div>
                   )}
-                  {!bt.actif && <div style={{ fontSize: 9, color: C.red, marginTop: 4, fontWeight: 600 }}>DÉSACTIVÉ</div>}
+                  {!bt.actif && <div style={{ fontSize: 9, color: C.red, marginTop: 4, fontWeight: 600 }}>{t('badge.disabled')}</div>}
                 </div>
                 );
               })}
-              {badgeTemplates.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun modèle de badge. Créez-en un pour commencer !</div>}
+              {badgeTemplates.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('badge.no_templates')}</div>}
             </div>
 
             {/* Award badge manually */}
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Attribuer un badge manuellement</h2>
-            <p style={{ fontSize: 12, color: C.textLight, marginBottom: 12 }}>Sélectionnez un collaborateur et un badge pour l'attribuer immédiatement. Le collaborateur recevra une notification.</p>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{t('badge.award_manually')}</h2>
+            <p style={{ fontSize: 12, color: C.textLight, marginBottom: 12 }}>{t('badge.award_desc')}</p>
             <div className="iz-card" style={{ ...sCard, padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-              <select id="award-user" style={{ ...sInput, flex: 1 }}><option value="">Choisir un collaborateur...</option>{adminUsers.map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}</select>
-              <select id="award-badge" style={{ ...sInput, flex: 1 }}><option value="">Choisir un badge...</option>{badgeTemplates.filter(bt => bt.actif).map(bt => <option key={bt.id} value={bt.id}>{bt.nom}</option>)}</select>
+              <select id="award-user" style={{ ...sInput, flex: 1 }}><option value="">{t('badge.choose_user')}</option>{adminUsers.map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}</select>
+              <select id="award-badge" style={{ ...sInput, flex: 1 }}><option value="">{t('badge.choose_badge')}</option>{badgeTemplates.filter(bt => bt.actif).map(bt => <option key={bt.id} value={bt.id}>{bt.nom}</option>)}</select>
               <button onClick={async () => {
                 const uid = (document.getElementById("award-user") as HTMLSelectElement)?.value;
                 const bid = (document.getElementById("award-badge") as HTMLSelectElement)?.value;
                 if (!uid || !bid) { addToast_admin("Sélectionnez un collaborateur et un badge"); return; }
                 try { await awardBadge(Number(uid), { badge_template_id: Number(bid) }); reloadGamif(); addToast_admin("Badge attribué !"); } catch { addToast_admin(t('toast.error')); }
-              }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}><Award size={14} /> Attribuer</button>
+              }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}><Award size={14} /> {t('badge.award')}</button>
             </div>
 
             {/* Recent badges */}
-            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Badges récents</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>{t('badge.recent')}</h2>
             <div className="iz-card" style={{ ...sCard, overflow: "hidden", padding: 0 }}>
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 1fr 0.5fr", gap: 0, padding: "10px 16px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
-                <span>Collaborateur</span><span>Badge</span><span>Source</span><span>Date</span><span></span>
+                <span>{t('nps.collaborator')}</span><span>Badge</span><span>{t('badge.source')}</span><span>{t('nps.date')}</span><span></span>
               </div>
               {badges.slice(0, 20).map(b => {
                 const collab = COLLABORATEURS.find(c => c.id === b.collaborateur_id);
@@ -7439,7 +7439,7 @@ export default function OnboardingModule() {
                   </div>
                 );
               })}
-              {badges.length === 0 && <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun badge attribué pour le moment. Utilisez le formulaire ci-dessus ou configurez un workflow automatique.</div>}
+              {badges.length === 0 && <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('badge.no_badges')}</div>}
             </div>
 
             {/* Badge Template Create/Edit Panel */}
@@ -7447,7 +7447,7 @@ export default function OnboardingModule() {
               <div onClick={() => setBadgeTplPanel({ mode: "closed", data: {} })} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
               <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 480, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
                 <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{badgeTplPanel.mode === "create" ? "Nouveau modèle de badge" : "Modifier le badge"}</h2>
+                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{badgeTplPanel.mode === "create" ? t('badge.new_template') : t('badge.edit')}</h2>
                   <button onClick={() => setBadgeTplPanel({ mode: "closed", data: {} })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} /></button>
                 </div>
                 <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -7456,11 +7456,11 @@ export default function OnboardingModule() {
                     <div style={{ width: 72, height: 72, borderRadius: "50%", background: (badgeTplPanel.data.color || "#F9A825") + "20", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", border: `3px solid ${(badgeTplPanel.data.color || "#F9A825")}40` }}>
                       {(() => { const IC = getBadgeIcon(badgeTplPanel.data.icon || "trophy"); return <IC size={32} color={badgeTplPanel.data.color || "#F9A825"} />; })()}
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>{badgeTplPanel.data.nom || "Nom du badge"}</div>
-                    <div style={{ fontSize: 12, color: C.textMuted }}>{badgeTplPanel.data.description || "Description du badge"}</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>{badgeTplPanel.data.nom || t('badge.name')}</div>
+                    <div style={{ fontSize: 12, color: C.textMuted }}>{badgeTplPanel.data.description || t('badge.no_desc')}</div>
                   </div>
 
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Nom du badge *</label>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('badge.name')} *</label>
                     <TranslatableField value={badgeTplPanel.data.nom || ""} onChange={v => setBadgeTplPanel(p => ({ ...p, data: { ...p.data, nom: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder="Ex: Super Coopteur" />
                   </div>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Description</label>
