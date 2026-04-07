@@ -2166,13 +2166,17 @@ export default function OnboardingModule() {
   // ─── ENTREPRISE ──────────────────────────────────────────
   const renderCompanyBlock = (block: any) => {
     const iconMap: Record<string, React.FC<any>> = { building: Building2, sparkles: Sparkles, heart: Gift, rocket: Zap, users: Users, shield: ShieldCheck, star: Star, target: Target };
+    const tr = (field: string) => {
+      const val = block.translations?.[field]?.[lang];
+      return val || (block as any)[field] || "";
+    };
     switch (block.type) {
       case 'hero':
         return (
           <div key={block.id} style={{ background: `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)`, borderRadius: 16, padding: "48px 40px", color: C.white, marginBottom: 24 }}>
             <div style={{ fontSize: 13, color: "rgba(255,255,255,.6)", marginBottom: 8 }}>{block.data?.subtitle || ""}</div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 12px" }}>{block.titre}</h1>
-            <p style={{ fontSize: 15, lineHeight: 1.6, opacity: .85, maxWidth: 600, margin: 0 }}>{block.contenu}</p>
+            <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 12px" }}>{tr('titre')}</h1>
+            <p style={{ fontSize: 15, lineHeight: 1.6, opacity: .85, maxWidth: 600, margin: 0 }}>{tr('contenu')}</p>
           </div>
         );
       case 'text':
@@ -2180,22 +2184,22 @@ export default function OnboardingModule() {
         return (
           <div key={block.id} className="iz-card" style={{ ...sCard, marginBottom: 16, display: "flex", gap: 16, alignItems: "flex-start" }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><TIcon size={22} color={C.pink} /></div>
-            <div><h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px" }}>{block.titre}</h3><p style={{ fontSize: 13, lineHeight: 1.7, color: C.textLight, margin: 0 }}>{block.contenu}</p></div>
+            <div><h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px" }}>{tr('titre')}</h3><p style={{ fontSize: 13, lineHeight: 1.7, color: C.textLight, margin: 0 }}>{tr('contenu')}</p></div>
           </div>
         );
       case 'mission':
         return (
           <div key={block.id} style={{ background: C.dark, borderRadius: 16, padding: "32px 36px", color: C.white, marginBottom: 16, position: "relative", overflow: "hidden" }}>
             <div style={{ fontSize: 48, fontWeight: 800, color: "rgba(255,255,255,.08)", position: "absolute", top: 12, left: 20 }}>{block.data?.number || "01"}</div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px", position: "relative" }}>{block.titre}</h3>
-            <p style={{ fontSize: 14, lineHeight: 1.6, opacity: .8, margin: 0, position: "relative" }}>{block.contenu}</p>
+            <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px", position: "relative" }}>{tr('titre')}</h3>
+            <p style={{ fontSize: 14, lineHeight: 1.6, opacity: .8, margin: 0, position: "relative" }}>{tr('contenu')}</p>
           </div>
         );
       case 'stats':
         return (
           <div key={block.id} style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{block.titre}</h3>
-            <p style={{ fontSize: 12, color: C.textLight, margin: "0 0 12px" }}>{block.contenu}</p>
+            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{tr('titre')}</h3>
+            <p style={{ fontSize: 12, color: C.textLight, margin: "0 0 12px" }}>{tr('contenu')}</p>
             {block.data?.badge && <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 8, background: C.greenLight, color: C.green, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>{block.data.badge}</div>}
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${(block.data?.items || []).length}, 1fr)`, gap: 12 }}>
               {(block.data?.items || []).map((s: any, i: number) => (
@@ -2210,7 +2214,7 @@ export default function OnboardingModule() {
       case 'values':
         return (
           <div key={block.id} style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 16px" }}>{block.titre}</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 16px" }}>{tr('titre')}</h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
               {(block.data?.items || []).map((v: any, i: number) => {
                 const VIcon = iconMap[v.icon] || Star;
@@ -2227,7 +2231,7 @@ export default function OnboardingModule() {
       case 'video':
         return (
           <div key={block.id} style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>{block.titre}</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>{tr('titre')}</h3>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min((block.data?.videos || []).length, 2)}, 1fr)`, gap: 16 }}>
               {(block.data?.videos || []).map((v: any, i: number) => (
                 <div key={i} className="iz-card" style={{ ...sCard, overflow: "hidden", padding: 0 }}>
@@ -2249,7 +2253,7 @@ export default function OnboardingModule() {
       case 'team':
         return (
           <div key={block.id} style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 16px" }}>{block.titre}</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 16px" }}>{tr('titre')}</h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
               {(block.data?.members || []).map((m: any, i: number) => (
                 <div key={i} className="iz-card" style={{ ...sCard, textAlign: "center" }}>
@@ -4750,19 +4754,26 @@ export default function OnboardingModule() {
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.company_page')}</h1>
-          <div style={{ display: "flex", gap: 8 }}>
-            <select onChange={async e => {
-              if (!e.target.value) return;
-              const newBlock = await apiCreateBlock({ type: e.target.value, titre: "Nouveau bloc", contenu: "", ordre: companyBlocks.length, actif: true, data: {} });
-              setCompanyBlocks(prev => [...prev, newBlock]);
-              setEditingBlockId(newBlock.id);
-              e.target.value = "";
-              addToast_admin("Bloc créé");
-            }} style={{ ...sInput, width: 200, fontSize: 12, cursor: "pointer" }}>
-              <option value="">+ Ajouter un bloc...</option>
-              {BLOCK_TYPES.map(bt => <option key={bt.type} value={bt.type}>{bt.label}</option>)}
-            </select>
-          </div>
+        </div>
+
+        {/* Add block tiles */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
+          {BLOCK_TYPES.map(bt => {
+            const BtIcon = bt.icon;
+            return (
+              <button key={bt.type} className="iz-sidebar-item" onClick={async () => {
+                const newBlock = await apiCreateBlock({ type: bt.type, titre: "Nouveau bloc", contenu: "", ordre: companyBlocks.length, actif: true, data: {} });
+                setCompanyBlocks(prev => [...prev, newBlock]);
+                setEditingBlockId(newBlock.id);
+                addToast_admin("Bloc créé");
+              }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: `1.5px dashed ${C.border}`, background: C.white, cursor: "pointer", fontFamily: font, fontSize: 12, fontWeight: 500, color: C.textLight, transition: "all .2s" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.pink; e.currentTarget.style.color = C.pink; e.currentTarget.style.background = C.pinkBg; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textLight; e.currentTarget.style.background = C.white; }}>
+                <BtIcon size={15} />
+                {bt.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Blocks list */}
@@ -4781,7 +4792,7 @@ export default function OnboardingModule() {
                   style={{ width: 40, height: 22, borderRadius: 11, background: block.actif ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s", flexShrink: 0 }}>
                   <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: block.actif ? 20 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
                 </div>
-                <button onClick={() => setEditingBlockId(block.id === editingBlockId ? null : block.id)} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>{t('common.edit')}</button>
+                <button onClick={() => { setContentTranslations((block as any).translations || {}); setEditingBlockId(block.id === editingBlockId ? null : block.id); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>{t('common.edit')}</button>
                 <button onClick={() => {
                   setConfirmDialog({ message: "Supprimer ce bloc ?", onConfirm: async () => {
                     await apiDeleteBlock(block.id);
@@ -4801,33 +4812,33 @@ export default function OnboardingModule() {
             <div onClick={() => setEditingBlockId(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
             <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 520, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "24px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Modifier le bloc</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{t('common.edit_block')}</h2>
                 <button onClick={() => setEditingBlockId(null)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
               </div>
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
                 <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Titre</label>
-                  <input value={editBlock.titre || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, titre: e.target.value } : b))} style={sInput} />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.title')}</label>
+                  <TranslatableField value={editBlock.titre || ""} onChange={v => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, titre: v } : b))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.titre} onTranslationsChange={tr => setTr("titre", tr)} style={sInput} />
                 </div>
                 <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Contenu</label>
-                  <textarea value={editBlock.contenu || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, contenu: e.target.value } : b))} rows={4} style={{ ...sInput, resize: "vertical" }} />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.content')}</label>
+                  <TranslatableField value={editBlock.contenu || ""} onChange={v => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, contenu: v } : b))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.contenu} onTranslationsChange={tr => setTr("contenu", tr)} style={{ ...sInput, resize: "vertical" }} multiline rows={4} />
                 </div>
                 <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Ordre</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.order')}</label>
                   <input type="number" value={editBlock.ordre} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, ordre: Number(e.target.value) } : b))} style={{ ...sInput, width: 80 }} />
                 </div>
                 {/* Preview */}
                 <div style={{ marginTop: 20, padding: "16px", background: C.bg, borderRadius: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 10 }}>Aperçu</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 10 }}>{t('common.preview')}</div>
                   {renderCompanyBlock(editBlock)}
                 </div>
               </div>
               <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
                 <button onClick={() => setEditingBlockId(null)} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                 <button onClick={async () => {
-                  await apiUpdateBlock(editBlock.id, { titre: editBlock.titre, contenu: editBlock.contenu, ordre: editBlock.ordre, data: editBlock.data });
-                  addToast_admin("Bloc enregistré");
+                  await apiUpdateBlock(editBlock.id, { titre: editBlock.titre, contenu: editBlock.contenu, ordre: editBlock.ordre, data: editBlock.data, translations: contentTranslations });
+                  addToast_admin(t('toast.saved'));
                   setEditingBlockId(null);
                 }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13 }}>{t('common.save')}</button>
               </div>
@@ -4849,24 +4860,24 @@ export default function OnboardingModule() {
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.nps')}</h1>
-          <button onClick={() => { setNpsPanelData({ titre: "", description: "", type: "nps", declencheur: "fin_parcours", questions: [{ text: "Sur une échelle de 0 à 10, recommanderiez-vous notre processus d'onboarding ?", type: "nps" }], actif: true }); resetTr(); setNpsPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau questionnaire</button>
+          <button onClick={() => { setNpsPanelData({ titre: "", description: "", type: "nps", declencheur: "fin_parcours", questions: [{ text: "", type: "nps" }], actif: true }); resetTr(); setNpsPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('nps.new_survey')}</button>
         </div>
 
         {/* Explanation */}
         <div style={{ padding: "16px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20, fontSize: 12, color: C.blue, lineHeight: 1.7 }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Comment fonctionne le NPS & Satisfaction ?</div>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>{t('nps.how_title')}</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
-              <b>1. Créez un questionnaire</b> — Cliquez "Nouveau questionnaire" et ajoutez des questions de type NPS (0-10), note (1-5 étoiles), texte libre ou choix multiple.<br/>
-              <b>2. Envoyez-le</b> — Cliquez "Envoyer à tous" pour créer une enquête pour chaque collaborateur. L'envoi peut aussi être automatique via un workflow (fin de parcours, date spécifique...).<br/>
-              <b>3. Collectez les réponses</b> — Les collaborateurs répondent depuis leur espace "Satisfaction". Vous suivez les résultats ici en temps réel.
+              <b>{t('nps.step1')}</b> — {t('nps.step1_desc')}<br/>
+              <b>{t('nps.step2')}</b> — {t('nps.step2_desc')}<br/>
+              <b>{t('nps.step3')}</b> — {t('nps.step3_desc')}
             </div>
             <div>
-              <b>Score NPS</b> = % Promoteurs (9-10) − % Détracteurs (0-6)<br/>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.green }} /> Promoteurs (9-10) : recommandent activement</span><br/>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#F9A825" }} /> Passifs (7-8) : satisfaits mais pas engagés</span><br/>
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.red }} /> Détracteurs (0-6) : insatisfaits</span><br/>
-              Un score &gt; 50 est excellent, &gt; 0 est bon, &lt; 0 nécessite des actions.
+              <b>{t('nps.score_formula')}</b><br/>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.green }} /> {t('nps.promoters')}</span><br/>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: "#F9A825" }} /> {t('nps.passives')}</span><br/>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.red }} /> {t('nps.detractors')}</span><br/>
+              {t('nps.score_guide')}
             </div>
           </div>
         </div>
@@ -4876,19 +4887,19 @@ export default function OnboardingModule() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
             <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "20px 16px" }}>
               <div style={{ fontSize: 36, fontWeight: 800, color: npsColor(npsStats.nps_score) }}>{npsStats.nps_score}</div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Score NPS</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>{t('nps.score_nps')}</div>
             </div>
             <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "20px 16px" }}>
               <div style={{ fontSize: 36, fontWeight: 800, color: C.amber }}>{npsStats.avg_rating.toFixed(1)}<span style={{ fontSize: 16, color: C.textMuted }}>/5</span></div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Satisfaction moyenne</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>{t('nps.avg_satisfaction')}</div>
             </div>
             <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "20px 16px" }}>
               <div style={{ fontSize: 36, fontWeight: 800, color: C.blue }}>{npsStats.response_rate}%</div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Taux de réponse</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>{t('nps.response_rate')}</div>
             </div>
             <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "20px 16px" }}>
               <div style={{ fontSize: 36, fontWeight: 800, color: C.text }}>{npsStats.total_completed}<span style={{ fontSize: 16, color: C.textMuted }}>/{npsStats.total_responses}</span></div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Réponses</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>{t('nps.responses')}</div>
             </div>
           </div>
         )}
@@ -4896,16 +4907,16 @@ export default function OnboardingModule() {
         {/* NPS distribution bar */}
         {npsStats && npsStats.total_completed > 0 && (
           <div className="iz-card" style={{ ...sCard, padding: "16px 20px", marginBottom: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Répartition NPS</div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{t('nps.distribution')}</div>
             <div style={{ display: "flex", height: 28, borderRadius: 8, overflow: "hidden", marginBottom: 8 }}>
               {npsStats.promoters > 0 && <div style={{ flex: npsStats.promoters, background: C.green, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: C.white }}>{npsStats.promoters}</div>}
               {npsStats.passives > 0 && <div style={{ flex: npsStats.passives, background: C.amber, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: C.white }}>{npsStats.passives}</div>}
               {npsStats.detractors > 0 && <div style={{ flex: npsStats.detractors, background: C.red, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: C.white }}>{npsStats.detractors}</div>}
             </div>
             <div style={{ display: "flex", gap: 16, fontSize: 11 }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.green }} /> Promoteurs (9-10) : {npsStats.promoters}</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.amber }} /> Passifs (7-8) : {npsStats.passives}</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.red }} /> Détracteurs (0-6) : {npsStats.detractors}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.green }} /> {t('nps.promoters').split(':')[0]} : {npsStats.promoters}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.amber }} /> {t('nps.passives').split(':')[0]} : {npsStats.passives}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><div style={{ width: 8, height: 8, borderRadius: 2, background: C.red }} /> {t('nps.detractors').split(':')[0]} : {npsStats.detractors}</span>
             </div>
           </div>
         )}
@@ -4930,33 +4941,33 @@ export default function OnboardingModule() {
                 <div style={{ padding: "16px 20px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                     <span style={{ fontSize: 15, fontWeight: 600 }}>{s.titre}</span>
-                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: s.actif ? C.greenLight : C.bg, color: s.actif ? C.green : C.textMuted }}>{s.actif ? "Actif" : "Inactif"}</span>
+                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: s.actif ? C.greenLight : C.bg, color: s.actif ? C.green : C.textMuted }}>{s.actif ? t('nps.active') : t('nps.inactive')}</span>
                   </div>
                   {s.description && <div style={{ fontSize: 12, color: C.textLight, marginBottom: 8 }}>{s.description}</div>}
                   <div style={{ display: "flex", gap: 12, fontSize: 11, color: C.textMuted }}>
-                    <span>Type : {s.type === "nps" ? "NPS" : s.type === "satisfaction" ? "Satisfaction" : "Custom"}</span>
-                    <span>{s.questions?.length || 0} question{(s.questions?.length || 0) > 1 ? "s" : ""}</span>
-                    <span>{s.responses_count || 0} réponse{(s.responses_count || 0) > 1 ? "s" : ""}</span>
+                    <span>Type : {s.type === "nps" ? "NPS" : s.type === "satisfaction" ? "Satisfaction" : t('nps.type_custom')}</span>
+                    <span>{s.questions?.length || 0} {t('nps.question')}{(s.questions?.length || 0) > 1 ? "s" : ""}</span>
+                    <span>{s.responses_count || 0} {t('nps.response')}{(s.responses_count || 0) > 1 ? "s" : ""}</span>
                   </div>
                 </div>
                 <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => { setNpsPanelData({ id: s.id, titre: s.titre, description: s.description || "", type: s.type, declencheur: s.declencheur, questions: s.questions || [], actif: s.actif }); setContentTranslations((s as any).translations || {}); setNpsPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11 }}>{t('common.edit')}</button>
-                  <button onClick={async () => { try { await apiSendNpsAll(s.id); addToast_admin("Questionnaire envoyé à tous les collaborateurs"); } catch { addToast_admin(t('toast.error')); } }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Send size={11} /> Envoyer à tous</button>
+                  <button onClick={async () => { try { await apiSendNpsAll(s.id); addToast_admin(t('toast.saved')); } catch { addToast_admin(t('toast.error')); } }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Send size={11} /> {t('nps.send_all')}</button>
                 </div>
               </div>
             ))}
-            {npsSurveys.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun questionnaire créé</div>}
+            {npsSurveys.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('nps.no_surveys')}</div>}
           </div>
         )}
 
         {/* Responses detail */}
         {npsTab === "responses" && npsSelectedSurvey && (
           <div>
-            <button onClick={() => setNpsSelectedSurvey(null)} style={{ background: "none", border: "none", cursor: "pointer", color: C.pink, fontSize: 13, fontFamily: font, marginBottom: 12, display: "flex", alignItems: "center", gap: 4 }}><ChevronLeft size={14} /> Retour aux questionnaires</button>
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>{npsSelectedSurvey.titre} — {npsSelectedSurvey.responses?.length || 0} réponses</h3>
+            <button onClick={() => setNpsSelectedSurvey(null)} style={{ background: "none", border: "none", cursor: "pointer", color: C.pink, fontSize: 13, fontFamily: font, marginBottom: 12, display: "flex", alignItems: "center", gap: 4 }}><ChevronLeft size={14} /> {t('nps.back_surveys')}</button>
+            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>{npsSelectedSurvey.titre} — {npsSelectedSurvey.responses?.length || 0} {t('nps.responses').toLowerCase()}</h3>
             <div className="iz-card" style={{ ...sCard, overflow: "hidden", padding: 0 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1.5fr 0.6fr 0.6fr 2fr 1fr", gap: 0, padding: "10px 16px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
-                <span>Collaborateur</span><span>Score NPS</span><span>Note</span><span>Commentaire</span><span>Date</span>
+                <span>{t('nps.collaborator')}</span><span>{t('nps.score')}</span><span>{t('nps.rating')}</span><span>{t('nps.comment')}</span><span>{t('nps.date')}</span>
               </div>
               {(npsSelectedSurvey.responses || []).filter(r => r.completed_at).map(r => (
                 <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 0.6fr 0.6fr 2fr 1fr", gap: 0, padding: "12px 16px", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13 }}>
@@ -4967,14 +4978,14 @@ export default function OnboardingModule() {
                   <div style={{ fontSize: 11, color: C.textMuted }}>{fmtDate(r.completed_at)}</div>
                 </div>
               ))}
-              {(npsSelectedSurvey.responses || []).filter(r => r.completed_at).length === 0 && <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucune réponse reçue</div>}
+              {(npsSelectedSurvey.responses || []).filter(r => r.completed_at).length === 0 && <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('nps.no_responses')}</div>}
             </div>
           </div>
         )}
 
         {/* Responses tab (no survey selected) */}
         {npsTab === "responses" && !npsSelectedSurvey && (
-          <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Sélectionnez un questionnaire pour voir les réponses</div>
+          <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('nps.select_survey')}</div>
         )}
 
         {/* Create/Edit panel */}
@@ -4983,37 +4994,37 @@ export default function OnboardingModule() {
             <div onClick={() => setNpsPanelMode("closed")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
             <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 560, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{npsPanelMode === "create" ? "Nouveau questionnaire" : "Modifier le questionnaire"}</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{npsPanelMode === "create" ? t('nps.new_survey') : t('nps.edit_survey')}</h2>
                 <button onClick={() => setNpsPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
               </div>
               <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
-                <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Titre *</label><TranslatableField value={npsPanelData.titre} onChange={v => setNpsPanelData((p: any) => ({ ...p, titre: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.titre} onTranslationsChange={tr => setTr("titre", tr)} style={sInput} placeholder="Ex: NPS Onboarding" /></div>
+                <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.title')} *</label><TranslatableField value={npsPanelData.titre} onChange={v => setNpsPanelData((p: any) => ({ ...p, titre: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.titre} onTranslationsChange={tr => setTr("titre", tr)} style={sInput} placeholder="Ex: NPS Onboarding" /></div>
                 <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label><TranslatableField multiline rows={3} value={npsPanelData.description || ""} onChange={v => setNpsPanelData((p: any) => ({ ...p, description: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ ...sInput, minHeight: 60, resize: "vertical" }} /></div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Type</label>
                     <select value={npsPanelData.type} onChange={e => setNpsPanelData((p: any) => ({ ...p, type: e.target.value }))} style={sInput}>
-                      <option value="nps">NPS (0-10)</option><option value="satisfaction">Satisfaction (1-5)</option><option value="custom">Personnalisé</option>
+                      <option value="nps">{t('nps.q_type_nps')}</option><option value="satisfaction">{t('nps.type_satisfaction')}</option><option value="custom">{t('nps.type_custom')}</option>
                     </select>
                   </div>
                   <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Déclencheur</label>
                     <select value={npsPanelData.declencheur} onChange={e => setNpsPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={sInput}>
-                      <option value="fin_parcours">Fin de parcours</option><option value="fin_phase">Fin de phase</option><option value="manuel">Envoi manuel</option><option value="date_specifique">Date spécifique</option>
+                      <option value="fin_parcours">{t('nps.trigger_end_path')}</option><option value="fin_phase">{t('nps.trigger_end_phase')}</option><option value="manuel">{t('nps.trigger_manual')}</option><option value="date_specifique">{t('nps.trigger_date')}</option>
                     </select>
                   </div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 8 }}>Questions</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 8 }}>{t('nps.questions')}</div>
                 {(npsPanelData.questions || []).map((q: any, i: number) => (
                   <div key={i} style={{ padding: 12, background: C.bg, borderRadius: 10, display: "flex", gap: 10, alignItems: "start" }}>
                     <div style={{ flex: 1 }}>
-                      <input value={q.text} onChange={e => { const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], text: e.target.value }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} style={{ ...sInput, marginBottom: 6 }} placeholder="Texte de la question" />
+                      <TranslatableField value={q.text} onChange={v => { const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], text: v }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations[`question_${i}`]} onTranslationsChange={tr => setTr(`question_${i}`, tr)} style={{ ...sInput, marginBottom: 6 }} placeholder="Texte de la question" />
                       <select value={q.type} onChange={e => { const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], type: e.target.value }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} style={{ ...sInput, fontSize: 11 }}>
-                        <option value="nps">NPS (0-10)</option><option value="rating">Note (1-5 étoiles)</option><option value="text">Texte libre</option><option value="choice">Choix multiple</option>
+                        <option value="nps">{t('nps.q_type_nps')}</option><option value="rating">{t('nps.q_type_rating')}</option><option value="text">{t('nps.q_type_text')}</option><option value="choice">{t('nps.q_type_choice')}</option>
                       </select>
                     </div>
                     <button onClick={() => { const qs = npsPanelData.questions.filter((_: any, j: number) => j !== i); setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={14} color={C.red} /></button>
                   </div>
                 ))}
-                <button onClick={() => setNpsPanelData((p: any) => ({ ...p, questions: [...(p.questions || []), { text: "", type: "text" }] }))} style={{ ...sBtn("outline"), fontSize: 12, display: "flex", alignItems: "center", gap: 4, alignSelf: "flex-start" }}><Plus size={12} /> Ajouter une question</button>
+                <button onClick={() => setNpsPanelData((p: any) => ({ ...p, questions: [...(p.questions || []), { text: "", type: "text" }] }))} style={{ ...sBtn("outline"), fontSize: 12, display: "flex", alignItems: "center", gap: 4, alignSelf: "flex-start" }}><Plus size={12} /> {t('nps.add_question')}</button>
               </div>
               <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "space-between" }}>
                 <div>{npsPanelMode === "edit" && npsPanelData.id && <button onClick={() => showConfirm("Supprimer ce questionnaire ?", async () => { try { await apiDeleteNps(npsPanelData.id); reloadNps(); setNpsPanelMode("closed"); } catch {} })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red }}>{t('common.delete')}</button>}</div>
@@ -5045,14 +5056,14 @@ export default function OnboardingModule() {
         </div>
         <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead><tr style={{ background: C.bg }}>{["Nom","Type","Juridiction","Statut",""].map(h => <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
+            <thead><tr style={{ background: C.bg }}>{[t('contrat.name'), t('contrat.type'), t('contrat.jurisdiction'), t('contrat.status'), ""].map(h => <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
             <tbody>
               {contrats.map((c: any) => (
                 <tr key={c.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }} onClick={() => { setContratPanelData({ id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction, actif: c.actif, fichier: c.fichier || "" }); setContentTranslations((c as any).translations || {}); setContratPanelMode("edit"); }}>
                   <td style={{ padding: "10px 14px", fontWeight: 500 }}>{c.nom}</td>
                   <td style={{ padding: "10px 14px" }}>{c.type}</td>
                   <td style={{ padding: "10px 14px" }}>{c.juridiction}</td>
-                  <td style={{ padding: "10px 14px" }}><span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: c.actif ? C.greenLight : C.bg, color: c.actif ? C.green : C.textMuted }}>{c.actif ? "Actif" : "Inactif"}</span></td>
+                  <td style={{ padding: "10px 14px" }}><span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: c.actif ? C.greenLight : C.bg, color: c.actif ? C.green : C.textMuted }}>{c.actif ? t('nps.active') : t('nps.inactive')}</span></td>
                   <td style={{ padding: "10px 14px" }}><button onClick={e => { e.stopPropagation(); setContratPanelData({ id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction, actif: c.actif, fichier: c.fichier || "" }); setContratPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "3px 10px", fontSize: 11 }}>{t('common.edit')}</button></td>
                 </tr>
               ))}
@@ -5071,13 +5082,13 @@ export default function OnboardingModule() {
               <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
                 {/* Left: form */}
                 <div style={{ width: 300, flexShrink: 0, padding: "20px 24px", overflow: "auto", borderRight: `1px solid ${C.border}` }}>
-                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom du contrat *</label><TranslatableField value={contratPanelData.nom} onChange={v => setContratPanelData((p: any) => ({ ...p, nom: v }))} placeholder="Ex: CDI — Droit Suisse" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
+                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.contract_name')} *</label><TranslatableField value={contratPanelData.nom} onChange={v => setContratPanelData((p: any) => ({ ...p, nom: v }))} placeholder="Ex: CDI — Droit Suisse" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                     <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Type</label><select value={contratPanelData.type} onChange={e => setContratPanelData((p: any) => ({ ...p, type: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TYPES_CONTRAT.map(t => <option key={t} value={t}>{t}</option>)}<option value="Avenant">Avenant</option></select></div>
                     <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Juridiction</label><select value={contratPanelData.juridiction} onChange={e => setContratPanelData((p: any) => ({ ...p, juridiction: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}><option value="Suisse">Suisse</option><option value="France">France</option><option value="Multi">Multi</option></select></div>
                   </div>
                   <div style={{ marginBottom: 16 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Fichier template</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.template_file')}</label>
                     <div style={{ border: `2px dashed ${C.border}`, borderRadius: 10, padding: "20px", textAlign: "center", cursor: "pointer", transition: "all .2s" }}
                       className="iz-upload-zone"
                       onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = C.pink; e.currentTarget.style.background = C.pinkBg; }}
@@ -5089,13 +5100,13 @@ export default function OnboardingModule() {
                           <FileText size={20} color={C.pink} />
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{contratPanelData.fichier}</div>
-                            <div style={{ fontSize: 10, color: C.pink }}>Cliquez pour remplacer</div>
+                            <div style={{ fontSize: 10, color: C.pink }}>{t('contrat.click_replace')}</div>
                           </div>
                         </div>
                       ) : (
                         <>
                           <Upload size={24} color={C.textMuted} style={{ marginBottom: 8 }} />
-                          <div style={{ fontSize: 13, color: C.text }}>Glisser-déposer ou <span style={{ color: C.pink, fontWeight: 600 }}>parcourir</span></div>
+                          <div style={{ fontSize: 13, color: C.text }}>{t('contrat.drag_drop')} <span style={{ color: C.pink, fontWeight: 600 }}>{t('contrat.browse')}</span></div>
                           <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Word (.docx), PDF, OpenDocument (.odt)</div>
                         </>
                       )}
@@ -5103,11 +5114,11 @@ export default function OnboardingModule() {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: C.bg, borderRadius: 10, cursor: "pointer", marginBottom: 16 }} onClick={() => setContratPanelData((p: any) => ({ ...p, actif: !p.actif }))}>
                     <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${contratPanelData.actif ? C.pink : C.border}`, background: contratPanelData.actif ? C.pink : C.white, display: "flex", alignItems: "center", justifyContent: "center" }}>{contratPanelData.actif && <Check size={14} color={C.white} />}</div>
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>Contrat actif</span>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{t('contrat.active_contract')}</span>
                   </div>
                   <div style={{ padding: "12px 14px", background: C.bg, borderRadius: 10, fontSize: 11, color: C.textLight }}>
-                    <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>Signature électronique</div>
-                    <div>Les contrats peuvent être envoyés pour signature via DocuSign ou UgoSign depuis le dossier du collaborateur, en utilisant le connecteur configuré dans Intégrations.</div>
+                    <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>{t('contrat.esign_title')}</div>
+                    <div>{t('contrat.esign_desc')}</div>
                   </div>
                 </div>
                 {/* Right: preview */}
@@ -5119,7 +5130,7 @@ export default function OnboardingModule() {
                       <FileText size={64} color={C.textMuted} style={{ marginBottom: 16 }} />
                       <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 4 }}>{contratPanelData.fichier}</div>
                       <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>
-                        {contratPanelData.fichier.endsWith('.pdf') ? 'Chargez un nouveau PDF pour prévisualiser' : 'Prévisualisation disponible pour les fichiers PDF uniquement'}
+                        {contratPanelData.fichier.endsWith('.pdf') ? t('contrat.upload_pdf') : t('contrat.pdf_only')}
                       </div>
                       <div style={{ fontSize: 11, color: C.textLight }}>
                         Les fichiers Word (.docx) et OpenDocument (.odt) ne peuvent pas être prévisualisés dans le navigateur.<br/>
@@ -5129,8 +5140,8 @@ export default function OnboardingModule() {
                   ) : (
                     <div style={{ textAlign: "center", padding: 40 }}>
                       <Eye size={48} color={C.border} style={{ marginBottom: 16 }} />
-                      <div style={{ fontSize: 14, fontWeight: 500, color: C.textMuted }}>Prévisualisation</div>
-                      <div style={{ fontSize: 12, color: C.textLight, marginTop: 4 }}>Chargez un fichier PDF pour voir l'aperçu ici</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: C.textMuted }}>{t('contrat.preview')}</div>
+                      <div style={{ fontSize: 12, color: C.textLight, marginTop: 4 }}>{t('contrat.upload_pdf')}</div>
                     </div>
                   )}
                 </div>
@@ -5720,6 +5731,17 @@ export default function OnboardingModule() {
       return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <h1 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 20px" }}>Intégrations</h1>
+
+        {/* How it works */}
+        <div style={{ padding: "16px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20, fontSize: 12, color: C.blue, lineHeight: 1.7 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} /> Comment ça marche ?</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+            <div><strong>1. Connectez vos outils</strong> — Activez les intégrations avec vos solutions existantes : signature électronique, SIRH, communication et SSO.</div>
+            <div><strong>2. Configuration</strong> — Renseignez vos clés API ou identifiants pour chaque service. Le provider par défaut est utilisé automatiquement dans les workflows.</div>
+            <div><strong>3. Automatisation</strong> — Les intégrations actives permettent d'envoyer des signatures, synchroniser les données RH et notifier via Teams ou Slack.</div>
+          </div>
+        </div>
+
         {categories.map((cat: string) => {
           const sigProviders = cat === "signature" ? (integrations || []).filter((i: any) => i.categorie === "signature") : [];
           const activeSignProviders = sigProviders.filter((i: any) => i.connecte || i.provider === "native");
@@ -5728,10 +5750,10 @@ export default function OnboardingModule() {
           <div key={cat} style={{ marginBottom: 28 }}>
             <h2 style={{ fontSize: 14, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 12 }}>{CAT_LABELS[cat] || cat}</h2>
             {cat === "signature" && (
-              <div className="iz-card" style={{ ...sCard, marginBottom: 12, display: "flex", alignItems: "center", gap: 16, background: C.pinkBg, border: `1px solid ${C.pinkLight}` }}>
+              <div className="iz-card" style={{ ...sCard, marginBottom: 12, display: "flex", alignItems: "center", gap: 16, background: C.blueLight, border: `1px solid ${C.blue}30` }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.dark }}>Provider de signature par défaut</div>
-                  <div style={{ fontSize: 11, color: C.textLight }}>Utilisé automatiquement lors de la création d'une action de type Signature</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.blue }}>Provider de signature par défaut</div>
+                  <div style={{ fontSize: 11, color: C.blue, opacity: 0.7 }}>Utilisé automatiquement lors de la création d'une action de type Signature</div>
                 </div>
                 <select value={defaultSignProvider} onChange={async (e) => {
                   const newDefault = e.target.value;
@@ -5743,7 +5765,7 @@ export default function OnboardingModule() {
                   }
                   addToast_admin(`Provider par défaut : ${newDefault}`);
                   refetchIntegrations();
-                }} style={{ ...sInput, width: 220, fontSize: 13, cursor: "pointer", background: C.white }}>
+                }} style={{ ...sInput, width: 220, fontSize: 13, cursor: "pointer", background: C.blueLight, color: C.blue, border: `1px solid ${C.blue}40` }}>
                   {activeSignProviders.map((sp: any) => {
                     const meta = INTEGRATION_META[sp.provider];
                     return <option key={sp.id} value={sp.provider}>{sp.nom}{sp.connecte ? " ✓" : ""}</option>;
@@ -6420,31 +6442,49 @@ export default function OnboardingModule() {
             background: "transparent", color: C.textMuted, cursor: "pointer", fontFamily: font, fontSize: 13, transition: "all .15s",
           }}>
             <Settings size={18} />
-            {!collapsed && <span>Paramètres</span>}
+            {!collapsed && <span>{t('admin.settings') || 'Paramètres'}</span>}
           </button>
         </div>
-        {/* User avatar */}
-        <div style={{ borderTop: `1px solid ${C.border}`, padding: collapsed ? "12px 0" : "10px 12px", display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10 }}>
-          <div onClick={() => { if (collapsed) setSidebarCollapsed(false); }} style={{ width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg, ${C.pinkSoft}, ${C.pink})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: C.white, cursor: "pointer", flexShrink: 0 }}>
-            {auth.user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+        {/* User avatar + menu */}
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: collapsed ? "12px 0" : "10px 12px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10 }}>
+            <div onClick={() => { if (collapsed) setSidebarCollapsed(false); }} style={{ width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg, ${C.pinkSoft}, ${C.pink})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: C.white, cursor: "pointer", flexShrink: 0 }}>
+              {auth.user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+            </div>
+            {!collapsed && (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{auth.user?.name || "Admin"}</div>
+              </div>
+            )}
           </div>
           {!collapsed && (
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{auth.user?.name || "Admin"}</div>
-              <button onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `${window.location.pathname}?tenant=${tid}` : window.location.pathname; }); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: C.textMuted, fontFamily: font, padding: 0, display: "flex", alignItems: "center", gap: 4 }}>
-                <LogOut size={11} /> {t('auth.logout')}
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 8 }}>
+              <button onClick={() => setAdminPage("admin_apparence")} className="iz-sidebar-item" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", fontFamily: font, fontSize: 11, color: C.textMuted, width: "100%", transition: "all .15s" }}>
+                <UserCheck size={13} /> {t('common.profile')}
+              </button>
+              <div style={{ display: "flex", gap: 3, padding: "4px 8px" }}>
+                {activeLanguages.map(l => (
+                  <button key={l} onClick={() => switchLang(l)} title={LANG_META[l].nativeName} style={{
+                    padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: lang === l ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font,
+                    background: lang === l ? C.pinkBg : "transparent", color: lang === l ? C.pink : C.textMuted, transition: "all .15s",
+                  }}>{LANG_META[l].flag} {l.toUpperCase()}</button>
+                ))}
+              </div>
+              <button onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `${window.location.pathname}?tenant=${tid}` : window.location.pathname; }); }} className="iz-sidebar-item" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", fontFamily: font, fontSize: 11, color: C.textMuted, width: "100%", transition: "all .15s" }}>
+                <LogOut size={13} /> {t('auth.logout')}
               </button>
             </div>
           )}
-        </div>
-        {/* Language selector */}
-        <div style={{ padding: collapsed ? "6px 4px" : "6px 12px", display: "flex", gap: 3, justifyContent: "center", borderTop: `1px solid ${C.border}` }}>
-          {activeLanguages.map(l => (
-            <button key={l} onClick={() => switchLang(l)} title={LANG_META[l].nativeName} style={{
-              padding: collapsed ? "4px" : "3px 6px", borderRadius: 4, fontSize: collapsed ? 14 : 10, fontWeight: lang === l ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font,
-              background: lang === l ? C.pinkBg : "transparent", color: lang === l ? C.pink : C.textMuted, transition: "all .15s",
-            }}>{collapsed ? LANG_META[l].flag : `${LANG_META[l].flag} ${l.toUpperCase()}`}</button>
-          ))}
+          {collapsed && (
+            <div style={{ display: "flex", gap: 3, justifyContent: "center", marginTop: 8 }}>
+              {activeLanguages.map(l => (
+                <button key={l} onClick={() => switchLang(l)} title={LANG_META[l].nativeName} style={{
+                  padding: "4px", borderRadius: 4, fontSize: 14, fontWeight: lang === l ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font,
+                  background: lang === l ? C.pinkBg : "transparent", color: lang === l ? C.pink : C.textMuted, transition: "all .15s",
+                }}>{LANG_META[l].flag}</button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -7516,14 +7556,21 @@ export default function OnboardingModule() {
               <button onClick={() => { setUserPanelData({ name: "", email: "", password: "", role: "onboardee" }); setUserPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}><UserPlus size={14} /> {t('suivi.invite_people')}</button>
             </div>
 
-            {/* Role filter dropdown */}
-            <div style={{ marginBottom: 16 }}>
-              <select value={userRoleFilter} onChange={e => setUserRoleFilter(e.target.value)} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 500, border: `1px solid ${C.pink}`, color: C.pink, background: C.white, cursor: "pointer", fontFamily: font, outline: "none" }}>
-                <option value="all">Tous les utilisateurs ({adminUsers.length})</option>
-                {Object.entries(ROLE_META).map(([role, meta]) => (
-                  <option key={role} value={role}>{meta.label} ({adminUsers.filter(u => u.role === role).length})</option>
-                ))}
-              </select>
+            {/* Role filter tiles */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+              {[
+                { key: "all", label: `Tous`, count: adminUsers.length, color: C.pink, bg: C.pinkBg },
+                ...Object.entries(ROLE_META).map(([role, meta]) => ({ key: role, label: meta.label, count: adminUsers.filter(u => u.role === role).length, color: meta.color, bg: meta.bg })),
+              ].map(tile => {
+                const active = userRoleFilter === tile.key;
+                return (
+                  <button key={tile.key} onClick={() => setUserRoleFilter(tile.key)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: `1.5px solid ${active ? tile.color : C.border}`, background: active ? tile.bg : C.white, cursor: "pointer", fontFamily: font, fontSize: 12, fontWeight: active ? 600 : 500, color: active ? tile.color : C.textLight, transition: "all .2s" }}
+                  onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = tile.color; e.currentTarget.style.color = tile.color; } }}
+                  onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textLight; } }}>
+                    {tile.label} <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 8, background: active ? tile.color + "20" : C.bg, color: active ? tile.color : C.textMuted, fontWeight: 600 }}>{tile.count}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Table header */}
@@ -8774,22 +8821,22 @@ export default function OnboardingModule() {
 
           const saveTheme = (color: string) => {
             saveSetting("theme_color", color, setThemeColor);
-            addToast_admin("Couleur du thème enregistrée");
+            addToast_admin(t('toast.saved'));
           };
 
           return (
           <div style={{ flex: 1, padding: "24px 32px", overflow: "auto", maxWidth: 800 }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 8px" }}>{t('admin.appearance')}</h1>
-            <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>Personnalisez l'apparence de votre espace.</p>
+            <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>{t('settings.appearance_desc')}</p>
 
             {/* ── Logo ──────────────────────────────────────── */}
             <div style={sSection}>
-              <h2 style={sSectionTitle}><Building2 size={18} color={C.blue} /> Logo de l'entreprise</h2>
-              <p style={sSectionDesc}>Remplacez le logo Illizeo par celui de votre entreprise. Il apparaîtra dans la sidebar, la page de connexion et les emails.</p>
+              <h2 style={sSectionTitle}><Building2 size={18} color={C.blue} /> {t('settings.company_logo')}</h2>
+              <p style={sSectionDesc}>{t('settings.logo_desc')}</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                 {/* Icône (carré) */}
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>Icône (carré)</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{t('settings.icon_square')}</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                     <div style={{ width: 64, height: 64, borderRadius: 12, border: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: C.bg }}>
                       <img src={customLogo || ILLIZEO_LOGO_URI} alt="Logo" style={{ width: 48, height: 48, objectFit: "contain" }} />
@@ -8803,16 +8850,16 @@ export default function OnboardingModule() {
                           reader.onload = () => { const url = reader.result as string; saveSetting("custom_logo", url, setCustomLogo); addToast_admin("Icône mise à jour"); };
                           reader.readAsDataURL(file);
                         }} />
-                        <span className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}><Upload size={12} /> Changer</span>
+                        <span className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}><Upload size={12} /> {t('settings.change')}</span>
                       </label>
-                      {customLogo && <button onClick={() => { saveSetting("custom_logo", "", setCustomLogo); addToast_admin("Icône réinitialisée"); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>Réinitialiser</button>}
+                      {customLogo && <button onClick={() => { saveSetting("custom_logo", "", setCustomLogo); addToast_admin(t('settings.reset')); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>{t('settings.reset')}</button>}
                     </div>
                   </div>
                   <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6 }}>PNG ou SVG, 128×128px recommandé</div>
                 </div>
                 {/* Logo complet (horizontal) */}
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>Logo complet (horizontal)</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{t('settings.logo_horizontal')}</label>
                   <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                     <div style={{ width: 180, height: 64, borderRadius: 12, border: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: C.bg, padding: "0 12px" }}>
                       <img src={customLogoFull || ILLIZEO_FULL_LOGO_URI} alt="Logo" style={{ height: 32, objectFit: "contain", maxWidth: "100%" }} />
@@ -8826,9 +8873,9 @@ export default function OnboardingModule() {
                           reader.onload = () => { const url = reader.result as string; saveSetting("custom_logo_full", url, setCustomLogoFull); addToast_admin("Logo mis à jour"); };
                           reader.readAsDataURL(file);
                         }} />
-                        <span className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}><Upload size={12} /> Changer</span>
+                        <span className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}><Upload size={12} /> {t('settings.change')}</span>
                       </label>
-                      {customLogoFull && <button onClick={() => { saveSetting("custom_logo_full", "", setCustomLogoFull); addToast_admin("Logo réinitialisé"); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>Réinitialiser</button>}
+                      {customLogoFull && <button onClick={() => { saveSetting("custom_logo_full", "", setCustomLogoFull); addToast_admin(t('settings.reset')); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>{t('settings.reset')}</button>}
                     </div>
                   </div>
                   <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6 }}>PNG ou SVG, 400×100px recommandé</div>
@@ -8836,7 +8883,7 @@ export default function OnboardingModule() {
               </div>
               {/* Preview */}
               <div style={{ marginTop: 16, padding: "16px 20px", borderRadius: 10, background: C.bg }}>
-                <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>Aperçu sidebar :</div>
+                <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>{t('settings.sidebar_preview')}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.white, padding: "12px 16px", borderRadius: 10, border: `1px solid ${C.border}`, width: "fit-content" }}>
                   <img src={customLogo || ILLIZEO_LOGO_URI} alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />
                   <img src={customLogoFull || ILLIZEO_FULL_LOGO_URI} alt="" style={{ height: 22, objectFit: "contain" }} />
@@ -8846,8 +8893,8 @@ export default function OnboardingModule() {
 
             {/* ── Favicon ──────────────────────────────────── */}
             <div style={sSection}>
-              <h2 style={sSectionTitle}><Globe size={18} color="#7B5EA7" /> Favicon</h2>
-              <p style={sSectionDesc}>L'icône qui apparaît dans l'onglet du navigateur. Format carré recommandé (32×32 ou 64×64px).</p>
+              <h2 style={sSectionTitle}><Globe size={18} color="#7B5EA7" /> {t('settings.favicon')}</h2>
+              <p style={sSectionDesc}>{t('settings.favicon_desc')}</p>
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ width: 48, height: 48, borderRadius: 10, border: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: C.bg }}>
                   <img src={customFavicon || ILLIZEO_LOGO_URI} alt="Favicon" style={{ width: 32, height: 32, objectFit: "contain" }} />
@@ -8861,9 +8908,9 @@ export default function OnboardingModule() {
                       reader.onload = () => { const url = reader.result as string; saveSetting("custom_favicon", url, setCustomFavicon); addToast_admin("Favicon mis à jour"); };
                       reader.readAsDataURL(file);
                     }} />
-                    <span className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}><Upload size={12} /> Changer</span>
+                    <span className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}><Upload size={12} /> {t('settings.change')}</span>
                   </label>
-                  {customFavicon && <button onClick={() => { saveSetting("custom_favicon", "", setCustomFavicon); addToast_admin("Favicon réinitialisé"); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>Réinitialiser</button>}
+                  {customFavicon && <button onClick={() => { saveSetting("custom_favicon", "", setCustomFavicon); addToast_admin(t('settings.reset')); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>{t('settings.reset')}</button>}
                 </div>
                 <div style={{ fontSize: 10, color: C.textMuted }}>PNG, SVG ou ICO — 32×32px recommandé</div>
               </div>
@@ -8871,8 +8918,8 @@ export default function OnboardingModule() {
 
             {/* ── Fond page de connexion ─────────────────────── */}
             <div style={sSection}>
-              <h2 style={sSectionTitle}><Clapperboard size={18} color={C.pink} /> Fond de la page de connexion</h2>
-              <p style={sSectionDesc}>Personnalisez l'arrière-plan derrière la modale de connexion. Si aucune image n'est définie, un dégradé aux couleurs du thème sera utilisé.</p>
+              <h2 style={sSectionTitle}><Clapperboard size={18} color={C.pink} /> {t('settings.login_bg')}</h2>
+              <p style={sSectionDesc}>{t('settings.login_bg_desc')}</p>
               <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
                 <div style={{ width: 240, height: 140, borderRadius: 12, border: `2px solid ${C.border}`, overflow: "hidden", background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 }}>
                   <div style={{ width: 80, background: "rgba(255,255,255,.9)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
@@ -8892,34 +8939,34 @@ export default function OnboardingModule() {
                       reader.onload = () => { const url = reader.result as string; saveSetting("login_bg_image", url, setLoginBgImage); addToast_admin("Fond de connexion mis à jour"); };
                       reader.readAsDataURL(file);
                     }} />
-                    <span className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 18px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}><Upload size={13} /> Choisir une image</span>
+                    <span className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 18px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}><Upload size={13} /> {t('settings.choose_image')}</span>
                   </label>
-                  {loginBgImage && <button onClick={() => { saveSetting("login_bg_image", "", setLoginBgImage); addToast_admin("Fond réinitialisé (dégradé par défaut)"); }} style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, color: C.red, borderColor: C.red }}>Réinitialiser</button>}
-                  <div style={{ fontSize: 10, color: C.textMuted, lineHeight: 1.5, maxWidth: 200 }}>JPG ou PNG, résolution recommandée 1920×1080. L'image sera affichée en plein écran derrière la modale de connexion.</div>
+                  {loginBgImage && <button onClick={() => { saveSetting("login_bg_image", "", setLoginBgImage); addToast_admin(t('settings.reset')); }} style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, color: C.red, borderColor: C.red }}>{t('settings.reset')}</button>}
+                  <div style={{ fontSize: 10, color: C.textMuted, lineHeight: 1.5, maxWidth: 200 }}>{t('settings.login_bg_hint')}</div>
                 </div>
               </div>
             </div>
 
             {/* ── Langues ────────────────────────────────────── */}
             <div style={sSection}>
-              <h2 style={sSectionTitle}><Moon size={18} color={darkMode ? C.amber : C.textMuted} /> Mode sombre</h2>
-              <p style={sSectionDesc}>Activez le mode sombre pour réduire la fatigue oculaire dans les environnements peu éclairés.</p>
+              <h2 style={sSectionTitle}><Moon size={18} color={darkMode ? C.amber : C.textMuted} /> {t('settings.dark_mode')}</h2>
+              <p style={sSectionDesc}>{t('settings.dark_mode_desc')}</p>
               <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
                 <div onClick={toggleDarkMode} style={{ width: 52, height: 28, borderRadius: 14, background: darkMode ? C.pink : C.border, cursor: "pointer", position: "relative", transition: "all .2s" }}>
                   <div style={{ width: 24, height: 24, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: darkMode ? 26 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {darkMode ? <Moon size={12} color={C.pink} /> : <Sun size={12} color={C.amber} />}
                   </div>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{darkMode ? "Mode sombre activé" : "Mode clair"}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{darkMode ? t('settings.dark_enabled') : t('settings.light_mode')}</span>
               </div>
               <div style={{ display: "flex", gap: 12 }}>
                 <div style={{ flex: 1, padding: 16, borderRadius: 10, background: "#fff", border: `2px solid ${!darkMode ? C.pink : C.border}`, cursor: "pointer", textAlign: "center" }} onClick={() => { if (darkMode) toggleDarkMode(); }}>
                   <Sun size={20} color="#F9A825" style={{ marginBottom: 4 }} />
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>Clair</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#333" }}>{t('settings.light')}</div>
                 </div>
                 <div style={{ flex: 1, padding: 16, borderRadius: 10, background: "#1E1E32", border: `2px solid ${darkMode ? C.pink : "#2A2A3D"}`, cursor: "pointer", textAlign: "center" }} onClick={() => { if (!darkMode) toggleDarkMode(); }}>
                   <Moon size={20} color="#E91E8C" style={{ marginBottom: 4 }} />
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#E8E8EE" }}>Sombre</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#E8E8EE" }}>{t('settings.dark')}</div>
                 </div>
               </div>
             </div>
@@ -8954,13 +9001,13 @@ export default function OnboardingModule() {
                   );
                 })}
               </div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>Le français est toujours actif. Les collaborateurs pourront choisir parmi les langues activées.</div>
+              <div style={{ fontSize: 11, color: C.textMuted }}>{t('settings.fr_always')}</div>
             </div>
 
             {/* ── Thème couleur ──────────────────────────────── */}
             <div style={sSection}>
-              <h2 style={sSectionTitle}><Palette size={18} color={themeColor} /> Couleur du thème</h2>
-              <p style={sSectionDesc}>Choisissez la couleur principale de votre interface. Elle s'applique aux boutons, liens et accents.</p>
+              <h2 style={sSectionTitle}><Palette size={18} color={themeColor} /> {t('settings.theme_color')}</h2>
+              <p style={sSectionDesc}>{t('settings.theme_desc')}</p>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
                 {THEME_PRESETS.map(p => (
                   <button key={p.color} onClick={() => saveTheme(p.color)} title={p.name} style={{
@@ -8972,25 +9019,25 @@ export default function OnboardingModule() {
                 ))}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <label style={{ fontSize: 12, color: C.textLight }}>Couleur personnalisée :</label>
+                <label style={{ fontSize: 12, color: C.textLight }}>{t('settings.custom_color')}</label>
                 <input type="color" value={themeColor} onChange={e => saveTheme(e.target.value)} style={{ width: 36, height: 36, border: "none", borderRadius: 8, cursor: "pointer", padding: 0, background: "none" }} />
                 <span style={{ fontSize: 12, fontFamily: "monospace", color: C.textMuted, background: C.bg, padding: "4px 10px", borderRadius: 6 }}>{themeColor.toUpperCase()}</span>
               </div>
               <div style={{ marginTop: 12, padding: "12px 16px", borderRadius: 10, background: C.bg, display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 12, color: C.textLight }}>Aperçu :</span>
-                <button style={{ padding: "6px 16px", borderRadius: 8, background: themeColor, color: "#fff", border: "none", fontSize: 12, fontWeight: 600, fontFamily: font, cursor: "default" }}>Bouton principal</button>
-                <span style={{ color: themeColor, fontWeight: 600, fontSize: 12 }}>Lien actif</span>
+                <span style={{ fontSize: 12, color: C.textLight }}>{t('common.preview')} :</span>
+                <button style={{ padding: "6px 16px", borderRadius: 8, background: themeColor, color: "#fff", border: "none", fontSize: 12, fontWeight: 600, fontFamily: font, cursor: "default" }}>{t('settings.main_button')}</button>
+                <span style={{ color: themeColor, fontWeight: 600, fontSize: 12 }}>{t('settings.active_link')}</span>
                 <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: themeColor + "20", color: themeColor }}>Badge</span>
               </div>
             </div>
 
             {/* ── Langue & Région ────────────────────────────── */}
             <div style={sSection}>
-              <h2 style={sSectionTitle}><Languages size={18} color={C.blue} /> Langue & Région</h2>
-              <p style={sSectionDesc}>Définissez la langue d'interface, la région et le fuseau horaire.</p>
+              <h2 style={sSectionTitle}><Languages size={18} color={C.blue} /> {t('settings.lang_region')}</h2>
+              <p style={sSectionDesc}>{t('settings.lang_region_desc')}</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Langue d'interface</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('settings.interface_lang')}</label>
                   <div style={{ display: "flex", gap: 8 }}>
                     {(["fr", "en"] as const).map(l => (
                       <button key={l} onClick={() => switchLang(l)} style={{
@@ -9004,14 +9051,14 @@ export default function OnboardingModule() {
                   </div>
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Région</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('settings.region')}</label>
                   <select value={region} onChange={e => saveSetting("region", e.target.value, setRegion)} style={sInput}>
                     {REGIONS.map(r => <option key={r.code} value={r.code}>{r.flag} {r.label} ({r.currency})</option>)}
                   </select>
                 </div>
               </div>
               <div style={{ marginTop: 16 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Fuseau horaire</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('settings.timezone')}</label>
                 <select value={timezone} onChange={e => saveSetting("timezone", e.target.value, setTimezone)} style={{ ...sInput, maxWidth: 320 }}>
                   {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz.replace("_", " ")}</option>)}
                 </select>
@@ -9020,11 +9067,11 @@ export default function OnboardingModule() {
 
             {/* ── Format date & heure ────────────────────────── */}
             <div style={sSection}>
-              <h2 style={sSectionTitle}><Calendar size={18} color={C.amber} /> Format de date & heure</h2>
-              <p style={sSectionDesc}>Personnalisez l'affichage des dates et heures dans toute l'application.</p>
+              <h2 style={sSectionTitle}><Calendar size={18} color={C.amber} /> {t('settings.date_time')}</h2>
+              <p style={sSectionDesc}>{t('settings.date_time_desc')}</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Format de date</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('settings.date_format')}</label>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {[
                       { value: "DD/MM/YYYY", example: "03/04/2026" },
@@ -9045,7 +9092,7 @@ export default function OnboardingModule() {
                   </div>
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Format d'heure</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('settings.time_format')}</label>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {[
                       { value: "24h", example: "14:30" },
@@ -9062,7 +9109,7 @@ export default function OnboardingModule() {
                     ))}
                   </div>
                   <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: C.bg }}>
-                    <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Aperçu actuel :</div>
+                    <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>{t('settings.current_preview')}</div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
                       {fmtDateTime(new Date())}
                     </div>
@@ -9191,17 +9238,17 @@ export default function OnboardingModule() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <div>
                 <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('equip.title')}</h1>
-                <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Suivez l'attribution et la restitution du matériel mis à disposition de vos collaborateurs.</p>
+                <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>{t('equip.desc')}</p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {equipTab === "inventaire" && <button onClick={() => { resetTr(); setEquipPanel({ mode: "create", data: { equipment_type_id: equipTypes[0]?.id || "", nom: "", numero_serie: "", marque: "", modele: "", etat: "disponible", date_achat: "", valeur: "", notes: "" } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.add')}</button>}
-                {equipTab === "packages" && <button onClick={() => { resetTr(); setPkgPanel({ mode: "create", data: { nom: "", description: "", icon: "package", couleur: "#C2185B", items: [{ equipment_type_id: equipTypes[0]?.id || "", quantite: 1, notes: "" }] } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau package</button>}
+                {equipTab === "packages" && <button onClick={() => { resetTr(); setPkgPanel({ mode: "create", data: { nom: "", description: "", icon: "package", couleur: "#C2185B", items: [{ equipment_type_id: equipTypes[0]?.id || "", quantite: 1, notes: "" }] } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.new_package')}</button>}
                 {equipTab === "types" && <button onClick={async () => {
-                  const nom = prompt("Nom du type d'équipement :");
+                  const nom = prompt(t('equip.type_prompt'));
                   if (!nom) return;
-                  const cat = prompt("Catégorie (materiel ou licence) :", "materiel");
+                  const cat = prompt(t('equip.cat_prompt'), "materiel");
                   try { await apiCreateEquipType({ nom, categorie: cat === "licence" ? "licence" : "materiel", icon: cat === "licence" ? "key" : "package" }); reloadEquip(); addToast_admin("Type créé"); } catch { addToast_admin(t('toast.error')); }
-                }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouveau type</button>}
+                }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.new_type')}</button>}
               </div>
             </div>
 
@@ -9224,11 +9271,11 @@ export default function OnboardingModule() {
             {equipStats && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 20 }}>
                 {[
-                  { label: "Total", value: equipStats.total, icon: Boxes, color: C.text, bg: C.bg },
-                  { label: "Disponible", value: equipStats.disponible, icon: CheckCircle, color: C.green, bg: C.greenLight },
-                  { label: "Attribué", value: equipStats.attribue, icon: UserCheck, color: C.blue, bg: C.blueLight },
-                  { label: "En commande", value: equipStats.enCommande, icon: Clock, color: C.amber, bg: C.amberLight },
-                  { label: "Valeur totale", value: fmtCurrency(equipStats.valeurTotale), icon: Banknote, color: C.pink, bg: C.pinkBg },
+                  { label: t('equip.total'), value: equipStats.total, icon: Boxes, color: C.text, bg: C.bg },
+                  { label: t('equip.available'), value: equipStats.disponible, icon: CheckCircle, color: C.green, bg: C.greenLight },
+                  { label: t('equip.assigned'), value: equipStats.attribue, icon: UserCheck, color: C.blue, bg: C.blueLight },
+                  { label: t('equip.on_order'), value: equipStats.enCommande, icon: Clock, color: C.amber, bg: C.amberLight },
+                  { label: t('equip.total_value'), value: fmtCurrency(equipStats.valeurTotale), icon: Banknote, color: C.pink, bg: C.pinkBg },
                 ].map((s, i) => (
                   <div key={i} className="iz-card" style={{ ...sCard, padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
                     <div style={{ width: 36, height: 36, borderRadius: 10, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><s.icon size={16} color={s.color} /></div>
@@ -9240,7 +9287,7 @@ export default function OnboardingModule() {
 
             {/* Filter */}
             <div style={{ display: "flex", gap: 4, padding: 3, background: C.bg, borderRadius: 8, marginBottom: 16, width: "fit-content" }}>
-              {[["all", "Tous"], ["disponible", "Disponible"], ["attribue", "Attribué"], ["en_commande", "En commande"], ["en_reparation", "En réparation"], ["retire", "Retiré"]].map(([key, label]) => (
+              {[["all", t('equip.all')], ["disponible", t('equip.available')], ["attribue", t('equip.assigned')], ["en_commande", t('equip.on_order')], ["en_reparation", t('equip.in_repair')], ["retire", t('equip.retired')]].map(([key, label]) => (
                 <button key={key} onClick={() => setEquipFilter(key)} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: equipFilter === key ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font, background: equipFilter === key ? C.pink : "transparent", color: equipFilter === key ? C.white : C.textMuted, transition: "all .15s" }}>{label}</button>
               ))}
             </div>
@@ -9248,9 +9295,9 @@ export default function OnboardingModule() {
             {/* Table */}
             <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
               <div style={{ display: "grid", gridTemplateColumns: "0.3fr 1.5fr 1fr 0.8fr 1fr 0.8fr 0.5fr", gap: 0, padding: "10px 16px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
-                <span></span><span>Matériel</span><span>Type</span><span>État</span><span>Attribué à</span><span>N° série</span><span></span>
+                <span></span><span>{t('equip.equipment')}</span><span>{t('equip.type')}</span><span>{t('equip.status')}</span><span>{t('equip.assigned_to')}</span><span>{t('equip.serial')}</span><span></span>
               </div>
-              {filtered.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun matériel trouvé</div>}
+              {filtered.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('equip.none_found')}</div>}
               {filtered.map(eq => {
                 const meta = ETAT_META[eq.etat] || ETAT_META.disponible;
                 const TypeIcon = EQUIP_ICON_MAP[eq.type?.icon || "package"] || Package;
@@ -9315,10 +9362,10 @@ export default function OnboardingModule() {
                       </div>
                     </div>
                     <div style={{ padding: "12px 20px" }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 8 }}>Contenu ({pkg.items.length} éléments)</div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 8 }}>{t('equip.content')} ({pkg.items.length} {t('equip.elements')})</div>
                       {pkg.items.map((item, i) => (
                         <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 12 }}>
-                          <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: item.type?.categorie === "licence" ? C.blueLight : C.bg, color: item.type?.categorie === "licence" ? C.blue : C.textMuted }}>{item.type?.categorie === "licence" ? "Licence" : "Matériel"}</span>
+                          <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: item.type?.categorie === "licence" ? C.blueLight : C.bg, color: item.type?.categorie === "licence" ? C.blue : C.textMuted }}>{item.type?.categorie === "licence" ? t('equip.licence') : t('equip.hardware')}</span>
                           <span style={{ fontWeight: 500, color: C.text }}>{item.type?.nom || "?"}</span>
                           {item.quantite > 1 && <span style={{ color: C.textMuted }}>×{item.quantite}</span>}
                           {item.notes && <span style={{ color: C.textLight, fontSize: 10 }}>({item.notes})</span>}
@@ -9330,35 +9377,35 @@ export default function OnboardingModule() {
                         const collabId = prompt("ID du collaborateur à provisionner :");
                         if (!collabId) return;
                         try { const res = await apiProvisionPkg(pkg.id, Number(collabId)); reloadEquip(); addToast_admin(res.message); } catch { addToast_admin(t('toast.error')); }
-                      }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px", display: "flex", alignItems: "center", gap: 4 }}><UserPlus size={12} /> Provisionner à un collaborateur</button>
+                      }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px", display: "flex", alignItems: "center", gap: 4 }}><UserPlus size={12} /> {t('equip.provision')}</button>
                     </div>
                   </div>
                 ))}
-                {equipPackages.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun package. Créez-en un pour regrouper matériel et licences.</div>}
+                {equipPackages.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('equip.no_package')}</div>}
               </div>
             )}
 
             {/* ═══ TAB: Types & Licences ═══ */}
             {equipTab === "types" && (
               <div>
-                {[{ cat: "materiel", label: "Matériel", color: C.text }, { cat: "licence", label: "Licences logicielles", color: C.blue }].map(section => {
+                {[{ cat: "materiel", label: t('equip.hardware_section'), color: C.text }, { cat: "licence", label: t('equip.licence_section'), color: C.blue }].map(section => {
                   const types = equipTypes.filter(t => (t as any).categorie === section.cat || (!( t as any).categorie && section.cat === "materiel"));
                   return (
                     <div key={section.cat} style={{ marginBottom: 24 }}>
                       <h2 style={{ fontSize: 15, fontWeight: 600, color: section.color, marginBottom: 12 }}>{section.label} ({types.length})</h2>
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-                        {types.map(t => {
-                          const TypeIcon = EQUIP_ICON_MAP[t.icon] || Package;
+                        {types.map(et => {
+                          const TypeIcon = EQUIP_ICON_MAP[et.icon] || Package;
                           return (
-                            <div key={t.id} className="iz-card" style={{ ...sCard, textAlign: "center", padding: "16px", opacity: t.actif ? 1 : 0.4 }}>
+                            <div key={et.id} className="iz-card" style={{ ...sCard, textAlign: "center", padding: "16px", opacity: et.actif ? 1 : 0.4 }}>
                               <div style={{ width: 44, height: 44, borderRadius: 12, background: section.cat === "licence" ? C.blueLight : C.bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px" }}>
                                 <TypeIcon size={20} color={section.cat === "licence" ? C.blue : C.textMuted} />
                               </div>
-                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{t.nom}</div>
-                              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 6 }}>{t.description || "—"}</div>
-                              {t.equipments_count !== undefined && <div style={{ fontSize: 10, color: C.textMuted }}>{t.equipments_count} en inventaire</div>}
+                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{et.nom}</div>
+                              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 6 }}>{et.description || "—"}</div>
+                              {et.equipments_count !== undefined && <div style={{ fontSize: 10, color: C.textMuted }}>{et.equipments_count} {t('equip.in_inventory')}</div>}
                               <div style={{ display: "flex", gap: 4, justifyContent: "center", marginTop: 8 }}>
-                                <button onClick={() => showConfirm(`Supprimer le type "${t.nom}" ?`, async () => { try { await apiDeleteEquipType(t.id); reloadEquip(); addToast_admin("Type supprimé"); } catch { addToast_admin("Erreur — des équipements utilisent ce type"); } })} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><Trash size={11} color={C.red} /></button>
+                                <button onClick={() => showConfirm(`${t('common.delete')} "${et.nom}" ?`, async () => { try { await apiDeleteEquipType(et.id); reloadEquip(); addToast_admin(t('toast.deleted')); } catch { addToast_admin(t('toast.error')); } })} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><Trash size={11} color={C.red} /></button>
                               </div>
                             </div>
                           );
@@ -9384,7 +9431,7 @@ export default function OnboardingModule() {
                       {equipTypes.map(t => <option key={t.id} value={t.id}>{t.nom}</option>)}
                     </select>
                   </div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Nom / Description *</label>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.name_label')} *</label>
                     <TranslatableField value={equipPanel.data.nom || ""} onChange={v => setEquipPanel(p => ({ ...p, data: { ...p.data, nom: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder="Ex: MacBook Pro 14 pouces" />
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -9482,7 +9529,7 @@ export default function OnboardingModule() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
               <div>
                 <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.signatures')}</h1>
-                <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Gérez les documents que vos collaborateurs doivent lire, accepter ou signer (règlement intérieur, droit à l'image, NDA...).</p>
+                <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>{t('sign.desc')}</p>
               </div>
               <button onClick={() => { resetTr(); setSignPanel({ mode: "create", data: { titre: "", description: "", type: "lecture", obligatoire: true, actif: true } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('doc.new_template')}</button>
             </div>
@@ -9490,8 +9537,8 @@ export default function OnboardingModule() {
             {/* How it works */}
             <div style={{ padding: "16px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20, fontSize: 12, color: C.blue, lineHeight: 1.7 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div><strong>Type "Lecture"</strong> — Le collaborateur lit le document et confirme "J'ai lu et j'accepte". Parfait pour le règlement intérieur, la charte IT, la politique RGPD.</div>
-                <div><strong>Type "Signature"</strong> — Le collaborateur signe électroniquement. Pour le droit à l'image, les NDA, les avenants au contrat. Intégrable avec DocuSign/UgoSign.</div>
+                <div>{t('sign.read_desc')}</div>
+                <div>{t('sign.sign_desc')}</div>
               </div>
             </div>
 
@@ -9506,7 +9553,7 @@ export default function OnboardingModule() {
                         <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{doc.titre}</h3>
                       </div>
                       <div style={{ display: "flex", gap: 4 }}>
-                        <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: doc.type === "lecture" ? C.blueLight : C.pinkBg, color: doc.type === "lecture" ? C.blue : C.pink }}>{doc.type === "lecture" ? "Lecture + Acceptation" : "Signature"}</span>
+                        <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: doc.type === "lecture" ? C.blueLight : C.pinkBg, color: doc.type === "lecture" ? C.blue : C.pink }}>{doc.type === "lecture" ? t('sign.type_read') : t('sign.type_sign')}</span>
                         {doc.obligatoire && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.redLight, color: C.red }}>{t('dash.obligatory')}</span>}
                       </div>
                     </div>
@@ -9515,17 +9562,17 @@ export default function OnboardingModule() {
                   </div>
                   <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg }}>
                     <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
-                      <span style={{ color: C.text }}><strong>{doc.total_signes || 0}</strong>/{doc.total_envois || 0} signés</span>
+                      <span style={{ color: C.text }}><strong>{doc.total_signes || 0}</strong>/{doc.total_envois || 0} {t('sign.signed')}</span>
                     </div>
                     <div style={{ display: "flex", gap: 4 }}>
-                      <button onClick={async () => { try { await sendSignatureDocToAll(doc.id); reloadSign(); addToast_admin("Document envoyé à tous"); } catch { addToast_admin(t('toast.error')); } }} title="Envoyer à tous" className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 10px", fontSize: 10, display: "flex", alignItems: "center", gap: 4 }}><Send size={10} /> Envoyer à tous</button>
+                      <button onClick={async () => { try { await sendSignatureDocToAll(doc.id); reloadSign(); addToast_admin("Document envoyé à tous"); } catch { addToast_admin(t('toast.error')); } }} title={t('sign.send_all')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 10px", fontSize: 10, display: "flex", alignItems: "center", gap: 4 }}><Send size={10} /> {t('sign.send_all')}</button>
                       <button onClick={() => { setContentTranslations((doc as any).translations || {}); setSignPanel({ mode: "edit", data: { ...doc } }); }} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
                       <button onClick={() => showConfirm(`Supprimer "${doc.titre}" ?`, async () => { try { await apiDeleteSignDoc(doc.id); reloadSign(); addToast_admin(t('toast.deleted')); } catch {} })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={12} color={C.red} /></button>
                     </div>
                   </div>
                 </div>
               ))}
-              {signDocs.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun document. Créez-en un pour commencer.</div>}
+              {signDocs.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('sign.no_docs')}</div>}
             </div>
 
             {/* Create/Edit Panel */}
@@ -9533,7 +9580,7 @@ export default function OnboardingModule() {
               <div onClick={() => setSignPanel({ mode: "closed", data: {} })} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
               <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 480, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
                 <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{signPanel.mode === "create" ? "Nouveau document" : "Modifier"}</h2>
+                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{signPanel.mode === "create" ? t('sign.new_doc') : t('common.edit')}</h2>
                   <button onClick={() => setSignPanel({ mode: "closed", data: {} })} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
                 </div>
                 <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
