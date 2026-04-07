@@ -37,7 +37,9 @@
       "Bash(scp -P 3022 -i ~/.ssh/id_illizeo_onboarding C:/Users/WilfridPaulRobertDus/Onboarding/illizeo-onboarding/dist/assets/index-D5RngGlM.js 199287-4428@gate.jpc.infomaniak.com:~/webroot/ROOT/public/build/assets/index-D5RngGlM.js)",
       "Bash(ssh -i ~/.ssh/id_illizeo_onboarding 199287-4428@gate.jpc.infomaniak.com -p 3022 \"cd ~/webroot/ROOT/public/build && sed -i 's/index-BcwEChBI.js/index-D5RngGlM.js/g' index.html && rm -f assets/index-BcwEChBI.js && echo 'Done'\")",
       "Bash(scp -P 3022 -i ~/.ssh/id_illizeo_onboarding C:/Users/WilfridPaulRobertDus/Onboarding/illizeo-onboarding/dist/assets/index-CBIwm2l3.js 199287-4428@gate.jpc.infomaniak.com:~/webroot/ROOT/public/build/assets/index-CBIwm2l3.js)",
-      "Bash(ssh -i ~/.ssh/id_illizeo_onboarding 199287-4428@gate.jpc.infomaniak.com -p 3022 \"cd ~/webroot/ROOT/public/build && sed -i 's/index-D5RngGlM.js/index-CBIwm2l3.js/g' index.html && rm -f assets/index-D5RngGlM.js && echo 'Done'\")"
+      "Bash(ssh -i ~/.ssh/id_illizeo_onboarding 199287-4428@gate.jpc.infomaniak.com -p 3022 \"cd ~/webroot/ROOT/public/build && sed -i 's/index-D5RngGlM.js/index-CBIwm2l3.js/g' index.html && rm -f assets/index-D5RngGlM.js && echo 'Done'\")",
+      "Bash(scp -P 3022 -i ~/.ssh/id_illizeo_onboarding C:/Users/WilfridPaulRobertDus/Onboarding/illizeo-onboarding/dist/assets/index-x9Y6MkXB.js 199287-4428@gate.jpc.infomaniak.com:~/webroot/ROOT/public/build/assets/index-x9Y6MkXB.js)",
+      "Bash(ssh -i ~/.ssh/id_illizeo_onboarding 199287-4428@gate.jpc.infomaniak.com -p 3022 \"cd ~/webroot/ROOT/public/build && sed -i 's/index-CBIwm2l3.js/index-x9Y6MkXB.js/g' index.html && rm -f assets/index-CBIwm2l3.js && echo 'Done'\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\WilfridPaulRobertDus\\Onboarding\\illizeo-api\\database"

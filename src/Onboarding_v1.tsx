@@ -5310,9 +5310,9 @@ export default function OnboardingModule() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('coopt.title')}</h1>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setCooptSettingsOpen(true)} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6 }}><Zap size={14} /> Paramètres</button>
+            <button onClick={() => setCooptSettingsOpen(true)} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6 }}><Zap size={14} /> {t('coopt.settings')}</button>
             {cooptTab === "cooptations" && <button onClick={() => { setCooptPanelData({ referrer_name: "", referrer_email: "", candidate_name: "", candidate_email: "", candidate_poste: "", type_recompense: cooptSettings?.type_recompense_defaut || "prime", montant_recompense: cooptSettings?.montant_defaut || 500, mois_requis: cooptSettings?.mois_requis_defaut || 6, notes: "", campaign_id: null }); setCooptPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('coopt.new')}</button>}
-            {cooptTab === "campagnes" && <button onClick={() => { setCampaignPanelData({ titre: "", description: "", departement: "", site: "", type_contrat: "CDI", type_recompense: "prime", montant_recompense: cooptSettings?.montant_defaut || 500, mois_requis: cooptSettings?.mois_requis_defaut || 6, nombre_postes: 1, priorite: "normale", date_limite: "" }); setCampaignPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Nouvelle campagne</button>}
+            {cooptTab === "campagnes" && <button onClick={() => { setCampaignPanelData({ titre: "", description: "", departement: "", site: "", type_contrat: "CDI", type_recompense: "prime", montant_recompense: cooptSettings?.montant_defaut || 500, mois_requis: cooptSettings?.mois_requis_defaut || 6, nombre_postes: 1, priorite: "normale", date_limite: "" }); setCampaignPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('coopt.new_campaign')}</button>}
           </div>
         </div>
 
@@ -5320,12 +5320,12 @@ export default function OnboardingModule() {
         {cooptStats && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
             {[
-              { label: "En cours", value: (cooptStats.en_attente || 0) + (cooptStats.embauche || 0), icon: Hourglass, color: C.blue, bg: C.blueLight },
-              { label: "Validées", value: cooptStats.valide || 0, icon: CheckCircle2, color: C.green, bg: C.greenLight },
-              { label: "Taux de conversion", value: `${cooptStats.conversion_rate || 0}%`, icon: TrendingUp, color: C.pink, bg: C.pinkBg },
-              { label: "Délai moyen embauche", value: `${cooptStats.avg_days_to_hire || 0}j`, icon: Clock, color: "#5C6BC0", bg: C.blueLight },
-              { label: "Récompenses versées", value: `${fmtCurrency(cooptStats.total_recompenses_versees || 0)}`, icon: Banknote, color: "#7B5EA7", bg: C.purple + "15" },
-              { label: "En attente de versement", value: `${fmtCurrency(cooptStats.recompenses_en_attente || 0)}`, icon: CircleDollarSign, color: C.amber, bg: C.amberLight },
+              { label: t('coopt.in_progress'), value: (cooptStats.en_attente || 0) + (cooptStats.embauche || 0), icon: Hourglass, color: C.blue, bg: C.blueLight },
+              { label: t('coopt.validated'), value: cooptStats.valide || 0, icon: CheckCircle2, color: C.green, bg: C.greenLight },
+              { label: t('coopt.conversion_rate'), value: `${cooptStats.conversion_rate || 0}%`, icon: TrendingUp, color: C.pink, bg: C.pinkBg },
+              { label: t('coopt.avg_hire_time'), value: `${cooptStats.avg_days_to_hire || 0}j`, icon: Clock, color: "#5C6BC0", bg: C.blueLight },
+              { label: t('coopt.rewards_paid'), value: `${fmtCurrency(cooptStats.total_recompenses_versees || 0)}`, icon: Banknote, color: "#7B5EA7", bg: C.purple + "15" },
+              { label: t('coopt.pending_payment'), value: `${fmtCurrency(cooptStats.recompenses_en_attente || 0)}`, icon: CircleDollarSign, color: C.amber, bg: C.amberLight },
             ].map((s, i) => (
               <div key={i} className="iz-card" style={{ ...sCard, padding: "16px 20px", display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><s.icon size={18} color={s.color} /></div>
@@ -5353,7 +5353,7 @@ export default function OnboardingModule() {
           {/* Filters row */}
           <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 16, flexWrap: "wrap" }}>
           <div style={{ display: "flex", gap: 4, padding: 3, background: C.bg, borderRadius: 8, width: "fit-content" }}>
-            {([["all", `Tous (${cooptations.length})`], ["en_attente", "En attente"], ["embauche", "Embauchés"], ["valide", "Validés"], ["recompense_versee", "Récompensés"], ["refuse", "Refusés"]] as const).map(([key, label]) => (
+            {([["all", `${t('coopt.all')} (${cooptations.length})`], ["en_attente", t('coopt.pending')], ["embauche", t('coopt.hired')], ["valide", t('coopt.validated')], ["recompense_versee", t('coopt.rewarded')], ["refuse", t('coopt.refused')]] as const).map(([key, label]) => (
               <button key={key} onClick={() => setCooptFilter(key as any)} style={{
                 padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: cooptFilter === key ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font,
                 background: cooptFilter === key ? C.pink : "transparent", color: cooptFilter === key ? C.white : C.textMuted, transition: "all .15s",
@@ -5362,7 +5362,7 @@ export default function OnboardingModule() {
           </div>
           {campaigns.length > 0 && (
             <select value={cooptCampaignFilter} onChange={e => setCooptCampaignFilter(e.target.value === "all" ? "all" : Number(e.target.value))} style={{ ...sInput, width: "auto", fontSize: 11, padding: "6px 10px" }}>
-              <option value="all">Toutes les campagnes</option>
+              <option value="all">{t('coopt.all_campaigns')}</option>
               {campaigns.map(c => <option key={c.id} value={c.id}>{c.titre}</option>)}
             </select>
           )}
@@ -5371,9 +5371,9 @@ export default function OnboardingModule() {
           {/* Table */}
           <div className="iz-card" style={{ ...sCard, overflow: "hidden" }}>
             <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1.5fr 0.8fr 1fr 1fr 0.8fr 0.5fr", gap: 0, padding: "10px 16px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase", letterSpacing: .3 }}>
-              <span>Parrain</span><span>Candidat coopté</span><span>Statut</span><span>Récompense</span><span>Période probatoire</span><span>Poste</span><span></span>
+              <span>{t('coopt.referrer')}</span><span>{t('coopt.candidate')}</span><span>{t('contrat.status')}</span><span>{t('coopt.reward')}</span><span>{t('coopt.probation')}</span><span>{t('coopt.position')}</span><span></span>
             </div>
-            {filtered.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucune cooptation trouvée</div>}
+            {filtered.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('coopt.no_referrals')}</div>}
             {filtered.map(c => {
               const meta = COOPT_STATUS_META[c.statut] || COOPT_STATUS_META.en_attente;
               return (
@@ -5399,18 +5399,18 @@ export default function OnboardingModule() {
                   <div style={{ fontWeight: 600, color: c.recompense_versee ? C.green : C.text }}>
                     {c.type_recompense === "prime" ? `${fmtCurrency(c.montant_recompense || 0)}` : c.description_recompense || "Cadeau"}
                   </div>
-                  {c.recompense_versee && <div style={{ fontSize: 10, color: C.green }}>Versée le {fmtDate(c.date_versement)}</div>}
+                  {c.recompense_versee && <div style={{ fontSize: 10, color: C.green }}>{t('coopt.paid_on')} {fmtDate(c.date_versement)}</div>}
                 </div>
                 <div>
                   {c.date_embauche ? (
                     <div>
-                      <div style={{ fontSize: 12 }}>{c.mois_requis} mois requis</div>
+                      <div style={{ fontSize: 12 }}>{c.mois_requis} {t('coopt.months_required')}</div>
                       {c.statut === "embauche" && c.jours_restants !== null && c.jours_restants > 0 ? (
-                        <div style={{ fontSize: 10, color: C.blue }}>{c.jours_restants} jours restants</div>
+                        <div style={{ fontSize: 10, color: C.blue }}>{c.jours_restants} {t('coopt.days_left')}</div>
                       ) : c.statut === "embauche" && c.is_validable ? (
-                        <div style={{ fontSize: 10, color: C.green, fontWeight: 600 }}>Validable !</div>
+                        <div style={{ fontSize: 10, color: C.green, fontWeight: 600 }}>{t('coopt.validable')}</div>
                       ) : c.date_validation ? (
-                        <div style={{ fontSize: 10, color: C.textMuted }}>Fin : {fmtDate(c.date_validation)}</div>
+                        <div style={{ fontSize: 10, color: C.textMuted }}>{t('coopt.end_date')} {fmtDate(c.date_validation)}</div>
                       ) : null}
                     </div>
                   ) : <span style={{ color: C.textMuted }}>—</span>}
@@ -5458,30 +5458,30 @@ export default function OnboardingModule() {
                     {camp.departement && <span>{camp.departement}</span>}
                     {camp.site && <span>{camp.site}</span>}
                     <span>{camp.type_contrat}</span>
-                    <span>{camp.nombre_postes} poste{camp.nombre_postes > 1 ? "s" : ""}</span>
+                    <span>{camp.nombre_postes} {t('coopt.posts')}{camp.nombre_postes > 1 ? "s" : ""}</span>
                   </div>
                 </div>
                 <div style={{ padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
-                    <div><span style={{ fontWeight: 600, color: C.text }}>{camp.type_recompense === "prime" ? `${fmtCurrency(camp.montant_recompense || 0)}` : camp.description_recompense || "Cadeau"}</span><br /><span style={{ fontSize: 10, color: C.textMuted }}>Récompense</span></div>
-                    <div><span style={{ fontWeight: 600, color: C.text }}>{camp.mois_requis} mois</span><br /><span style={{ fontSize: 10, color: C.textMuted }}>Période probatoire</span></div>
-                    <div><span style={{ fontWeight: 600, color: C.text }}>{camp.cooptations_count || 0}</span><br /><span style={{ fontSize: 10, color: C.textMuted }}>Candidatures</span></div>
+                    <div><span style={{ fontWeight: 600, color: C.text }}>{camp.type_recompense === "prime" ? `${fmtCurrency(camp.montant_recompense || 0)}` : camp.description_recompense || "Cadeau"}</span><br /><span style={{ fontSize: 10, color: C.textMuted }}>{t('coopt.reward')}</span></div>
+                    <div><span style={{ fontWeight: 600, color: C.text }}>{camp.mois_requis} mois</span><br /><span style={{ fontSize: 10, color: C.textMuted }}>{t('coopt.probation')}</span></div>
+                    <div><span style={{ fontWeight: 600, color: C.text }}>{camp.cooptations_count || 0}</span><br /><span style={{ fontSize: 10, color: C.textMuted }}>{t('coopt.applications')}</span></div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/cooptation/${camp.share_token}`); addToast_admin("Lien copié !"); }} title="Copier le lien de partage" className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Link size={12} /> Partager</button>
+                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/cooptation/${camp.share_token}`); addToast_admin(t('toast.saved')); }} title={t('coopt.share')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Link size={12} /> {t('coopt.share')}</button>
                     <button onClick={() => { setCampaignPanelData({ ...camp, date_limite: camp.date_limite || "" }); setCampaignPanelMode("edit"); }} style={{ background: C.bg, border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer" }}><FilePen size={14} color={C.textMuted} /></button>
                   </div>
                 </div>
                 {camp.date_limite && (
                   <div style={{ padding: "6px 20px 12px", fontSize: 10, color: new Date(camp.date_limite) < new Date() ? C.red : C.textMuted }}>
                     <Calendar size={10} style={{ verticalAlign: -1, marginRight: 4 }} />
-                    Date limite : {fmtDate(camp.date_limite)}
+                    {t('coopt.deadline')} {fmtDate(camp.date_limite)}
                   </div>
                 )}
               </div>
               );
             })}
-            {campaigns.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucune campagne créée</div>}
+            {campaigns.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('coopt.no_campaigns')}</div>}
           </div>
         )}
 
@@ -5490,10 +5490,10 @@ export default function OnboardingModule() {
           <div className="iz-card" style={{ ...sCard, overflow: "hidden" }}>
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10 }}>
               <Trophy size={18} color={C.amber} />
-              <span style={{ fontSize: 15, fontWeight: 600 }}>Top Coopteurs</span>
-              <span style={{ fontSize: 11, color: C.textMuted, marginLeft: "auto" }}>Points : recommandation (5) + embauche (10) + validation (25) + bonus (15)</span>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{t('coopt.top_referrers')}</span>
+              <span style={{ fontSize: 11, color: C.textMuted, marginLeft: "auto" }}>{t('coopt.points_desc')}</span>
             </div>
-            {leaderboard.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun point attribué pour le moment</div>}
+            {leaderboard.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('coopt.no_points')}</div>}
             {leaderboard.map((entry, i) => {
               const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
               const initials = entry.referrer_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
@@ -5526,31 +5526,31 @@ export default function OnboardingModule() {
             </div>
             <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
               {campaigns.filter(c => c.statut === "active").length > 0 && (
-                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Campagne associée</label>
+                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.associated_campaign')}</label>
                   <select value={cooptPanelData.campaign_id || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, campaign_id: e.target.value ? Number(e.target.value) : null })} style={sInput}>
-                    <option value="">— Aucune campagne —</option>
+                    <option value="">{t('coopt.no_campaign')}</option>
                     {campaigns.filter(c => c.statut === "active").map(c => <option key={c.id} value={c.id}>{c.titre} ({c.type_contrat})</option>)}
                   </select>
                 </div>
               )}
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginBottom: -4 }}>Parrain (employé)</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginBottom: -4 }}>{t('coopt.referrer_employee')}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Nom</label><input value={cooptPanelData.referrer_name} onChange={e => setCooptPanelData({ ...cooptPanelData, referrer_name: e.target.value })} style={sInput} /></div>
                 <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Email</label><input value={cooptPanelData.referrer_email} onChange={e => setCooptPanelData({ ...cooptPanelData, referrer_email: e.target.value })} style={sInput} /></div>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 8, marginBottom: -4 }}>Candidat coopté</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 8, marginBottom: -4 }}>{t('coopt.referred_candidate')}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Nom</label><input value={cooptPanelData.candidate_name} onChange={e => setCooptPanelData({ ...cooptPanelData, candidate_name: e.target.value })} style={sInput} /></div>
                 <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Email</label><input value={cooptPanelData.candidate_email} onChange={e => setCooptPanelData({ ...cooptPanelData, candidate_email: e.target.value })} style={sInput} /></div>
               </div>
-              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Poste visé</label><input value={cooptPanelData.candidate_poste || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, candidate_poste: e.target.value })} style={sInput} /></div>
+              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.target_position')}</label><input value={cooptPanelData.candidate_poste || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, candidate_poste: e.target.value })} style={sInput} /></div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}><Phone size={10} /> Téléphone</label><input value={cooptPanelData.telephone || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, telephone: e.target.value })} style={sInput} placeholder="+41 79 123 45 67" /></div>
+                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}><Phone size={10} /> {t('coopt.phone')}</label><input value={cooptPanelData.telephone || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, telephone: e.target.value })} style={sInput} placeholder="+41 79 123 45 67" /></div>
                 <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}><Linkedin size={10} /> LinkedIn</label><input value={cooptPanelData.linkedin_url || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, linkedin_url: e.target.value })} style={sInput} placeholder="https://linkedin.com/in/..." /></div>
               </div>
               {/* CV Upload */}
               <div>
-                <label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}><Paperclip size={10} /> CV / Pièce jointe</label>
+                <label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "flex", alignItems: "center", gap: 4 }}><Paperclip size={10} /> {t('coopt.cv_attachment')}</label>
                 {cooptPanelData.cv_original_name ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: C.greenLight, fontSize: 12 }}>
                     <FileText size={14} color={C.green} />
@@ -5559,7 +5559,7 @@ export default function OnboardingModule() {
                   </div>
                 ) : (
                   <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 8, border: `1px dashed ${C.border}`, cursor: "pointer", fontSize: 12, color: C.textLight, transition: "all .15s" }}>
-                    <Upload size={14} /> Glisser ou cliquer pour ajouter un CV (PDF, DOC, max 5 Mo)
+                    <Upload size={14} /> {t('coopt.drop_cv')}
                     <input type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
@@ -5576,22 +5576,22 @@ export default function OnboardingModule() {
                   </label>
                 )}
               </div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 8, marginBottom: -4 }}>Récompense</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 8, marginBottom: -4 }}>{t('coopt.reward')}</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Type</label>
+                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.reward_type')}</label>
                   <select value={cooptPanelData.type_recompense} onChange={e => setCooptPanelData({ ...cooptPanelData, type_recompense: e.target.value })} style={sInput}>
                     <option value="prime">Prime (CHF)</option>
                     <option value="cadeau">Cadeau</option>
                   </select>
                 </div>
                 {cooptPanelData.type_recompense === "prime" ? (
-                  <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Montant (CHF)</label><input type="number" value={cooptPanelData.montant_recompense || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, montant_recompense: Number(e.target.value) })} style={sInput} /></div>
+                  <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.amount')}</label><input type="number" value={cooptPanelData.montant_recompense || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, montant_recompense: Number(e.target.value) })} style={sInput} /></div>
                 ) : (
                   <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Description</label><input value={cooptPanelData.description_recompense || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, description_recompense: e.target.value })} style={sInput} placeholder="Ex: carte cadeau, journée spa..." /></div>
                 )}
-                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Mois requis</label><input type="number" value={cooptPanelData.mois_requis} onChange={e => setCooptPanelData({ ...cooptPanelData, mois_requis: Number(e.target.value) })} style={sInput} /></div>
+                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.months_req')}</label><input type="number" value={cooptPanelData.mois_requis} onChange={e => setCooptPanelData({ ...cooptPanelData, mois_requis: Number(e.target.value) })} style={sInput} /></div>
               </div>
-              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Notes</label><textarea value={cooptPanelData.notes || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, notes: e.target.value })} style={{ ...sInput, minHeight: 80, resize: "vertical" }} /></div>
+              <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.notes')}</label><textarea value={cooptPanelData.notes || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, notes: e.target.value })} style={{ ...sInput, minHeight: 80, resize: "vertical" }} /></div>
             </div>
             <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
               {cooptPanelMode === "edit" && cooptPanelData.id && (
@@ -5656,7 +5656,7 @@ export default function OnboardingModule() {
                 ) : (
                   <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Description</label><input value={campaignPanelData.description_recompense || ""} onChange={e => setCampaignPanelData({ ...campaignPanelData, description_recompense: e.target.value })} style={sInput} /></div>
                 )}
-                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Mois requis</label><input type="number" value={campaignPanelData.mois_requis} onChange={e => setCampaignPanelData({ ...campaignPanelData, mois_requis: Number(e.target.value) })} style={sInput} /></div>
+                <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.months_req')}</label><input type="number" value={campaignPanelData.mois_requis} onChange={e => setCampaignPanelData({ ...campaignPanelData, mois_requis: Number(e.target.value) })} style={sInput} /></div>
               </div>
               {campaignPanelMode === "edit" && (
                 <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>Statut</label>
