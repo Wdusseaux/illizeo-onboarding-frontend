@@ -43,7 +43,11 @@ export const _MOCK_NOTIFICATIONS_LIST = [
   "Nouveau questionnaire disponible", "Nouvelle tâche disponible", "Relance des invitations",
   "Pièce administrative à signer disponible", "Catégorie de pièces administratives complétée",
   "Catégorie de pièce administrative refusée", "Catégorie de pièce administrative à valider",
-  "Pièce administrative complétée", "La ressource a été mise à jour", "Pièces administratives signées", "Questionnaire complété"
+  "Pièce administrative complétée", "La ressource a été mise à jour", "Pièces administratives signées", "Questionnaire complété",
+  "Nouveau message reçu", "Document validé", "Badge obtenu", "Cooptation — Statut mis à jour",
+  "Parcours terminé", "Signature de contrat requise", "Rappel pré-arrivée J-3",
+  "Feedback buddy / parrain demandé", "Mobilité interne — Début de parcours",
+  "Retour de congé — Parcours initié", "Résumé hebdomadaire collaborateur", "NPS — Nouvelle enquête disponible"
 ];
 
 export const NOTIF_RESOURCES = ["Événements"];
