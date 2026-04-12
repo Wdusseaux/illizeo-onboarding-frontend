@@ -553,7 +553,7 @@ export function createAdminDashboardSuivi(ctx: any) {
             <input value={suiviSearch} onChange={e => setSuiviSearch(e.target.value)} placeholder={t('common.search')} style={{ border: "none", outline: "none", background: "transparent", flex: 1, fontSize: 13, fontFamily: font, color: C.text }} />
           </div>
           <div style={{ display: "flex", gap: 4, padding: 3, background: C.bg, borderRadius: 8 }}>
-            {([["all", `Tous (${COLLABORATEURS.length})`], ["en_cours", "En cours"], ["en_retard", "En retard"], ["termine", "Terminé"]] as const).map(([key, label]) => (
+            {([["all", `${t('misc.all')} (${COLLABORATEURS.length})`], ["en_cours", t('status.ongoing')], ["en_retard", t('status.late')], ["termine", t('status.completed')]] as const).map(([key, label]) => (
               <button key={key} onClick={() => setSuiviFilter(key)} style={{
                 padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: suiviFilter === key ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font,
                 background: suiviFilter === key ? C.pink : "transparent", color: suiviFilter === key ? C.white : C.textMuted, transition: "all .15s",

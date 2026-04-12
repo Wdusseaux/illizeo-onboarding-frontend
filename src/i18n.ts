@@ -886,6 +886,7 @@ const translations: Record<string, Record<Lang, string>> = {
   'team_role.recruiter': { fr: 'Recruteur', en: 'Recruiter', de: 'Recruiter', it: 'Recruiter', es: 'Reclutador' },
 
   // ─── Misc ────────────────────────────────────────
+  'misc.all': { fr: 'Tous', en: 'All', de: 'Alle', it: 'Tutti', es: 'Todos' },
   'misc.no_result': { fr: 'Aucun résultat', en: 'No results', de: 'Keine Ergebnisse', it: 'Nessun risultato', es: 'Sin resultados' },
   'misc.complete': { fr: 'Compléter', en: 'Complete', de: 'Vervollständigen', it: 'Completare', es: 'Completar' },
   'misc.select': { fr: '— Sélectionner —', en: '— Select —', de: '— Auswählen —', it: '— Seleziona —', es: '— Seleccionar —' },
