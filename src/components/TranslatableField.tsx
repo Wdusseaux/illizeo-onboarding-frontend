@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Languages, X } from "lucide-react";
-import { LANG_META, type Lang } from "../i18n";
+import { t, LANG_META, type Lang } from "../i18n";
 import { C, sInput, sBtn, font } from "../constants";
 
 export type Translations = Partial<Record<Lang, string>>;
@@ -93,7 +93,7 @@ export default function TranslatableField({
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Languages size={18} color={C.pink} />
-              <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Traductions</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{t('common.translations')}</span>
             </div>
             <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color={C.textLight} /></button>
           </div>
@@ -110,7 +110,7 @@ export default function TranslatableField({
               <div key={lang} style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
                   {LANG_META[lang].flag} {LANG_META[lang].nativeName}
-                  {isCurrent && <span style={{ fontSize: 10, color: C.textLight, fontWeight: 400 }}>(principal)</span>}
+                  {isCurrent && <span style={{ fontSize: 10, color: C.textLight, fontWeight: 400 }}>({t('common.primary')})</span>}
                 </label>
                 {multiline ? (
                   <textarea

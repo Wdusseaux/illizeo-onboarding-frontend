@@ -1958,13 +1958,13 @@ export function createAdminInlinePages(ctx: any) {
                   <button onClick={() => setSignPanel({ mode: "closed", data: {} })} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
                 </div>
                 <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Titre *</label>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('sign.title_label')}</label>
                     <TranslatableField value={signPanel.data.titre || ""} onChange={v => setSignPanel(p => ({ ...p, data: { ...p.data, titre: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.titre} onTranslationsChange={tr => setTr("titre", tr)} style={sInput} placeholder="Ex: Règlement intérieur" /></div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Description</label>
-                    <TranslatableField multiline rows={3} value={signPanel.data.description || ""} onChange={v => setSignPanel(p => ({ ...p, data: { ...p.data, description: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ ...sInput, minHeight: 60, resize: "vertical" }} placeholder="Décrivez le contenu du document..." /></div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Type</label>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('sign.desc_label')}</label>
+                    <TranslatableField multiline rows={3} value={signPanel.data.description || ""} onChange={v => setSignPanel(p => ({ ...p, data: { ...p.data, description: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ ...sInput, minHeight: 60, resize: "vertical" }} /></div>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('sign.type_label')}</label>
                     <div style={{ display: "flex", gap: 8 }}>
-                      {[{ id: "lecture", label: "Lecture + Acceptation", icon: BookOpen, desc: "Le collaborateur confirme avoir lu" }, { id: "signature", label: "Signature électronique", icon: PenLine, desc: "Le collaborateur signe le document" }].map(t => (
+                      {[{ id: "lecture", label: t('sign.type_read_label'), icon: BookOpen, desc: t('sign.type_read_desc') }, { id: "signature", label: t('sign.type_sign_label'), icon: PenLine, desc: t('sign.type_sign_desc') }].map(t => (
                         <button key={t.id} onClick={() => setSignPanel(p => ({ ...p, data: { ...p.data, type: t.id } }))} style={{ flex: 1, padding: "12px", borderRadius: 10, border: `2px solid ${signPanel.data.type === t.id ? C.pink : C.border}`, background: signPanel.data.type === t.id ? C.pinkBg : C.white, cursor: "pointer", textAlign: "left", fontFamily: font }}>
                           <t.icon size={18} color={signPanel.data.type === t.id ? C.pink : C.textMuted} style={{ marginBottom: 6 }} />
                           <div style={{ fontSize: 13, fontWeight: 600, color: signPanel.data.type === t.id ? C.pink : C.text }}>{t.label}</div>
@@ -1974,7 +1974,7 @@ export function createAdminInlinePages(ctx: any) {
                     </div>
                   </div>
                   {/* File upload */}
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Fichier (PDF, DOC)</label>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('sign.file_label')}</label>
                     {signPanel.data.fichier_nom ? (
                       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: C.greenLight, fontSize: 12 }}>
                         <FileText size={14} color={C.green} />
@@ -1982,11 +1982,11 @@ export function createAdminInlinePages(ctx: any) {
                       </div>
                     ) : (
                       <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 8, border: `1px dashed ${C.border}`, cursor: "pointer", fontSize: 12, color: C.textLight }}>
-                        <Upload size={14} /> Cliquer pour ajouter un fichier (max 10 Mo)
+                        <Upload size={14} /> {t('sign.click_upload')}
                         <input type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={async (e) => {
                           const file = e.target.files?.[0]; if (!file) return;
                           if (signPanel.data.id) {
-                            try { const res = await uploadSignatureFile(signPanel.data.id, file); setSignPanel(p => ({ ...p, data: { ...p.data, fichier_nom: res.filename } })); addToast_admin("Fichier uploadé"); } catch { addToast_admin("Erreur upload"); }
+                            try { const res = await uploadSignatureFile(signPanel.data.id, file); setSignPanel(p => ({ ...p, data: { ...p.data, fichier_nom: res.filename } })); addToast_admin(t('sign.file_uploaded')); } catch { addToast_admin(t('sign.upload_error')); }
                           } else { setSignPanel(p => ({ ...p, data: { ...p.data, _pendingFile: file, fichier_nom: file.name } })); }
                         }} />
                       </label>
@@ -1994,17 +1994,17 @@ export function createAdminInlinePages(ctx: any) {
                   </div>
                   <div style={{ display: "flex", gap: 16 }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer" }}>
-                      <input type="checkbox" checked={signPanel.data.obligatoire !== false} onChange={() => setSignPanel(p => ({ ...p, data: { ...p.data, obligatoire: !p.data.obligatoire } }))} style={{ accentColor: C.pink }} /> Obligatoire
+                      <input type="checkbox" checked={signPanel.data.obligatoire !== false} onChange={() => setSignPanel(p => ({ ...p, data: { ...p.data, obligatoire: !p.data.obligatoire } }))} style={{ accentColor: C.pink }} /> {t('sign.mandatory')}
                     </label>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer" }}>
-                      <input type="checkbox" checked={signPanel.data.actif !== false} onChange={() => setSignPanel(p => ({ ...p, data: { ...p.data, actif: !p.data.actif } }))} style={{ accentColor: C.green }} /> Actif
+                      <input type="checkbox" checked={signPanel.data.actif !== false} onChange={() => setSignPanel(p => ({ ...p, data: { ...p.data, actif: !p.data.actif } }))} style={{ accentColor: C.green }} /> {t('sign.active')}
                     </label>
                   </div>
                 </div>
                 <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button onClick={() => setSignPanel({ mode: "closed", data: {} })} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
                   <button onClick={async () => {
-                    if (!signPanel.data.titre?.trim()) { addToast_admin("Le titre est requis"); return; }
+                    if (!signPanel.data.titre?.trim()) { addToast_admin(t('sign.title_required')); return; }
                     try {
                       const payload = { titre: signPanel.data.titre, description: signPanel.data.description || null, type: signPanel.data.type || "lecture", obligatoire: signPanel.data.obligatoire !== false, actif: signPanel.data.actif !== false, translations: buildTranslationsPayload() };
                       let created: any;
