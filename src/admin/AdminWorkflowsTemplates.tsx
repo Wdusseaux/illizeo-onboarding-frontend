@@ -699,8 +699,21 @@ export function createAdminWorkflowsTemplates(ctx: any) {
       { key: "arrivees_semaine", label: t('notifcfg.weekly_arrivals'), icon: CalendarDays },
       { key: "nouvelle_recrue", label: t('notifcfg.new_hire'), icon: UserPlus },
       { key: "questionnaire_complete", label: t('notifcfg.survey_complete'), icon: CheckCircle },
-      { key: "invitation_utilisateur", label: "Invitation d'un utilisateur", icon: Mail },
-      { key: "delegation", label: "Délégation créée / modifiée", icon: ArrowRight },
+      { key: "invitation_utilisateur", label: t('notifcfg.user_invitation'), icon: Mail },
+      { key: "delegation", label: t('notifcfg.delegation'), icon: ArrowRight },
+      // New notifications
+      { key: "nouveau_message", label: t('notifcfg.new_message'), icon: MessageSquare },
+      { key: "document_valide", label: t('notifcfg.doc_validated'), icon: CheckCircle2 },
+      { key: "badge_obtenu", label: t('notifcfg.badge_earned'), icon: Award },
+      { key: "cooptation_statut", label: t('notifcfg.cooptation_status'), icon: Handshake },
+      { key: "parcours_termine", label: t('notifcfg.path_completed'), icon: Trophy },
+      { key: "signature_requise", label: t('notifcfg.signature_required'), icon: PenTool },
+      { key: "rappel_pre_arrivee", label: t('notifcfg.pre_arrival_reminder'), icon: Rocket },
+      { key: "feedback_buddy", label: t('notifcfg.buddy_feedback'), icon: Hand },
+      { key: "mobilite_interne", label: t('notifcfg.internal_mobility'), icon: Route },
+      { key: "retour_conge", label: t('notifcfg.return_from_leave'), icon: Heart },
+      { key: "resume_hebdo", label: t('notifcfg.weekly_summary'), icon: CalendarCheck },
+      { key: "nps_enquete", label: t('notifcfg.nps_survey'), icon: Star },
     ];
     const toggleNotif = (key: string, channel: "email" | "push" | "inapp") => {
       setNotifConfig(prev => {
@@ -717,12 +730,12 @@ export function createAdminWorkflowsTemplates(ctx: any) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.notif_config')}</h1>
         </div>
-        <p style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Choisissez quelles notifications sont envoyées et par quel canal.</p>
+        <p style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>{t('notifcfg.subtitle')}</p>
 
         <div className="iz-card" style={{ ...sCard, overflow: "hidden", padding: 0 }}>
           {/* Header */}
           <div style={{ display: "grid", gridTemplateColumns: "2fr 80px 80px 80px", gap: 0, padding: "12px 20px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
-            <span>Notification</span><span style={{ textAlign: "center" }}>Email</span><span style={{ textAlign: "center" }}>Push</span><span style={{ textAlign: "center" }}>In-app</span>
+            <span>{t('notifcfg.notification')}</span><span style={{ textAlign: "center" }}>Email</span><span style={{ textAlign: "center" }}>Push</span><span style={{ textAlign: "center" }}>In-app</span>
           </div>
           {NOTIF_TYPES.map((n, i) => {
             const cfg = notifConfig[n.key] || { email: true, push: false, inapp: true };
