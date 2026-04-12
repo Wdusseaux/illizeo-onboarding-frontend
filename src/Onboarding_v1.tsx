@@ -1200,6 +1200,23 @@ export default function OnboardingModule() {
   ctx.saveSetting = saveSetting;
   ctx.hasTrackedOnboard = hasTrackedOnboard;
 
+  // SIDEBAR_ITEMS must be built before factories since EmployeePages destructures it
+  const SIDEBAR_ITEMS = [
+    { section: t('sidebar.my_workspace'), items: [
+      { id: "tableau_de_bord" as const, label: t('sidebar.dashboard'), icon: LayoutDashboard },
+      { id: "mes_actions" as const, label: t('sidebar.my_actions'), icon: Zap, badge: 7 },
+      { id: "suivi" as const, label: t('sidebar.my_tracking'), icon: Target },
+      { id: "messagerie" as const, label: t('sidebar.messaging'), icon: MessageCircle },
+      { id: "notifications" as const, label: t('sidebar.notifications'), icon: Bell, badge: notifUnread > 0 ? notifUnread : undefined },
+    ]},
+    { section: t('sidebar.illizeo'), items: [
+      { id: "entreprise" as const, label: t('sidebar.company'), icon: Building2 },
+      { id: "cooptation" as const, label: t('admin.cooptation'), icon: Handshake },
+      { id: "satisfaction" as const, label: t('admin.nps'), icon: Star },
+    ]},
+  ];
+  ctx.SIDEBAR_ITEMS = SIDEBAR_ITEMS;
+
   const empRenders = createEmployeeRenders(ctx);
   const {
     renderSidebar, renderActionCard, renderDashboard, renderMesActions,
@@ -1476,21 +1493,6 @@ export default function OnboardingModule() {
   }
 
   // ─── DASHBOARD (MAIN APP) ────────────────────────────────
-  const SIDEBAR_ITEMS = [
-    { section: t('sidebar.my_workspace'), items: [
-      { id: "tableau_de_bord" as const, label: t('sidebar.dashboard'), icon: LayoutDashboard },
-      { id: "mes_actions" as const, label: t('sidebar.my_actions'), icon: Zap, badge: 7 },
-      { id: "suivi" as const, label: t('sidebar.my_tracking'), icon: Target },
-      { id: "messagerie" as const, label: t('sidebar.messaging'), icon: MessageCircle },
-      { id: "notifications" as const, label: t('sidebar.notifications'), icon: Bell, badge: notifUnread > 0 ? notifUnread : undefined },
-    ]},
-    { section: t('sidebar.illizeo'), items: [
-      { id: "entreprise" as const, label: t('sidebar.company'), icon: Building2 },
-      { id: "cooptation" as const, label: t('admin.cooptation'), icon: Handshake },
-      { id: "satisfaction" as const, label: t('admin.nps'), icon: Star },
-    ]},
-  ];
-
   if (role === "rh") {
     return (
       <div style={{ display: "flex", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text }}>
