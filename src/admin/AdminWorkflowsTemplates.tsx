@@ -450,16 +450,49 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                   <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.subject')} *</label><TranslatableField value={tplPanelData.sujet} onChange={v => setTplPanelData((p: any) => ({ ...p, sujet: v }))} placeholder="Bienvenue chez Illizeo — {{prenom}}" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.sujet} onTranslationsChange={tr => setTr("sujet", tr)} /></div>
                   <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.trigger')}</label><select value={tplPanelData.declencheur} onChange={e => setTplPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TPL_TRIGGERS.map(tr => <option key={tr} value={tr}>{tr}</option>)}</select></div>
                   <div style={{ marginBottom: 16 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.email_body')}</label>
-                    <TranslatableField
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{t('tpl.email_body')}</label>
+                      {activeLanguages.length > 1 && (
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {activeLanguages.map(l => (
+                            <button key={l} onClick={() => {
+                              // Save current content for current lang before switching
+                              if (lang === "fr") {
+                                // value is already in tplPanelData.contenu
+                              } else {
+                                setTr("contenu", { ...contentTranslations.contenu, [lang]: tplPanelData.contenu });
+                              }
+                              // Load content for target lang
+                              if (l === "fr") {
+                                // Restore FR content from the original value
+                                const frVal = tplPanelData._contenu_fr ?? tplPanelData.contenu;
+                                setTplPanelData((p: any) => ({ ...p, contenu: frVal, _bodyLang: "fr" }));
+                              } else {
+                                // Save FR if first switch
+                                if (!tplPanelData._contenu_fr && (tplPanelData._bodyLang || "fr") === "fr") {
+                                  setTplPanelData((p: any) => ({ ...p, _contenu_fr: p.contenu }));
+                                }
+                                setTplPanelData((p: any) => ({ ...p, contenu: contentTranslations.contenu?.[l] || "", _bodyLang: l }));
+                              }
+                            }} style={{
+                              padding: "3px 8px", borderRadius: 5, fontSize: 10, fontWeight: 600, border: "none", cursor: "pointer", fontFamily: font,
+                              background: (tplPanelData._bodyLang || "fr") === l ? C.pink : C.bg,
+                              color: (tplPanelData._bodyLang || "fr") === l ? C.white : C.textMuted,
+                            }}>{LANG_META[l as Lang]?.flag} {l.toUpperCase()}</button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <RichEditor
                       value={tplPanelData.contenu || ""}
-                      onChange={v => setTplPanelData((p: any) => ({ ...p, contenu: v }))}
-                      currentLang={lang}
-                      activeLangs={activeLanguages}
-                      translations={contentTranslations.contenu}
-                      onTranslationsChange={tr => setTr("contenu", tr)}
-                      multiline
-                      rows={6}
+                      onChange={(html) => {
+                        setTplPanelData((p: any) => ({ ...p, contenu: html }));
+                        // Also update translation for non-FR lang
+                        const bodyLang = tplPanelData._bodyLang || "fr";
+                        if (bodyLang !== "fr") {
+                          setTr("contenu", { ...contentTranslations.contenu, [bodyLang]: html });
+                        }
+                      }}
                       placeholder="Bonjour {{prenom}}, Bienvenue chez Illizeo !"
                     />
                   </div>
