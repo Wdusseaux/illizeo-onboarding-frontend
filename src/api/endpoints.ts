@@ -93,6 +93,10 @@ export async function deleteCollaborateur(id: number) {
   return apiFetch<void>(`/collaborateurs/${id}`, { method: 'DELETE' });
 }
 
+export async function purgeDemoCollaborateurs() {
+  return apiFetch<{ deleted: number }>('/collaborateurs/purge-demo', { method: 'POST' });
+}
+
 // ─── Parcours ───────────────────────────────────────────────
 interface ApiParcours {
   id: number; nom: string; categorie_id: number; actions_count: number;

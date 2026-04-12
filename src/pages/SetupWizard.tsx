@@ -80,6 +80,7 @@ import {
   uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures,
   type SignatureDoc, type DocAcknowledgement,
   checkDossier, validateDossier, exportDossier, resetDossier, type DossierCheck,
+  purgeDemoCollaborateurs,
 } from "../api/endpoints";
 import { apiFetch } from "../api/client";
 
@@ -489,7 +490,25 @@ export function createSetupWizard(ctx: any) {
                   <p style={{ fontSize: 13, color: C.textLight, lineHeight: 1.6, margin: "0 0 16px" }}>
                     {t('wiz.finalize_desc')}
                   </p>
-                  <button onClick={finishSetupWizard} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "12px 28px", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* Purge demo data checkbox */}
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, background: C.white, border: `1px solid ${C.border}`, cursor: "pointer", marginBottom: 16 }}>
+                    <input type="checkbox" id="purge-demo" style={{ marginTop: 2, accentColor: C.pink, width: 16, height: 16 }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{t('wiz.purge_demo')}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{t('wiz.purge_demo_desc')}</div>
+                    </div>
+                  </label>
+                  <button onClick={async () => {
+                    const purgeCheckbox = document.getElementById('purge-demo') as HTMLInputElement;
+                    if (purgeCheckbox?.checked) {
+                      try {
+                        const res = await purgeDemoCollaborateurs();
+                        addToast_admin(t('wiz.demo_purged') || `${res.deleted} collaborateur(s) de démo supprimé(s)`);
+                        refetchCollaborateurs();
+                      } catch { /* ignore */ }
+                    }
+                    finishSetupWizard();
+                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "12px 28px", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
                     <Sparkles size={16} /> {t('wiz.access_space')}
                   </button>
                 </div>
