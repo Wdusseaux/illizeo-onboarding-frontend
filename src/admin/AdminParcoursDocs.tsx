@@ -435,6 +435,15 @@ export function createAdminParcoursDocs(ctx: any) {
   
     // ─── DOCUMENTS ─────────────────────────────────────────────
 
+    // Translate known document category titles
+    const DOC_CAT_I18N: Record<string, string> = {
+      "complementaires": t('doccat.complementaires'),
+      "formulaires": t('doccat.formulaires'),
+      "suisse": t('doccat.suisse'),
+      "supplementaires": t('doccat.supplementaires'),
+    };
+    const trCatTitre = (cat: any) => DOC_CAT_I18N[cat.id] || DOC_CAT_I18N[cat.slug] || cat.titre;
+
     const renderDocuments = () => {
       const reloadDocs = () => getDocuments().then(setRealDocs).catch(() => {});
       // Use real API documents when available, fallback to mock
@@ -449,12 +458,12 @@ export function createAdminParcoursDocs(ctx: any) {
               cat.pieces.map((piece, pi) => {
                 const seed = collab.id * 100 + pi;
                 const status = collab.progression === 100 ? "valide" : seed % 5 === 0 ? "refuse" : seed % 3 === 0 ? "manquant" : seed % 4 === 0 ? "en_attente" : "valide";
-                return { id: seed, collabId: collab.id, collabName: `${collab.prenom} ${collab.nom}`, collabInitials: collab.initials, collabColor: collab.color, categorie: cat.titre, categorieId: cat.id, piece: piece.nom, obligatoire: piece.obligatoire, type: piece.type, status, submittedAt: status !== "manquant" ? `2026-03-${String(10 + (seed % 20)).padStart(2, "0")}` : null, key: seed };
+                return { id: seed, collabId: collab.id, collabName: `${collab.prenom} ${collab.nom}`, collabInitials: collab.initials, collabColor: collab.color, categorie: trCatTitre(cat), categorieId: cat.id, piece: piece.nom, obligatoire: piece.obligatoire, type: piece.type, status, submittedAt: status !== "manquant" ? `2026-03-${String(10 + (seed % 20)).padStart(2, "0")}` : null, key: seed };
               })
             )
           );
 
-      const allPieces = ADMIN_DOC_CATEGORIES.flatMap(cat => cat.pieces.map(p => ({ ...p, categorie: cat.titre, categorieId: cat.id })));
+      const allPieces = ADMIN_DOC_CATEGORIES.flatMap(cat => cat.pieces.map(p => ({ ...p, categorie: trCatTitre(cat), categorieId: cat.id })));
       const totalTemplates = allPieces.length;
       const pendingValidation = docSubmissions.filter(d => d.status === "en_attente" || d.status === "soumis");
       const missing = docSubmissions.filter(d => d.status === "manquant");
@@ -528,7 +537,7 @@ export function createAdminParcoursDocs(ctx: any) {
             </div>
             <select value={gedCatFilter} onChange={e => setGedCatFilter(e.target.value)} style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12, fontFamily: font, color: C.text, cursor: "pointer" }}>
               <option value="all">{t('misc.all_categories')}</option>
-              {ADMIN_DOC_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.titre}</option>)}
+              {ADMIN_DOC_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{trCatTitre(cat)}</option>)}
             </select>
           </div>
 
@@ -541,7 +550,7 @@ export function createAdminParcoursDocs(ctx: any) {
               <div key={cat.id} style={{ marginBottom: 20 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                   <FolderOpen size={16} color={C.pink} />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{cat.titre}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{trCatTitre(cat)}</span>
                   <span style={{ fontSize: 11, color: C.textMuted }}>{catPieces.length} {t('misc.pieces')}</span>
                 </div>
                 <div className="iz-card" style={{ ...sCard, overflow: "hidden" }}>
@@ -627,9 +636,9 @@ export function createAdminParcoursDocs(ctx: any) {
                 if (selectedDocsForValidation.size === pendingValidation.length) setSelectedDocsForValidation(new Set());
                 else setSelectedDocsForValidation(new Set(pendingValidation.map(d => d.id)));
               }} style={{ cursor: "pointer" }} /></span>
-              <span>Collaborateur</span><span>Document</span><span>Catégorie</span><span>Soumis le</span><span>Actions</span>
+              <span>{t('doc.col_employee')}</span><span>{t('doc.col_document')}</span><span>{t('doc.col_category')}</span><span>{t('doc.col_submitted')}</span><span>{t('doc.col_actions')}</span>
             </div>
-            {pendingValidation.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun document en attente de validation</div>}
+            {pendingValidation.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('doc.no_pending')}</div>}
             {pendingValidation.map(d => (
               <div key={d.id} style={{ display: "grid", gridTemplateColumns: "40px 1.5fr 2fr 1fr 1fr 0.8fr", gap: 0, padding: "12px 16px", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13, background: selectedDocsForValidation.has(d.id) ? C.pinkBg + "40" : "transparent" }}
                 className="iz-sidebar-item">
@@ -666,7 +675,7 @@ export function createAdminParcoursDocs(ctx: any) {
               <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom du document *</label><TranslatableField value={tplPanelDoc.nom} onChange={v => setTplPanelDoc({ ...tplPanelDoc, nom: v })} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder="Ex: Pièce d'identité / Passeport" /></div>
               <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Catégorie</label>
                 <select value={tplPanelDoc.categorie} onChange={e => setTplPanelDoc({ ...tplPanelDoc, categorie: e.target.value })} style={sInput}>
-                  {ADMIN_DOC_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{cat.titre}</option>)}
+                  {ADMIN_DOC_CATEGORIES.map(cat => <option key={cat.id} value={cat.id}>{trCatTitre(cat)}</option>)}
                 </select>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>

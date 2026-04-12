@@ -954,7 +954,72 @@ export function createAdminInlinePages(ctx: any) {
           );
   };
 
+  // ── Drag & drop for field reordering ──
+  let _fieldDragFrom: { section: string; idx: number } | null = null;
+  let _fieldDragTo: { section: string; idx: number } | null = null;
+
+  const handleFieldDragStart = (section: string, idx: number) => {
+    _fieldDragFrom = { section, idx };
+  };
+  const handleFieldDragOver = (e: React.DragEvent, section: string, idx: number) => {
+    e.preventDefault();
+    _fieldDragTo = { section, idx };
+    document.querySelectorAll('[data-field-drag]').forEach(el => {
+      (el as HTMLElement).style.borderTopColor = 'transparent';
+    });
+    const target = document.querySelector(`[data-field-drag="${section}-${idx}"]`) as HTMLElement;
+    if (target) target.style.borderTopColor = C.pink;
+  };
+  const handleFieldDrop = async () => {
+    document.querySelectorAll('[data-field-drag]').forEach(el => {
+      (el as HTMLElement).style.borderTopColor = 'transparent';
+    });
+    if (!_fieldDragFrom || !_fieldDragTo || (_fieldDragFrom.section === _fieldDragTo.section && _fieldDragFrom.idx === _fieldDragTo.idx)) return;
+    const sectionFields = fieldConfig.filter(f => f.section === _fieldDragFrom!.section);
+    const otherFields = fieldConfig.filter(f => f.section !== _fieldDragFrom!.section);
+
+    if (_fieldDragFrom.section === _fieldDragTo.section) {
+      // Reorder within same section
+      const [moved] = sectionFields.splice(_fieldDragFrom.idx, 1);
+      sectionFields.splice(_fieldDragTo.idx, 0, moved);
+      const updated = sectionFields.map((f, i) => ({ ...f, ordre: i + 1 }));
+      setFieldConfig([...otherFields, ...updated]);
+      for (const f of updated) apiUpdateFieldConfig(f.id, { ordre: f.ordre }).catch(() => {});
+    } else {
+      // Move to different section
+      const [moved] = sectionFields.splice(_fieldDragFrom.idx, 1);
+      moved.section = _fieldDragTo.section;
+      const targetFields = fieldConfig.filter(f => f.section === _fieldDragTo!.section);
+      targetFields.splice(_fieldDragTo.idx, 0, moved);
+      const updatedTarget = targetFields.map((f, i) => ({ ...f, ordre: i + 1 }));
+      const updatedSource = sectionFields.map((f, i) => ({ ...f, ordre: i + 1 }));
+      const rest = fieldConfig.filter(f => f.section !== _fieldDragFrom!.section && f.section !== _fieldDragTo!.section);
+      setFieldConfig([...rest, ...updatedSource, ...updatedTarget]);
+      apiUpdateFieldConfig(moved.id, { section: moved.section, ordre: moved.ordre }).catch(() => {});
+      for (const f of updatedTarget) apiUpdateFieldConfig(f.id, { ordre: f.ordre }).catch(() => {});
+      for (const f of updatedSource) apiUpdateFieldConfig(f.id, { ordre: f.ordre }).catch(() => {});
+    }
+    addToast_admin(t('toast.order_saved') || "Ordre enregistré");
+    _fieldDragFrom = null;
+    _fieldDragTo = null;
+  };
+
+  // ── Drag & drop for section reordering ──
+  let _sectionDragFrom: number | null = null;
+  let _sectionDragTo: number | null = null;
+  // Sections order stored in state-like closure
+  const SECTION_DEFS_DEFAULT = [
+    { key: "personal", label: t('fields.personal'), icon: Users, color: "#C2185B" },
+    { key: "contract", label: t('fields.contract'), icon: FileSignature, color: "#1A73E8" },
+    { key: "job", label: t('fields.job'), icon: ClipboardList, color: "#E65100" },
+    { key: "position", label: t('fields.position'), icon: Navigation, color: "#00897B" },
+    { key: "org", label: t('fields.org'), icon: Building2, color: "#7B5EA7" },
+  ];
+
   const renderAdminFields = () => {
+    // Sort fields by ordre within each section
+    const sortedFieldConfig = [...fieldConfig].sort((a, b) => (a.ordre || 0) - (b.ordre || 0));
+
     return (
           <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1018,21 +1083,43 @@ export function createAdminInlinePages(ctx: any) {
                 </button>
               </div>
             </div>
-            {[
-              { key: "personal", label: t('fields.personal'), icon: Users, color: "#C2185B" },
-              { key: "contract", label: t('fields.contract'), icon: FileSignature, color: "#1A73E8" },
-              { key: "job", label: t('fields.job'), icon: ClipboardList, color: "#E65100" },
-              { key: "position", label: t('fields.position'), icon: Navigation, color: "#00897B" },
-              { key: "org", label: t('fields.org'), icon: Building2, color: "#7B5EA7" },
-            ].map(section => (
+            {SECTION_DEFS_DEFAULT.map(section => (
               <div key={section.key} style={{ marginBottom: 24 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                   <div style={{ width: 28, height: 28, borderRadius: 6, background: `${section.color}15`, display: "flex", alignItems: "center", justifyContent: "center" }}><section.icon size={14} color={section.color} /></div>
                   <h2 style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>{section.label}</h2>
+                  <span style={{ fontSize: 10, color: C.textMuted }}>({sortedFieldConfig.filter(f => f.section === section.key).length})</span>
                 </div>
-                <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
-                  {fieldConfig.filter(f => f.section === section.key).map((fc, i, arr) => (
-                    <div key={fc.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}
+                  onDragOver={(e) => {
+                    // Allow drop on empty sections
+                    const sectionFields = sortedFieldConfig.filter(f => f.section === section.key);
+                    if (sectionFields.length === 0) {
+                      e.preventDefault();
+                      _fieldDragTo = { section: section.key, idx: 0 };
+                    }
+                  }}
+                  onDrop={() => { if (sortedFieldConfig.filter(f => f.section === section.key).length === 0) handleFieldDrop(); }}>
+                  {sortedFieldConfig.filter(f => f.section === section.key).length === 0 && (
+                    <div style={{ padding: "16px", textAlign: "center", fontSize: 11, color: C.textMuted, borderTop: "2px solid transparent" }} data-field-drag={`${section.key}-0`}>
+                      {t('fields.drop_here') || "Glissez un champ ici"}
+                    </div>
+                  )}
+                  {sortedFieldConfig.filter(f => f.section === section.key).map((fc, i, arr) => (
+                    <div key={fc.id}
+                      data-field-drag={`${section.key}-${i}`}
+                      draggable
+                      onDragStart={() => handleFieldDragStart(section.key, i)}
+                      onDragOver={(e) => handleFieldDragOver(e, section.key, i)}
+                      onDragEnd={() => { document.querySelectorAll('[data-field-drag]').forEach(el => { (el as HTMLElement).style.borderTopColor = 'transparent'; }); }}
+                      onDrop={handleFieldDrop}
+                      style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none", borderTop: "2px solid transparent", transition: "border-color .15s", cursor: "grab" }}>
+                      {/* Drag handle */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "4px 2px", flexShrink: 0, color: C.textMuted }}>
+                        <div style={{ width: 12, display: "flex", flexWrap: "wrap", gap: 2 }}>
+                          {[...Array(6)].map((_, di) => <div key={di} style={{ width: 3, height: 3, borderRadius: "50%", background: C.border }} />)}
+                        </div>
+                      </div>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           <span style={{ fontSize: 13, fontWeight: 500 }}>{lang !== "fr" && fc.label_en ? fc.label_en : fc.label}</span>
