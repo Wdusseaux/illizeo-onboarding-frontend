@@ -34,12 +34,28 @@ export default function TranslatableField({
   }, [open]);
 
   const otherLangs = activeLangs.filter(l => l !== currentLang);
-  const hasTranslations = otherLangs.some(l => translations[l]?.trim());
+  const hasTranslations = otherLangs.some(l => {
+    if (l === "fr") return !!value?.trim();
+    return !!translations[l]?.trim();
+  });
+
+  // The displayed value in the main field depends on currentLang:
+  // - If currentLang is "fr", show/edit `value` directly
+  // - If currentLang is another lang, show/edit `translations[currentLang]`
+  const isFrPrimary = currentLang === "fr";
+  const displayValue = isFrPrimary ? value : (translations[currentLang] || "");
+  const handleDisplayChange = (v: string) => {
+    if (isFrPrimary) {
+      onChange(v);
+    } else {
+      onTranslationsChange?.({ ...translations, [currentLang]: v });
+    }
+  };
 
   if (otherLangs.length === 0 || !onTranslationsChange) {
     return multiline
-      ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows} disabled={disabled} style={{ ...sInput, resize: "vertical" as const, ...style }} />
-      : <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{ ...sInput, ...style }} />;
+      ? <textarea value={displayValue} onChange={e => handleDisplayChange(e.target.value)} placeholder={placeholder} rows={rows} disabled={disabled} style={{ ...sInput, resize: "vertical" as const, ...style }} />
+      : <input value={displayValue} onChange={e => handleDisplayChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{ ...sInput, ...style }} />;
   }
 
   return (
@@ -47,8 +63,8 @@ export default function TranslatableField({
       <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
         <div style={{ flex: 1 }}>
           {multiline
-            ? <textarea value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={rows} disabled={disabled} style={{ ...sInput, resize: "vertical" as const, ...style }} />
-            : <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{ ...sInput, ...style }} />
+            ? <textarea value={displayValue} onChange={e => handleDisplayChange(e.target.value)} placeholder={placeholder} rows={rows} disabled={disabled} style={{ ...sInput, resize: "vertical" as const, ...style }} />
+            : <input value={displayValue} onChange={e => handleDisplayChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{ ...sInput, ...style }} />
           }
         </div>
         <button
@@ -82,39 +98,39 @@ export default function TranslatableField({
             <button onClick={() => setOpen(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} color={C.textLight} /></button>
           </div>
 
-          {/* Primary language (read-only) */}
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-              {LANG_META[currentLang].flag} {LANG_META[currentLang].nativeName} <span style={{ fontSize: 10, color: C.textLight, fontWeight: 400 }}>(principal)</span>
-            </label>
-            <div style={{ ...sInput, fontSize: 13, background: C.bg, color: C.textMuted, whiteSpace: multiline ? "pre-wrap" : undefined, minHeight: multiline ? 60 : undefined }}>
-              {value || <span style={{ fontStyle: "italic", color: C.textLight }}>&mdash;</span>}
-            </div>
-          </div>
-
-          {otherLangs.map(lang => (
-            <div key={lang} style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                {LANG_META[lang].flag} {LANG_META[lang].nativeName}
-              </label>
-              {multiline ? (
-                <textarea
-                  rows={rows}
-                  value={translations[lang] || ""}
-                  onChange={e => onTranslationsChange({ ...translations, [lang]: e.target.value })}
-                  placeholder={`${placeholder || ""} (${LANG_META[lang].nativeName})`}
-                  style={{ ...sInput, fontSize: 13, resize: "vertical" as const }}
-                />
-              ) : (
-                <input
-                  value={translations[lang] || ""}
-                  onChange={e => onTranslationsChange({ ...translations, [lang]: e.target.value })}
-                  placeholder={`${placeholder || ""} (${LANG_META[lang].nativeName})`}
-                  style={{ ...sInput, fontSize: 13 }}
-                />
-              )}
-            </div>
-          ))}
+          {/* All languages — current lang is primary (read-only), others are editable */}
+          {activeLangs.map(lang => {
+            const isCurrent = lang === currentLang;
+            const langValue = lang === "fr" ? value : (translations[lang] || "");
+            const handleLangChange = (v: string) => {
+              if (lang === "fr") onChange(v);
+              else onTranslationsChange({ ...translations, [lang]: v });
+            };
+            return (
+              <div key={lang} style={{ marginBottom: 14 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                  {LANG_META[lang].flag} {LANG_META[lang].nativeName}
+                  {isCurrent && <span style={{ fontSize: 10, color: C.textLight, fontWeight: 400 }}>(principal)</span>}
+                </label>
+                {multiline ? (
+                  <textarea
+                    rows={rows}
+                    value={langValue}
+                    onChange={e => handleLangChange(e.target.value)}
+                    placeholder={`(${LANG_META[lang].nativeName})`}
+                    style={{ ...sInput, fontSize: 13, resize: "vertical" as const }}
+                  />
+                ) : (
+                  <input
+                    value={langValue}
+                    onChange={e => handleLangChange(e.target.value)}
+                    placeholder={`(${LANG_META[lang].nativeName})`}
+                    style={{ ...sInput, fontSize: 13 }}
+                  />
+                )}
+              </div>
+            );
+          })}
 
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
             <button onClick={() => setOpen(false)} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, padding: "6px 16px" }}>OK</button>

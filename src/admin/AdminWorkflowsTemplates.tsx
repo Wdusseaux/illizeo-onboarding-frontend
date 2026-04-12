@@ -446,20 +446,26 @@ export function createAdminWorkflowsTemplates(ctx: any) {
               </div>
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
                 {!tplPreview ? (<>
-                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom *</label><TranslatableField value={tplPanelData.nom} onChange={v => setTplPanelData((p: any) => ({ ...p, nom: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
-                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Sujet de l'email *</label><TranslatableField value={tplPanelData.sujet} onChange={v => setTplPanelData((p: any) => ({ ...p, sujet: v }))} placeholder="Bienvenue chez Illizeo — {{prenom}}" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.sujet} onTranslationsChange={tr => setTr("sujet", tr)} /></div>
-                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Déclencheur</label><select value={tplPanelData.declencheur} onChange={e => setTplPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TPL_TRIGGERS.map(tr => <option key={tr} value={tr}>{tr}</option>)}</select></div>
+                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.name')} *</label><TranslatableField value={tplPanelData.nom} onChange={v => setTplPanelData((p: any) => ({ ...p, nom: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
+                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.subject')} *</label><TranslatableField value={tplPanelData.sujet} onChange={v => setTplPanelData((p: any) => ({ ...p, sujet: v }))} placeholder="Bienvenue chez Illizeo — {{prenom}}" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.sujet} onTranslationsChange={tr => setTr("sujet", tr)} /></div>
+                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.trigger')}</label><select value={tplPanelData.declencheur} onChange={e => setTplPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TPL_TRIGGERS.map(tr => <option key={tr} value={tr}>{tr}</option>)}</select></div>
                   <div style={{ marginBottom: 16 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Corps de l'email</label>
-                    <RichEditor
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.email_body')}</label>
+                    <TranslatableField
                       value={tplPanelData.contenu || ""}
-                      onChange={(html) => setTplPanelData((p: any) => ({ ...p, contenu: html }))}
+                      onChange={v => setTplPanelData((p: any) => ({ ...p, contenu: v }))}
+                      currentLang={lang}
+                      activeLangs={activeLanguages}
+                      translations={contentTranslations.contenu}
+                      onTranslationsChange={tr => setTr("contenu", tr)}
+                      multiline
+                      rows={6}
                       placeholder="Bonjour {{prenom}}, Bienvenue chez Illizeo !"
                     />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: C.bg, borderRadius: 10, cursor: "pointer" }} onClick={() => setTplPanelData((p: any) => ({ ...p, actif: !p.actif }))}>
                     <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${tplPanelData.actif ? C.pink : C.border}`, background: tplPanelData.actif ? C.pink : C.white, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s" }}>{tplPanelData.actif && <Check size={14} color={C.white} />}</div>
-                    <span style={{ fontSize: 13, fontWeight: 500 }}>Template actif</span>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{t('tpl.active')}</span>
                   </div>
                 </>) : (
                   /* ── Preview mode ── */
