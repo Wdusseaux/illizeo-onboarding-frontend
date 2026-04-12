@@ -43,7 +43,7 @@ export default function RichEditor({ value, onChange, placeholder }: RichEditorP
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({ link: false }),
       Underline,
       TextStyle,
       Color,

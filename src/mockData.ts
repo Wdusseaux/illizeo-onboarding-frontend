@@ -210,19 +210,42 @@ export const _MOCK_EMAIL_TEMPLATES: EmailTemplate[] = [
   { id: 14, nom: "Cooptation — Récompense", sujet: "Votre cooptation a été validée !", declencheur: "Tous documents validés", variables: ["{{prenom}}", "{{candidat_nom}}", "{{montant}}"], actif: false },
   { id: 15, nom: "NPS — Enquête satisfaction", sujet: "Comment s'est passé votre onboarding ?", declencheur: "Parcours complété à 100%", variables: ["{{prenom}}", "{{parcours_nom}}", "{{lien}}"], actif: true },
   { id: 16, nom: "Badge obtenu", sujet: "Vous avez obtenu un nouveau badge ! 🏅", declencheur: "Attribution de badge", variables: ["{{prenom}}", "{{badge_nom}}"], actif: true },
+  // Onboarding complémentaires
+  { id: 17, nom: "Rappel pré-arrivée J-3", sujet: "Plus que 3 jours avant votre premier jour {{prenom}} !", declencheur: "J-3", variables: ["{{prenom}}", "{{site}}", "{{adresse}}", "{{manager}}"], actif: true },
+  { id: 18, nom: "Notification manager — Nouvel arrivant", sujet: "Nouvel arrivant dans votre équipe : {{collab_nom}}", declencheur: "Création du collaborateur", variables: ["{{manager}}", "{{collab_nom}}", "{{poste}}", "{{date_debut}}", "{{parcours_nom}}"], actif: true },
+  { id: 19, nom: "Feedback buddy / parrain", sujet: "Comment se passe l'intégration de {{collab_nom}} ?", declencheur: "J+14", variables: ["{{prenom}}", "{{collab_nom}}", "{{parcours_nom}}", "{{lien}}"], actif: true },
+  // Document validé
+  { id: 20, nom: "Document validé", sujet: "Votre document a été validé ✓", declencheur: "Document validé", variables: ["{{prenom}}", "{{document_nom}}"], actif: true },
+  // Signatures
+  { id: 21, nom: "Signature contrat", sujet: "Votre contrat est prêt à signer", declencheur: "Signature requise", variables: ["{{prenom}}", "{{document_nom}}", "{{lien}}"], actif: true },
+  { id: 22, nom: "Relance signature", sujet: "Rappel : document en attente de signature", declencheur: "J+3 après signature requise", variables: ["{{prenom}}", "{{document_nom}}", "{{lien}}"], actif: true },
+  // Crossboarding / Reboarding
+  { id: 23, nom: "Mobilité interne — Début", sujet: "Votre transition vers {{poste}} commence !", declencheur: "Création du parcours", variables: ["{{prenom}}", "{{poste}}", "{{site}}", "{{manager}}", "{{parcours_nom}}"], actif: true },
+  { id: 24, nom: "Retour de congé — Bienvenue", sujet: "Content de vous retrouver {{prenom}} !", declencheur: "Création du parcours", variables: ["{{prenom}}", "{{site}}", "{{manager}}", "{{parcours_nom}}"], actif: true },
+  // Communication
+  { id: 25, nom: "Nouveau message reçu", sujet: "Vous avez un nouveau message de {{collab_nom}}", declencheur: "Nouveau message", variables: ["{{prenom}}", "{{collab_nom}}", "{{lien}}"], actif: true },
+  { id: 26, nom: "Résumé hebdomadaire", sujet: "Votre semaine d'intégration — {{prenom}}", declencheur: "Hebdomadaire (lundi)", variables: ["{{prenom}}", "{{nb_docs_manquants}}", "{{parcours_nom}}", "{{lien}}"], actif: true },
+  // Rappel RH
+  { id: 27, nom: "Rappel RH — Actions en retard", sujet: "Rapport : {{nb_retards}} action(s) en retard", declencheur: "Hebdomadaire (lundi)", variables: ["{{nb_retards}}", "{{lien}}"], actif: true },
 ];
 export const TPL_CATEGORIES: Record<string, { label: string; color: string; bg: string }> = {
   onboarding: { label: "Onboarding", color: "#4CAF50", bg: "#E8F5E9" },
   offboarding: { label: "Offboarding", color: "#E53935", bg: "#FFEBEE" },
+  crossboarding: { label: "Crossboarding", color: "#00897B", bg: "#E0F2F1" },
   relance: { label: "Relance", color: "#F9A825", bg: "#FFF8E1" },
+  signature: { label: "Signature", color: "#E65100", bg: "#FFF3E0" },
+  communication: { label: "Communication", color: "#5C6BC0", bg: "#E8EAF6" },
   admin: { label: "Admin / RH", color: "#1A73E8", bg: "#E3F2FD" },
   cooptation: { label: "Cooptation", color: "#7B5EA7", bg: "#F3E5F5" },
 };
 export function guessTplCategory(nom: string): string {
   const n = nom.toLowerCase();
   if (n.includes("offboard") || n.includes("départ") || n.includes("checklist it")) return "offboarding";
+  if (n.includes("mobilité") || n.includes("crossboard") || n.includes("retour de congé") || n.includes("reboard")) return "crossboarding";
+  if (n.includes("signature") || n.includes("contrat")) return "signature";
+  if (n.includes("message") || n.includes("résumé hebdo") || n.includes("communication")) return "communication";
   if (n.includes("relance") || n.includes("rappel") || n.includes("retard")) return "relance";
-  if (n.includes("validation") || n.includes("période") || n.includes("nps")) return "admin";
+  if (n.includes("validation") || n.includes("période") || n.includes("nps") || n.includes("anniversaire")) return "admin";
   if (n.includes("cooptation")) return "cooptation";
   return "onboarding";
 }
