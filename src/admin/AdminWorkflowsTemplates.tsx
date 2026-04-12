@@ -719,37 +719,37 @@ export function createAdminWorkflowsTemplates(ctx: any) {
     ];
 
 
-    // Drag & drop state for block reordering
-    const dragBlockRef = useRef<number | null>(null);
-    const dragOverBlockRef = useRef<number | null>(null);
-    const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+    // Drag & drop state for block reordering (plain closure vars, no hooks)
+    let _dragFromIdx: number | null = null;
+    let _dragToIdx: number | null = null;
 
     const handleBlockDragStart = (idx: number) => {
-      dragBlockRef.current = idx;
+      _dragFromIdx = idx;
     };
 
     const handleBlockDragOver = (e: React.DragEvent, idx: number) => {
       e.preventDefault();
-      dragOverBlockRef.current = idx;
-      setDragOverIdx(idx);
+      _dragToIdx = idx;
+      // Visual feedback via DOM (avoids needing useState in factory)
+      document.querySelectorAll('[data-block-drag]').forEach(el => {
+        (el as HTMLElement).style.borderTopColor = 'transparent';
+      });
+      const target = document.querySelector(`[data-block-drag="${idx}"]`) as HTMLElement;
+      if (target) target.style.borderTopColor = C.pink;
     };
 
     const handleBlockDrop = async () => {
-      const fromIdx = dragBlockRef.current;
-      const toIdx = dragOverBlockRef.current;
-      if (fromIdx === null || toIdx === null || fromIdx === toIdx) {
-        setDragOverIdx(null);
-        return;
-      }
+      document.querySelectorAll('[data-block-drag]').forEach(el => {
+        (el as HTMLElement).style.borderTopColor = 'transparent';
+      });
+      if (_dragFromIdx === null || _dragToIdx === null || _dragFromIdx === _dragToIdx) return;
       const reordered = [...companyBlocks];
-      const [moved] = reordered.splice(fromIdx, 1);
-      reordered.splice(toIdx, 0, moved);
+      const [moved] = reordered.splice(_dragFromIdx, 1);
+      reordered.splice(_dragToIdx, 0, moved);
       const updated = reordered.map((b, i) => ({ ...b, ordre: i + 1 }));
       setCompanyBlocks(updated);
-      setDragOverIdx(null);
-      dragBlockRef.current = null;
-      dragOverBlockRef.current = null;
-      // Persist new order to API
+      _dragFromIdx = null;
+      _dragToIdx = null;
       for (const b of updated) {
         apiUpdateBlock(b.id, { ordre: b.ordre }).catch(() => {});
       }
@@ -765,7 +765,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
         </div>
 
         {/* Add block tiles */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginBottom: 20 }}>
           {BLOCK_TYPES.map(bt => {
             const BtIcon = bt.icon;
             return (
@@ -774,10 +774,10 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                 setCompanyBlocks(prev => [...prev, newBlock]);
                 setEditingBlockId(newBlock.id);
                 addToast_admin("Bloc créé");
-              }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: `1.5px dashed ${C.border}`, background: C.white, cursor: "pointer", fontFamily: font, fontSize: 12, fontWeight: 500, color: C.textLight, transition: "all .2s" }}
+              }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px dashed ${C.border}`, background: C.white, cursor: "pointer", fontFamily: font, fontSize: 11, fontWeight: 500, color: C.textLight, transition: "all .2s", whiteSpace: "nowrap" }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = C.pink; e.currentTarget.style.color = C.pink; e.currentTarget.style.background = C.pinkBg; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textLight; e.currentTarget.style.background = C.white; }}>
-                <BtIcon size={15} />
+                <BtIcon size={14} />
                 {bt.label}
               </button>
             );
@@ -789,14 +789,14 @@ export function createAdminWorkflowsTemplates(ctx: any) {
           {companyBlocks.map((block, idx) => {
             const bt = BLOCK_TYPES.find(t => t.type === block.type);
             const BIcon = bt?.icon || FileText;
-            const isDragOver = dragOverIdx === idx;
             return (
               <div
                 key={block.id}
+                data-block-drag={idx}
                 draggable
                 onDragStart={() => handleBlockDragStart(idx)}
                 onDragOver={(e) => handleBlockDragOver(e, idx)}
-                onDragEnd={() => setDragOverIdx(null)}
+                onDragEnd={() => { document.querySelectorAll('[data-block-drag]').forEach(el => { (el as HTMLElement).style.borderTopColor = 'transparent'; }); }}
                 onDrop={handleBlockDrop}
                 className="iz-card"
                 style={{
@@ -805,8 +805,8 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                   opacity: block.actif ? 1 : 0.5,
                   padding: "14px 18px",
                   cursor: "grab",
-                  borderTop: isDragOver ? `2px solid ${C.pink}` : undefined,
-                  transition: "border .15s, opacity .2s",
+                  borderTop: "2px solid transparent",
+                  transition: "border-color .15s, opacity .2s",
                 }}>
                 {/* Drag handle */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, cursor: "grab", padding: "4px 2px", flexShrink: 0, color: C.textMuted }}>
@@ -841,7 +841,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
         {editBlock && (
           <>
             <div onClick={() => setEditingBlockId(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
-            <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 520, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
+            <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 720, maxWidth: "90vw", height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "24px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{t('common.edit_block')}</h2>
                 <button onClick={() => setEditingBlockId(null)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
