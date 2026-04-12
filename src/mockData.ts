@@ -191,6 +191,16 @@ export const _MOCK_WORKFLOW_RULES: WorkflowRule[] = [
   { id: 13, nom: "Récompense cooptation", declencheur: "Cooptation validée", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: false },
   { id: 14, nom: "Félicitations anniversaire", declencheur: "Anniversaire d'embauche", action: "Envoyer un message IllizeoBot", destinataire: "Collaborateur", actif: true },
   { id: 15, nom: "Désactivation accès offboarding", declencheur: "Fin de parcours offboarding", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: true },
+  { id: 16, nom: "Rappel pré-arrivée J-3", declencheur: "J-3 avant date d'arrivée", action: "Envoyer email pré-arrivée", destinataire: "Collaborateur", actif: true },
+  { id: 17, nom: "Feedback buddy J+14", declencheur: "J+14 après arrivée", action: "Envoyer demande feedback", destinataire: "Buddy / Parrain", actif: true },
+  { id: 18, nom: "Confirmation document validé", declencheur: "Document validé", action: "Envoyer email confirmation", destinataire: "Collaborateur", actif: true },
+  { id: 19, nom: "Envoi contrat à signer", declencheur: "Contrat prêt", action: "Envoyer email signature", destinataire: "Collaborateur", actif: true },
+  { id: 20, nom: "Relance signature J+3", declencheur: "J+3 après envoi signature", action: "Envoyer relance signature", destinataire: "Collaborateur", actif: true },
+  { id: 21, nom: "Résumé hebdomadaire collaborateur", declencheur: "Hebdomadaire (lundi)", action: "Envoyer résumé semaine", destinataire: "Collaborateur", actif: true },
+  { id: 22, nom: "Rapport RH — Retards hebdo", declencheur: "Hebdomadaire (lundi)", action: "Envoyer rapport retards", destinataire: "Équipe RH", actif: true },
+  { id: 23, nom: "Notification nouveau message", declencheur: "Nouveau message reçu", action: "Envoyer notification email", destinataire: "Destinataire du message", actif: true },
+  { id: 24, nom: "Notification mobilité interne", declencheur: "Parcours crossboarding créé", action: "Envoyer email mobilité", destinataire: "Collaborateur", actif: true },
+  { id: 25, nom: "Notification retour de congé", declencheur: "Parcours reboarding créé", action: "Envoyer email bienvenue retour", destinataire: "Collaborateur", actif: true },
 ];
 
 export const _MOCK_EMAIL_TEMPLATES: EmailTemplate[] = [
