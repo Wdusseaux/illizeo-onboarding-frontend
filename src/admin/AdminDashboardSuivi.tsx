@@ -517,17 +517,15 @@ export function createAdminDashboardSuivi(ctx: any) {
     // ─── SUIVI COLLABORATEURS ─────────────────────────────────
 
     const renderSuivi = () => {
-      // Associate collaborateurs to parcours (deterministic mapping for demo)
-      const activeParcoursList = PARCOURS_TEMPLATES.filter(p => p.status === "actif");
-      const getCollabParcours = (collabId: number) => {
-        if (activeParcoursList.length === 0) return null;
-        return activeParcoursList[collabId % activeParcoursList.length];
-      };
+      // Resolve parcours filter name → id
+      const filterParcoursId = suiviParcoursFilter
+        ? PARCOURS_TEMPLATES.find(p => p.nom === suiviParcoursFilter)?.id ?? null
+        : null;
 
       const filtered = COLLABORATEURS
         .filter(c => suiviFilter === "all" || c.status === suiviFilter)
         .filter(c => !suiviSearch || `${c.prenom} ${c.nom} ${c.email || ""} ${c.poste}`.toLowerCase().includes(suiviSearch.toLowerCase()))
-        .filter(c => !suiviParcoursFilter || getCollabParcours(c.id)?.nom === suiviParcoursFilter);
+        .filter(c => !filterParcoursId || (c as any).parcours_id === filterParcoursId);
       return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>

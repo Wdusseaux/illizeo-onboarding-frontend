@@ -12,7 +12,7 @@ export interface Collaborateur {
   id: number; prenom: string; nom: string; email?: string; poste: string; site: string; departement: string;
   dateDebut: string; phase: string; progression: number; status: "en_cours" | "en_retard" | "termine";
   docsValides: number; docsTotal: number; actionsCompletes: number; actionsTotal: number;
-  initials: string; color: string;
+  initials: string; color: string; parcours_id?: number;
 }
 
 export type ParcoursCategorie = "onboarding" | "offboarding" | "crossboarding" | "reboarding";
