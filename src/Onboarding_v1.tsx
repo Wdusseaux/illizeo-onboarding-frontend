@@ -325,6 +325,7 @@ export default function OnboardingModule() {
   // Suivi filters
   const [suiviFilter, setSuiviFilter] = useState<"all" | "en_cours" | "en_retard" | "termine">("all");
   const [suiviSearch, setSuiviSearch] = useState("");
+  const [suiviParcoursFilter, setSuiviParcoursFilter] = useState<string | null>(null);
   const [collabMenuId, setCollabMenuId] = useState<number | null>(null);
   useEffect(() => {
     if (collabMenuId === null) return;
@@ -783,6 +784,7 @@ export default function OnboardingModule() {
     apiKeyInput, setApiKeyInput,
     suiviFilter, setSuiviFilter,
     suiviSearch, setSuiviSearch,
+    suiviParcoursFilter, setSuiviParcoursFilter,
     collabMenuId, setCollabMenuId,
     adMappings, setAdMappings,
     adGroups, setAdGroups,

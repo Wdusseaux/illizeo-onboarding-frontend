@@ -124,7 +124,7 @@ export function createAdminDashboardSuivi(ctx: any) {
     collabPanelMode, setCollabPanelMode, collabPanelData, setCollabPanelData, collabPanelLoading, setCollabPanelLoading, collabProfileId, setCollabProfileId,
     collabProfileTab, setCollabProfileTab, dossierCheck, setDossierCheck, groupePanelMode, setGroupePanelMode, groupePanelData, setGroupePanelData,
     groupePanelLoading, setGroupePanelLoading, integrationPanelId, setIntegrationPanelId, integrationConfig, setIntegrationConfig, integrationSaving, setIntegrationSaving,
-    apiKeyInput, setApiKeyInput, suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, collabMenuId, setCollabMenuId,
+    apiKeyInput, setApiKeyInput, suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, suiviParcoursFilter, setSuiviParcoursFilter, collabMenuId, setCollabMenuId,
     adMappings, setAdMappings, adGroups, setAdGroups, syncLoading, setSyncLoading, obTeams, setObTeams,
     teamPanelMode, setTeamPanelMode, teamPanelData, setTeamPanelData, wfPanelMode, setWfPanelMode, wfPanelData, setWfPanelData,
     tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData,
@@ -475,7 +475,7 @@ export function createAdminDashboardSuivi(ctx: any) {
             <div className="iz-card iz-fade-up iz-stagger-7" style={sCard}>
               <h3 style={{ ...sectionTitle, display: "flex", alignItems: "center", gap: 8 }}><Route size={16} color={C.purple} /> {t('dash.active_parcours')}</h3>
               {activeParcours.map(p => (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
+                <div key={p.id} onClick={() => { setSuiviParcoursFilter(p.nom); setAdminPage("admin_suivi"); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${C.border}`, cursor: "pointer", borderRadius: 6, transition: "background .15s" }} className="iz-sidebar-item">
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{p.nom}</div>
                     <div style={{ fontSize: 11, color: C.textMuted }}>{p.actionsCount} actions &middot; {p.docsCount} documents &middot; {p.phases.length} phases</div>
@@ -517,9 +517,17 @@ export function createAdminDashboardSuivi(ctx: any) {
     // ─── SUIVI COLLABORATEURS ─────────────────────────────────
 
     const renderSuivi = () => {
+      // Associate collaborateurs to parcours (deterministic mapping for demo)
+      const activeParcoursList = PARCOURS_TEMPLATES.filter(p => p.status === "actif");
+      const getCollabParcours = (collabId: number) => {
+        if (activeParcoursList.length === 0) return null;
+        return activeParcoursList[collabId % activeParcoursList.length];
+      };
+
       const filtered = COLLABORATEURS
         .filter(c => suiviFilter === "all" || c.status === suiviFilter)
-        .filter(c => !suiviSearch || `${c.prenom} ${c.nom} ${c.email || ""} ${c.poste}`.toLowerCase().includes(suiviSearch.toLowerCase()));
+        .filter(c => !suiviSearch || `${c.prenom} ${c.nom} ${c.email || ""} ${c.poste}`.toLowerCase().includes(suiviSearch.toLowerCase()))
+        .filter(c => !suiviParcoursFilter || getCollabParcours(c.id)?.nom === suiviParcoursFilter);
       return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -529,7 +537,16 @@ export function createAdminDashboardSuivi(ctx: any) {
           </div>
         </div>
 
-        {/* Search + filter bar (like screenshot) */}
+        {/* Active parcours filter badge */}
+        {suiviParcoursFilter && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", borderRadius: 8, background: C.pinkBg, color: C.pink, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
+            <Route size={14} />
+            {suiviParcoursFilter}
+            <button onClick={() => setSuiviParcoursFilter(null)} style={{ background: "none", border: "none", cursor: "pointer", color: C.pink, padding: 0, display: "flex" }}><X size={14} /></button>
+          </div>
+        )}
+
+        {/* Search + filter bar */}
         <div className="iz-card" style={{ ...sCard, marginBottom: 16, display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
           <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, background: C.bg, borderRadius: 8, padding: "8px 12px" }}>
             <Search size={16} color={C.textLight} />
