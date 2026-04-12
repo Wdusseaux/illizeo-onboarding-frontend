@@ -628,6 +628,13 @@ const translations: Record<string, Record<Lang, string>> = {
   'contrat.preview': { fr: 'Prévisualisation', en: 'Preview', de: 'Vorschau', it: 'Anteprima', es: 'Vista previa' },
   'contrat.upload_pdf': { fr: "Chargez un fichier PDF pour voir l'aperçu ici", en: 'Upload a PDF file to preview it here', de: 'Laden Sie eine PDF-Datei hoch', it: 'Carica un file PDF per visualizzarlo qui', es: 'Cargue un archivo PDF para previsualizarlo aquí' },
   'contrat.pdf_only': { fr: 'Prévisualisation disponible pour les fichiers PDF uniquement', en: 'Preview available for PDF files only', de: 'Vorschau nur für PDF-Dateien verfügbar', it: 'Anteprima disponibile solo per file PDF', es: 'Vista previa disponible solo para archivos PDF' },
+  'contrat.amendment': { fr: 'Avenant', en: 'Amendment', de: 'Nachtrag', it: 'Addendum', es: 'Anexo' },
+  'contrat.switzerland': { fr: 'Suisse', en: 'Switzerland', de: 'Schweiz', it: 'Svizzera', es: 'Suiza' },
+  'contrat.france': { fr: 'France', en: 'France', de: 'Frankreich', it: 'Francia', es: 'Francia' },
+  'contrat.delete_confirm': { fr: 'Supprimer ce contrat ?', en: 'Delete this contract?', de: 'Diesen Vertrag löschen?', it: 'Eliminare questo contratto?', es: '¿Eliminar este contrato?' },
+  'contrat.deleted': { fr: 'Contrat supprimé', en: 'Contract deleted', de: 'Vertrag gelöscht', it: 'Contratto eliminato', es: 'Contrato eliminado' },
+  'contrat.created': { fr: 'Contrat créé', en: 'Contract created', de: 'Vertrag erstellt', it: 'Contratto creato', es: 'Contrato creado' },
+  'contrat.updated': { fr: 'Contrat modifié', en: 'Contract updated', de: 'Vertrag aktualisiert', it: 'Contratto aggiornato', es: 'Contrato actualizado' },
 
   // ─── Employee Dashboard ──────────────────────────
   'emp.welcome': { fr: 'Bienvenue', en: 'Welcome', de: 'Willkommen', it: 'Benvenuto', es: 'Bienvenido' },

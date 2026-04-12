@@ -470,13 +470,13 @@ export function createAdminNPSContrats(ctx: any) {
                 <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{contratPanelMode === "create" ? t('contrat.new') : t('contrat.edit')}</h2>
                 <button onClick={() => setContratPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
               </div>
-              <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+              <div style={{ flex: 1, display: "flex" }}>
                 {/* Left: form */}
-                <div style={{ width: 300, flexShrink: 0, padding: "20px 24px", overflow: "auto", borderRight: `1px solid ${C.border}` }}>
+                <div style={{ width: 300, flexShrink: 0, padding: "20px 24px", overflow: "visible", borderRight: `1px solid ${C.border}`, position: "relative", zIndex: 10 }}>
                   <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.contract_name')} *</label><TranslatableField value={contratPanelData.nom} onChange={v => setContratPanelData((p: any) => ({ ...p, nom: v }))} placeholder="Ex: CDI — Droit Suisse" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Type</label><select value={contratPanelData.type} onChange={e => setContratPanelData((p: any) => ({ ...p, type: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TYPES_CONTRAT.map(t => <option key={t} value={t}>{t}</option>)}<option value="Avenant">Avenant</option></select></div>
-                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Juridiction</label><select value={contratPanelData.juridiction} onChange={e => setContratPanelData((p: any) => ({ ...p, juridiction: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}><option value="Suisse">Suisse</option><option value="France">France</option><option value="Multi">Multi</option></select></div>
+                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.type')}</label><select value={contratPanelData.type} onChange={e => setContratPanelData((p: any) => ({ ...p, type: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TYPES_CONTRAT.map(tc => <option key={tc} value={tc}>{tc}</option>)}<option value="Avenant">{t('contrat.amendment')}</option></select></div>
+                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.jurisdiction')}</label><select value={contratPanelData.juridiction} onChange={e => setContratPanelData((p: any) => ({ ...p, juridiction: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}><option value="Suisse">{t('contrat.switzerland')}</option><option value="France">{t('contrat.france')}</option><option value="Multi">Multi</option></select></div>
                   </div>
                   <div style={{ marginBottom: 16 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.template_file')}</label>
@@ -538,14 +538,14 @@ export function createAdminNPSContrats(ctx: any) {
                 </div>
               </div>
               <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 12, justifyContent: "space-between" }}>
-                <div>{contratPanelMode === "edit" && <button onClick={() => { setConfirmDialog({ message: "Supprimer ce contrat ?", onConfirm: async () => { try { await apiDeleteContrat(contratPanelData.id); addToast_admin("Contrat supprimé"); setContratPanelMode("closed"); /* refetch */ } catch {} setConfirmDialog(null); }}); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>}</div>
+                <div>{contratPanelMode === "edit" && <button onClick={() => { setConfirmDialog({ message: t('contrat.delete_confirm'), onConfirm: async () => { try { await apiDeleteContrat(contratPanelData.id); addToast_admin(t('contrat.deleted')); setContratPanelMode("closed"); /* refetch */ } catch {} setConfirmDialog(null); }}); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>}</div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setContratPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button onClick={async () => {
                     try {
                       const payload: Record<string, any> = { nom: contratPanelData.nom, type: contratPanelData.type, juridiction: contratPanelData.juridiction, actif: contratPanelData.actif, fichier: contratPanelData.fichier, translations: buildTranslationsPayload() };
-                      if (contratPanelMode === "create") { await apiCreateContrat(payload); addToast_admin("Contrat créé"); }
-                      else { await apiUpdateContrat(contratPanelData.id, payload); addToast_admin("Contrat modifié"); }
+                      if (contratPanelMode === "create") { await apiCreateContrat(payload); addToast_admin(t('contrat.created')); }
+                      else { await apiUpdateContrat(contratPanelData.id, payload); addToast_admin(t('contrat.updated')); }
                       setContratPanelMode("closed");
                     } catch { addToast_admin(t('toast.error')); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13 }}>{contratPanelMode === "create" ? t('common.create') : t('common.save')}</button>
