@@ -719,6 +719,43 @@ export function createAdminWorkflowsTemplates(ctx: any) {
     ];
 
 
+    // Drag & drop state for block reordering
+    const dragBlockRef = useRef<number | null>(null);
+    const dragOverBlockRef = useRef<number | null>(null);
+    const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+    const handleBlockDragStart = (idx: number) => {
+      dragBlockRef.current = idx;
+    };
+
+    const handleBlockDragOver = (e: React.DragEvent, idx: number) => {
+      e.preventDefault();
+      dragOverBlockRef.current = idx;
+      setDragOverIdx(idx);
+    };
+
+    const handleBlockDrop = async () => {
+      const fromIdx = dragBlockRef.current;
+      const toIdx = dragOverBlockRef.current;
+      if (fromIdx === null || toIdx === null || fromIdx === toIdx) {
+        setDragOverIdx(null);
+        return;
+      }
+      const reordered = [...companyBlocks];
+      const [moved] = reordered.splice(fromIdx, 1);
+      reordered.splice(toIdx, 0, moved);
+      const updated = reordered.map((b, i) => ({ ...b, ordre: i + 1 }));
+      setCompanyBlocks(updated);
+      setDragOverIdx(null);
+      dragBlockRef.current = null;
+      dragOverBlockRef.current = null;
+      // Persist new order to API
+      for (const b of updated) {
+        apiUpdateBlock(b.id, { ordre: b.ordre }).catch(() => {});
+      }
+      addToast_admin(t('toast.order_saved') || "Ordre enregistré");
+    };
+
     const renderEntreprise_admin = () => {
       const editBlock = companyBlocks.find(b => b.id === editingBlockId);
       return (
@@ -733,7 +770,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
             const BtIcon = bt.icon;
             return (
               <button key={bt.type} className="iz-sidebar-item" onClick={async () => {
-                const newBlock = await apiCreateBlock({ type: bt.type, titre: "Nouveau bloc", contenu: "", ordre: companyBlocks.length, actif: true, data: {} });
+                const newBlock = await apiCreateBlock({ type: bt.type, titre: "Nouveau bloc", contenu: "", ordre: companyBlocks.length + 1, actif: true, data: {} });
                 setCompanyBlocks(prev => [...prev, newBlock]);
                 setEditingBlockId(newBlock.id);
                 addToast_admin("Bloc créé");
@@ -747,13 +784,36 @@ export function createAdminWorkflowsTemplates(ctx: any) {
           })}
         </div>
 
-        {/* Blocks list */}
+        {/* Blocks list — drag & drop reorderable */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {companyBlocks.map(block => {
+          {companyBlocks.map((block, idx) => {
             const bt = BLOCK_TYPES.find(t => t.type === block.type);
             const BIcon = bt?.icon || FileText;
+            const isDragOver = dragOverIdx === idx;
             return (
-              <div key={block.id} className="iz-card" style={{ ...sCard, display: "flex", alignItems: "center", gap: 14, opacity: block.actif ? 1 : 0.5, padding: "14px 18px" }}>
+              <div
+                key={block.id}
+                draggable
+                onDragStart={() => handleBlockDragStart(idx)}
+                onDragOver={(e) => handleBlockDragOver(e, idx)}
+                onDragEnd={() => setDragOverIdx(null)}
+                onDrop={handleBlockDrop}
+                className="iz-card"
+                style={{
+                  ...sCard,
+                  display: "flex", alignItems: "center", gap: 14,
+                  opacity: block.actif ? 1 : 0.5,
+                  padding: "14px 18px",
+                  cursor: "grab",
+                  borderTop: isDragOver ? `2px solid ${C.pink}` : undefined,
+                  transition: "border .15s, opacity .2s",
+                }}>
+                {/* Drag handle */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, cursor: "grab", padding: "4px 2px", flexShrink: 0, color: C.textMuted }}>
+                  <div style={{ width: 12, display: "flex", flexWrap: "wrap", gap: 2 }}>
+                    {[...Array(6)].map((_, i) => <div key={i} style={{ width: 3, height: 3, borderRadius: "50%", background: C.textMuted }} />)}
+                  </div>
+                </div>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center" }}><BIcon size={16} color={C.pink} /></div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{block.titre || bt?.label || block.type}</div>
