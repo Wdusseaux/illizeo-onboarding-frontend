@@ -467,6 +467,8 @@ export default function OnboardingModule() {
   const { data: apiContrats } = useApiData(getContrats, isDemo ? _mockContrats : []);
   const [contrats, setContrats] = useState(_mockContrats);
   useEffect(() => { setContrats(apiContrats); }, [apiContrats]);
+  const [contractTypes, setContractTypes] = useState<string[]>(TYPES_CONTRAT);
+  const [jurisdictions, setJurisdictions] = useState<string[]>(["Suisse", "France", "Multi"]);
   const [selectedContratId, setSelectedContratId] = useState<number | null>(null);
   const [entrepriseBlocs, setEntrepriseBlocs] = useState([
     { id: 1, titre: "À propos", type: "Texte + image", actif: true },
@@ -865,7 +867,7 @@ export default function OnboardingModule() {
     parcoursStatut, setParcoursStatut,
     groupeColor, setGroupeColor,
     groupeMembres, setGroupeMembres,
-    contrats, setContrats,
+    contrats, setContrats, contractTypes, setContractTypes, jurisdictions, setJurisdictions,
     selectedContratId, setSelectedContratId,
     entrepriseBlocs, setEntrepriseBlocs,
     entrepriseVideos, setEntrepriseVideos,
@@ -971,6 +973,9 @@ export default function OnboardingModule() {
         if (s.login_bg_image) { setLoginBgImage(s.login_bg_image); localStorage.setItem("illizeo_login_bg_image", s.login_bg_image); }
         if (s.interface_language && ['fr','en','de','it','es'].includes(s.interface_language)) { setLang(s.interface_language as Lang); setLangState(s.interface_language as Lang); }
         if (s.active_languages) { try { const langs = JSON.parse(s.active_languages); setActiveLanguages(langs); localStorage.setItem("illizeo_active_languages", s.active_languages); } catch {} }
+        // Contract types & jurisdictions from company settings
+        if (s.contract_types) try { setContractTypes(JSON.parse(s.contract_types)); } catch {}
+        if (s.jurisdictions) try { setJurisdictions(JSON.parse(s.jurisdictions)); } catch {}
         // Setup wizard: show for new tenants (no setup_completed flag)
         if (auth.isAdmin && !s.setup_completed) {
           setShowSetupWizard(true);

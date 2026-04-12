@@ -635,6 +635,7 @@ const translations: Record<string, Record<Lang, string>> = {
   'contrat.deleted': { fr: 'Contrat supprimé', en: 'Contract deleted', de: 'Vertrag gelöscht', it: 'Contratto eliminato', es: 'Contrato eliminado' },
   'contrat.created': { fr: 'Contrat créé', en: 'Contract created', de: 'Vertrag erstellt', it: 'Contratto creato', es: 'Contrato creado' },
   'contrat.updated': { fr: 'Contrat modifié', en: 'Contract updated', de: 'Vertrag aktualisiert', it: 'Contratto aggiornato', es: 'Contrato actualizado' },
+  'contrat.add_value': { fr: 'Ajouter une valeur...', en: 'Add a value...', de: 'Wert hinzufügen...', it: 'Aggiungi un valore...', es: 'Agregar un valor...' },
 
   // ─── Employee Dashboard ──────────────────────────
   'emp.welcome': { fr: 'Bienvenue', en: 'Welcome', de: 'Willkommen', it: 'Benvenuto', es: 'Bienvenido' },

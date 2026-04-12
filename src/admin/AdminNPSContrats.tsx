@@ -127,7 +127,7 @@ export function createAdminNPSContrats(ctx: any) {
     apiKeyInput, setApiKeyInput, suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, collabMenuId, setCollabMenuId,
     adMappings, setAdMappings, adGroups, setAdGroups, syncLoading, setSyncLoading, obTeams, setObTeams,
     teamPanelMode, setTeamPanelMode, teamPanelData, setTeamPanelData, wfPanelMode, setWfPanelMode, wfPanelData, setWfPanelData,
-    tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData,
+    tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData, contractTypes, setContractTypes, jurisdictions, setJurisdictions,
     lang, setLangState, darkMode, setDarkMode, activeLanguages, setActiveLanguages, contentTranslations, setContentTranslations,
     fieldConfig, setFieldConfig, translateFieldId, setTranslateFieldId, translateEN, setTranslateEN, adminUsers, setAdminUsers,
     userPanelMode, setUserPanelMode, userPanelData, setUserPanelData, userPanelLoading, setUserPanelLoading, userSearch, setUserSearch,
@@ -445,6 +445,54 @@ export function createAdminNPSContrats(ctx: any) {
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.contracts')}</h1>
           <button onClick={() => { setContratPanelData({ nom: "", type: "CDI", juridiction: "Suisse", actif: true }); resetTr(); setContratPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('contrat.new')}</button>
         </div>
+        {/* Config: contract types & jurisdictions */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+          {[
+            { label: t('contrat.type'), items: contractTypes, setItems: setContractTypes, settingKey: "contract_types" },
+            { label: t('contrat.jurisdiction'), items: jurisdictions, setItems: setJurisdictions, settingKey: "jurisdictions" },
+          ].map(cfg => (
+            <div key={cfg.settingKey} className="iz-card" style={{ ...sCard, padding: "14px 18px" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8 }}>{cfg.label}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                {cfg.items.map((item, i) => (
+                  <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, background: C.bg, fontSize: 11, fontWeight: 500 }}>
+                    {item}
+                    <button onClick={() => {
+                      const updated = cfg.items.filter((_, j) => j !== i);
+                      cfg.setItems(updated);
+                      updateCompanySettings({ [cfg.settingKey]: JSON.stringify(updated) }).catch(() => {});
+                    }} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted, padding: 0, display: "flex" }}><X size={12} /></button>
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input id={`add-${cfg.settingKey}`} placeholder={t('contrat.add_value')} style={{ ...sInput, fontSize: 11, flex: 1, padding: "5px 10px" }} onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    const input = e.target as HTMLInputElement;
+                    const val = input.value.trim();
+                    if (val && !cfg.items.includes(val)) {
+                      const updated = [...cfg.items, val];
+                      cfg.setItems(updated);
+                      updateCompanySettings({ [cfg.settingKey]: JSON.stringify(updated) }).catch(() => {});
+                      input.value = "";
+                    }
+                  }
+                }} />
+                <button onClick={() => {
+                  const input = document.getElementById(`add-${cfg.settingKey}`) as HTMLInputElement;
+                  const val = input?.value?.trim();
+                  if (val && !cfg.items.includes(val)) {
+                    const updated = [...cfg.items, val];
+                    cfg.setItems(updated);
+                    updateCompanySettings({ [cfg.settingKey]: JSON.stringify(updated) }).catch(() => {});
+                    input.value = "";
+                  }
+                }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 10, padding: "4px 10px" }}><Plus size={12} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead><tr style={{ background: C.bg }}>{[t('contrat.name'), t('contrat.type'), t('contrat.jurisdiction'), t('contrat.status'), ""].map(h => <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
@@ -475,8 +523,8 @@ export function createAdminNPSContrats(ctx: any) {
                 <div style={{ width: 300, flexShrink: 0, padding: "20px 24px", overflow: "visible", borderRight: `1px solid ${C.border}`, position: "relative", zIndex: 10 }}>
                   <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.contract_name')} *</label><TranslatableField value={contratPanelData.nom} onChange={v => setContratPanelData((p: any) => ({ ...p, nom: v }))} placeholder="Ex: CDI — Droit Suisse" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.type')}</label><select value={contratPanelData.type} onChange={e => setContratPanelData((p: any) => ({ ...p, type: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TYPES_CONTRAT.map(tc => <option key={tc} value={tc}>{tc}</option>)}<option value="Avenant">{t('contrat.amendment')}</option></select></div>
-                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.jurisdiction')}</label><select value={contratPanelData.juridiction} onChange={e => setContratPanelData((p: any) => ({ ...p, juridiction: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}><option value="Suisse">{t('contrat.switzerland')}</option><option value="France">{t('contrat.france')}</option><option value="Multi">Multi</option></select></div>
+                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.type')}</label><select value={contratPanelData.type} onChange={e => setContratPanelData((p: any) => ({ ...p, type: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{contractTypes.map(tc => <option key={tc} value={tc}>{tc}</option>)}</select></div>
+                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.jurisdiction')}</label><select value={contratPanelData.juridiction} onChange={e => setContratPanelData((p: any) => ({ ...p, juridiction: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{jurisdictions.map(j => <option key={j} value={j}>{j}</option>)}</select></div>
                   </div>
                   <div style={{ marginBottom: 16 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('contrat.template_file')}</label>
