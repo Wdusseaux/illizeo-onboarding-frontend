@@ -2263,7 +2263,13 @@ export default function OnboardingModule() {
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
             <div style={{ width: 120, height: 120, borderRadius: "50%", background: avatarImage ? "none" : "linear-gradient(135deg, #E91E8C, #C2185B)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, fontWeight: 600, color: C.white, overflow: "hidden", border: `4px solid ${C.border}` }}>
               {avatarImage ? (
-                <img src={avatarImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${avatarPos.x}% ${avatarPos.y}%`, transform: `scale(${avatarZoom / 100})` }} />
+                <img src={avatarImage} alt="" style={{
+                  width: `${avatarZoom}%`, height: `${avatarZoom}%`,
+                  objectFit: "cover",
+                  position: "relative",
+                  left: `${(50 - avatarPos.x) * (avatarZoom - 100) / 100}%`,
+                  top: `${(50 - avatarPos.y) * (avatarZoom - 100) / 100}%`,
+                }} />
               ) : "NF"}
             </div>
           </div>

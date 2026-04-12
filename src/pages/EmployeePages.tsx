@@ -317,7 +317,13 @@ export function createEmployeeRenders(ctx: any) {
         <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative", zIndex: 2 }}>
           <div onClick={() => setShowAvatarEditor(true)} style={{ width: 56, height: 56, borderRadius: "50%", background: avatarImage ? "none" : "linear-gradient(135deg, #E91E8C, #C2185B)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 600, color: "#fff", border: "3px solid #fff", cursor: "pointer", overflow: "hidden", position: "relative" }}>
             {avatarImage ? (
-              <img src={avatarImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: `${avatarPos.x}% ${avatarPos.y}%`, transform: `scale(${avatarZoom / 100})` }} />
+              <img src={avatarImage} alt="" style={{
+                width: `${avatarZoom}%`, height: `${avatarZoom}%`,
+                objectFit: "cover",
+                position: "relative",
+                left: `${(50 - avatarPos.x) * (avatarZoom - 100) / 100}%`,
+                top: `${(50 - avatarPos.y) * (avatarZoom - 100) / 100}%`,
+              }} />
             ) : (auth.user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?")}
             <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.0)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: "all .2s" }} onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,.4)"; }} onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0"; (e.currentTarget as HTMLElement).style.background = "rgba(0,0,0,.0)"; }}>
               <Upload size={16} color={C.white} />
