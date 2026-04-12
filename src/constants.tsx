@@ -58,8 +58,8 @@ export const ANIM_STYLES = `
 .iz-timeline-dot { transition: transform .2s ease; }
 .iz-timeline-dot:hover { transform: scale(1.3); }
 
-.iz-upload-zone { transition: all .2s ease; border: 2px dashed #E8E8EE; }
-.iz-upload-zone:hover { border-color: var(--iz-pink); background: var(--iz-pink-bg); }
+.iz-upload-zone { transition: all .2s ease; border: 2px dashed var(--iz-border); background: transparent; }
+.iz-upload-zone:hover { border-color: var(--iz-pink); background: var(--iz-pink-bg); color: var(--iz-text); }
 
 .iz-tag { transition: all .15s ease; }
 .iz-tag:hover { transform: scale(1.05); }

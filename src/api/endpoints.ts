@@ -830,6 +830,10 @@ export async function getDocuments(params?: { collaborateur_id?: number; status?
   return apiFetch<UploadedDocument[]>(`/documents${query}`);
 }
 
+export async function createDocumentTemplate(data: { nom: string; obligatoire: boolean; type: string; categorie_id: number }) {
+  return apiFetch<any>('/documents', { method: 'POST', body: JSON.stringify(data) });
+}
+
 export async function uploadDocument(file: File, collaborateurId: number, categorie: string, nom: string) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
   const token = localStorage.getItem('illizeo_token');
