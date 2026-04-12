@@ -530,9 +530,9 @@ export function createAdminWorkflowsTemplates(ctx: any) {
     const ACCOMP_ROLES = [
       { key: "manager", label: t('team_role.manager'), icon: Users, color: "#4CAF50" },
       { key: "hrbp", label: t('team_role.hrbp'), icon: UserCheck, color: "#C2185B" },
-      { key: "buddy", label: "Buddy / Parrain", icon: Hand, color: "#F9A825" },
-      { key: "it", label: "IT Support", icon: Clock, color: "#1A73E8" },
-      { key: "recruteur", label: "Recruteur", icon: Search, color: "#7B5EA7" },
+      { key: "buddy", label: t('team_role.buddy'), icon: Hand, color: "#F9A825" },
+      { key: "it", label: t('team_role.it_support'), icon: Clock, color: "#1A73E8" },
+      { key: "recruteur", label: t('team_role.recruiter'), icon: Search, color: "#7B5EA7" },
     ];
 
 
@@ -541,9 +541,9 @@ export function createAdminWorkflowsTemplates(ctx: any) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.teams_groups')}</h1>
-            <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Gérez les équipes d'accompagnement des onboardees</p>
+            <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>{t('team.subtitle')}</p>
           </div>
-          <button onClick={() => { setTeamPanelData({ nom: "", description: "", site: "", members: [] }); resetTr(); setTeamPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> Nouvelle équipe</button>
+          <button onClick={() => { setTeamPanelData({ nom: "", description: "", site: "", members: [] }); resetTr(); setTeamPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('team.new')}</button>
         </div>
 
         {/* Workload overview */}
@@ -586,11 +586,11 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                     </div>
                   );
                 })}
-                {(team.members || []).length === 0 && <div style={{ fontSize: 11, color: C.textMuted }}>Aucun membre</div>}
+                {(team.members || []).length === 0 && <div style={{ fontSize: 11, color: C.textMuted }}>{t('team.no_member')}</div>}
               </div>
             </div>
           ))}
-          {obTeams.length === 0 && <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 40, color: C.textMuted }}>Aucune équipe d'accompagnement. Créez-en une !</div>}
+          {obTeams.length === 0 && <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 40, color: C.textMuted }}>{t('team.no_team')}</div>}
         </div>
 
         {/* Team panel */}
@@ -599,30 +599,30 @@ export function createAdminWorkflowsTemplates(ctx: any) {
             <div onClick={() => setTeamPanelMode("closed")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
             <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 520, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "24px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{teamPanelMode === "create" ? "Nouvelle équipe" : "Modifier l'équipe"}</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{teamPanelMode === "create" ? t('team.new') : t('team.edit')}</h2>
                 <button onClick={() => setTeamPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
               </div>
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom de l'équipe *</label><TranslatableField value={teamPanelData.nom} onChange={v => setTeamPanelData((p: any) => ({ ...p, nom: v }))} placeholder="Ex: Team Genève" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label><TranslatableField multiline rows={2} value={teamPanelData.description} onChange={v => setTeamPanelData((p: any) => ({ ...p, description: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} /></div>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Site (auto-assignation)</label><select value={teamPanelData.site} onChange={e => setTeamPanelData((p: any) => ({ ...p, site: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}><option value="">Aucun</option>{SITES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('team.name_label')}</label><TranslatableField value={teamPanelData.nom} onChange={v => setTeamPanelData((p: any) => ({ ...p, nom: v }))} placeholder="Ex: Team Genève" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
+                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.description')}</label><TranslatableField multiline rows={2} value={teamPanelData.description} onChange={v => setTeamPanelData((p: any) => ({ ...p, description: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} /></div>
+                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('team.site_label')}</label><select value={teamPanelData.site} onChange={e => setTeamPanelData((p: any) => ({ ...p, site: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}><option value="">{t('team.none')}</option>{SITES.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
 
                 {/* Members */}
                 <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>Membres de l'équipe</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{t('team.members_label')}</label>
                   {(teamPanelData.members || []).map((m: any, i: number) => (
                     <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
                       <select value={m.role} onChange={e => { const arr = [...teamPanelData.members]; arr[i] = { ...arr[i], role: e.target.value }; setTeamPanelData((p: any) => ({ ...p, members: arr })); }} style={{ ...sInput, width: 130, fontSize: 12, cursor: "pointer" }}>
                         {ACCOMP_ROLES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
                       </select>
                       <select value={m.user_id || ""} onChange={e => { const arr = [...teamPanelData.members]; arr[i] = { ...arr[i], user_id: Number(e.target.value) }; setTeamPanelData((p: any) => ({ ...p, members: arr })); }} style={{ ...sInput, flex: 1, fontSize: 12, cursor: "pointer" }}>
-                        <option value="">Sélectionner...</option>
+                        <option value="">{t('team.select_user')}</option>
                         {adminUsers.filter(u => ["admin_rh", "manager", "super_admin", "admin"].includes(u.role)).map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
                       </select>
                       <button onClick={() => { const arr = teamPanelData.members.filter((_: any, j: number) => j !== i); setTeamPanelData((p: any) => ({ ...p, members: arr })); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red }}><X size={14} /></button>
                     </div>
                   ))}
-                  <button onClick={() => setTeamPanelData((p: any) => ({ ...p, members: [...(p.members || []), { role: "buddy", user_id: null }] }))} style={{ fontSize: 11, color: C.pink, background: "none", border: "none", cursor: "pointer", fontWeight: 600, fontFamily: font }}>+ Ajouter un membre</button>
+                  <button onClick={() => setTeamPanelData((p: any) => ({ ...p, members: [...(p.members || []), { role: "buddy", user_id: null }] }))} style={{ fontSize: 11, color: C.pink, background: "none", border: "none", cursor: "pointer", fontWeight: 600, fontFamily: font }}>{t('team.add_member')}</button>
                 </div>
               </div>
               <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 12, justifyContent: "space-between" }}>
