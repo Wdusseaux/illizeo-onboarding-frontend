@@ -1600,11 +1600,11 @@ export function createAdminInlinePages(ctx: any) {
   const renderAdminEquipements = () => {
           const EQUIP_ICON_MAP: Record<string, any> = { laptop: Laptop, monitor: Monitor, phone: Phone, key: KeyRound, headphones: Headphones, mouse: Mouse, armchair: Armchair, car: Car, package: Package };
           const ETAT_META: Record<string, { label: string; color: string; bg: string }> = {
-            disponible: { label: "Disponible", color: C.green, bg: C.greenLight },
-            attribue: { label: "Attribué", color: C.blue, bg: C.blueLight },
-            en_commande: { label: "En commande", color: C.amber, bg: C.amberLight },
-            en_reparation: { label: "En réparation", color: "#7B5EA7", bg: C.purple + "15" },
-            retire: { label: "Retiré", color: C.textMuted, bg: C.bg },
+            disponible: { label: t('equip.state_available'), color: C.green, bg: C.greenLight },
+            attribue: { label: t('equip.state_assigned'), color: C.blue, bg: C.blueLight },
+            en_commande: { label: t('equip.state_ordered'), color: C.amber, bg: C.amberLight },
+            en_reparation: { label: t('equip.state_repair'), color: "#7B5EA7", bg: C.purple + "15" },
+            retire: { label: t('equip.state_retired'), color: C.textMuted, bg: C.bg },
           };
           const reloadEquip = () => { getEquipments().then(setEquipments).catch(() => {}); getEquipmentStats().then(setEquipStats).catch(() => {}); getEquipmentTypes().then(setEquipTypes).catch(() => {}); };
           const filtered = equipFilter === "all" ? equipments : equipments.filter(e => e.etat === equipFilter);
@@ -1810,40 +1810,40 @@ export function createAdminInlinePages(ctx: any) {
                     <TranslatableField value={equipPanel.data.nom || ""} onChange={v => setEquipPanel(p => ({ ...p, data: { ...p.data, nom: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder="Ex: MacBook Pro 14 pouces" />
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Marque</label>
+                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.brand')}</label>
                       <input value={equipPanel.data.marque || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, marque: e.target.value } }))} style={sInput} placeholder="Apple" /></div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Modèle</label>
+                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.model')}</label>
                       <input value={equipPanel.data.modele || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, modele: e.target.value } }))} style={sInput} placeholder="M3 Pro" /></div>
                   </div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Numéro de série</label>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.serial_number')}</label>
                     <input value={equipPanel.data.numero_serie || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, numero_serie: e.target.value } }))} style={sInput} placeholder="SN-XXXXX" /></div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>État</label>
+                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.state')}</label>
                       <select value={equipPanel.data.etat || "disponible"} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, etat: e.target.value } }))} style={sInput}>
                         {Object.entries(ETAT_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                       </select></div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Date d'achat</label>
+                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.purchase_date')}</label>
                       <input type="date" value={equipPanel.data.date_achat || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, date_achat: e.target.value } }))} style={sInput} /></div>
                   </div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Valeur (CHF)</label>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.value')}</label>
                     <input type="number" value={equipPanel.data.valeur || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, valeur: e.target.value } }))} style={sInput} placeholder="0.00" /></div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Notes</label>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.notes')}</label>
                     <textarea value={equipPanel.data.notes || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, notes: e.target.value } }))} style={{ ...sInput, minHeight: 60, resize: "vertical" }} /></div>
                 </div>
                 <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   {equipPanel.mode === "edit" && equipPanel.data.id && (
-                    <button onClick={() => showConfirm("Supprimer ce matériel ?", async () => { try { await apiDeleteEquip(equipPanel.data.id); reloadEquip(); setEquipPanel({ mode: "closed", data: {} }); addToast_admin(t('toast.deleted')); } catch {} })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, marginRight: "auto" }}>{t('common.delete')}</button>
+                    <button onClick={() => showConfirm(t('equip.delete_confirm'), async () => { try { await apiDeleteEquip(equipPanel.data.id); reloadEquip(); setEquipPanel({ mode: "closed", data: {} }); addToast_admin(t('toast.deleted')); } catch {} })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, marginRight: "auto" }}>{t('common.delete')}</button>
                   )}
                   <button onClick={() => setEquipPanel({ mode: "closed", data: {} })} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
                   <button onClick={async () => {
-                    if (!equipPanel.data.nom?.trim()) { addToast_admin("Le nom est requis"); return; }
+                    if (!equipPanel.data.nom?.trim()) { addToast_admin(t('equip.name_required')); return; }
                     try {
                       const payload = { equipment_type_id: equipPanel.data.equipment_type_id, nom: equipPanel.data.nom, numero_serie: equipPanel.data.numero_serie || null, marque: equipPanel.data.marque || null, modele: equipPanel.data.modele || null, etat: equipPanel.data.etat || "disponible", date_achat: equipPanel.data.date_achat || null, valeur: equipPanel.data.valeur ? Number(equipPanel.data.valeur) : null, notes: equipPanel.data.notes || null, translations: buildTranslationsPayload() };
                       if (equipPanel.mode === "edit" && equipPanel.data.id) await apiUpdateEquip(equipPanel.data.id, payload);
                       else await apiCreateEquip(payload);
-                      reloadEquip(); setEquipPanel({ mode: "closed", data: {} }); addToast_admin(equipPanel.mode === "create" ? "Matériel ajouté" : "Matériel modifié");
+                      reloadEquip(); setEquipPanel({ mode: "closed", data: {} }); addToast_admin(equipPanel.mode === "create" ? t('equip.added') : t('equip.updated'));
                     } catch { addToast_admin(t('toast.error')); }
-                  }} className="iz-btn-pink" style={sBtn("pink")}>{equipPanel.mode === "create" ? "Ajouter" : "Enregistrer"}</button>
+                  }} className="iz-btn-pink" style={sBtn("pink")}>{equipPanel.mode === "create" ? t('equip.add_btn') : t('common.save')}</button>
                 </div>
               </div>
             </>)}
