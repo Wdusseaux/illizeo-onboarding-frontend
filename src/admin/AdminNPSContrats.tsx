@@ -395,7 +395,7 @@ export function createAdminNPSContrats(ctx: any) {
                       <option value="nps">{t('nps.q_type_nps')}</option><option value="satisfaction">{t('nps.type_satisfaction')}</option><option value="custom">{t('nps.type_custom')}</option>
                     </select>
                   </div>
-                  <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Déclencheur</label>
+                  <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.trigger')}</label>
                     <select value={npsPanelData.declencheur} onChange={e => setNpsPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={sInput}>
                       <option value="fin_parcours">{t('nps.trigger_end_path')}</option><option value="fin_phase">{t('nps.trigger_end_phase')}</option><option value="manuel">{t('nps.trigger_manual')}</option><option value="date_specifique">{t('nps.trigger_date')}</option>
                     </select>
@@ -405,7 +405,7 @@ export function createAdminNPSContrats(ctx: any) {
                 {(npsPanelData.questions || []).map((q: any, i: number) => (
                   <div key={i} style={{ padding: 12, background: C.bg, borderRadius: 10, display: "flex", gap: 10, alignItems: "start" }}>
                     <div style={{ flex: 1 }}>
-                      <TranslatableField value={q.text} onChange={v => { const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], text: v }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations[`question_${i}`]} onTranslationsChange={tr => setTr(`question_${i}`, tr)} style={{ ...sInput, marginBottom: 6 }} placeholder="Texte de la question" />
+                      <TranslatableField value={q.text} onChange={v => { const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], text: v }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations[`question_${i}`]} onTranslationsChange={tr => setTr(`question_${i}`, tr)} style={{ ...sInput, marginBottom: 6 }} placeholder={t('nps.question_text')} />
                       <select value={q.type} onChange={e => { const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], type: e.target.value }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} style={{ ...sInput, fontSize: 11 }}>
                         <option value="nps">{t('nps.q_type_nps')}</option><option value="rating">{t('nps.q_type_rating')}</option><option value="text">{t('nps.q_type_text')}</option><option value="choice">{t('nps.q_type_choice')}</option>
                       </select>

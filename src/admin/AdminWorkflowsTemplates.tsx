@@ -253,7 +253,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
             <div style={{ width: 40, height: 40, borderRadius: 10, background: w.actif ? C.greenLight : C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><Zap size={18} color={w.actif ? C.green : C.textMuted} /></div>
             <div style={{ flex: 1, cursor: "pointer" }} onClick={() => { setWfPanelData({ id: w.id, nom: w.nom, declencheur: w.declencheur, action: w.action, destinataire: w.destinataire, actif: w.actif, email_subject: w.email_subject || "", email_body: w.email_body || "", bot_message: w.bot_message || "", badge_name: w.badge_name || "", badge_icon: w.badge_icon || "trophy", badge_color: w.badge_color || "#F9A825", target_user_id: w.target_user_id || "", target_group_id: w.target_group_id || "" }); setContentTranslations(w.translations || {}); setWfPanelMode("edit"); }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>{w.nom}</div>
-              <div style={{ fontSize: 12, color: C.textLight }}>Déclencheur: {w.declencheur} → {w.action} → {w.destinataire}</div>
+              <div style={{ fontSize: 12, color: C.textLight }}>{t('common.trigger')}: {w.declencheur} → {w.action} → {w.destinataire}</div>
             </div>
             <div onClick={async () => {
               try { await apiUpdateWorkflow(w.id, { actif: !w.actif }); refetchActions(); addToast_admin(`${w.nom} : ${!w.actif ? "activé" : "désactivé"}`); } catch {}
@@ -273,7 +273,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
               </div>
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
                 <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom *</label><TranslatableField value={wfPanelData.nom} onChange={v => setWfPanelData((p: any) => ({ ...p, nom: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Déclencheur</label><select value={wfPanelData.declencheur} onChange={e => setWfPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_TRIGGERS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.trigger')}</label><select value={wfPanelData.declencheur} onChange={e => setWfPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_TRIGGERS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                 <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Action</label><select value={wfPanelData.action} onChange={e => setWfPanelData((p: any) => ({ ...p, action: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
                 <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Destinataire</label><select value={wfPanelData.destinataire} onChange={e => setWfPanelData((p: any) => ({ ...p, destinataire: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_RECIPIENTS.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
 
@@ -417,7 +417,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
               </div>
               <div style={{ fontSize: 12, color: C.textLight, marginBottom: 4 }}>Sujet: {tpl.sujet}</div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: 11, color: C.textMuted }}>Déclencheur: {tpl.declencheur}</div>
+                <div style={{ fontSize: 11, color: C.textMuted }}>{t('common.trigger')}: {tpl.declencheur}</div>
                 <div style={{ display: "flex", gap: 4 }} onClick={e => e.stopPropagation()}>
                   <button onClick={async () => { try { await apiDuplicateEmailTpl(tpl.id); refetchActions(); addToast_admin("Template dupliqué"); } catch { addToast_admin(t('toast.error')); } }} title="Dupliquer" style={{ background: C.bg, border: "none", borderRadius: 4, padding: "3px 6px", cursor: "pointer" }}><FolderOpen size={12} color={C.textMuted} /></button>
                 </div>

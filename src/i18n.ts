@@ -79,6 +79,8 @@ const translations: Record<string, Record<Lang, string>> = {
   'sign.upload_error': { fr: 'Erreur upload', en: 'Upload error', de: 'Upload-Fehler', it: 'Errore upload', es: 'Error de carga' },
   'common.translations': { fr: 'Traductions', en: 'Translations', de: 'Übersetzungen', it: 'Traduzioni', es: 'Traducciones' },
   'common.primary': { fr: 'principal', en: 'primary', de: 'primär', it: 'principale', es: 'principal' },
+  'common.trigger': { fr: 'Déclencheur', en: 'Trigger', de: 'Auslöser', it: 'Trigger', es: 'Disparador' },
+  'nps.question_text': { fr: 'Texte de la question', en: 'Question text', de: 'Fragetext', it: 'Testo della domanda', es: 'Texto de la pregunta' },
   'sign.new_doc': { fr: 'Nouveau document', en: 'New document', de: 'Neues Dokument', it: 'Nuovo documento', es: 'Nuevo documento' },
   'admin.nps': { fr: 'NPS & Satisfaction', en: 'NPS & Satisfaction', de: 'NPS & Zufriedenheit', it: 'NPS & Soddisfazione', es: 'NPS & Satisfacción' },
   'admin.contracts': { fr: 'Contrats', en: 'Contracts', de: 'Verträge', it: 'Contratti', es: 'Contratos' },
