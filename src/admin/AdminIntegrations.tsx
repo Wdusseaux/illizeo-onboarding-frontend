@@ -890,10 +890,6 @@ export function createAdminIntegrations(ctx: any) {
     };
 
   
-    // ─── SIDEBAR ───────────────────────────────────────────────
-    const collapsed = sidebarCollapsed;
-    const sidebarW = collapsed ? 64 : 220;
-
   return {
     renderIntegrations,
   };

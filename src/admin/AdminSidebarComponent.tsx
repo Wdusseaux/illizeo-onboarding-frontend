@@ -242,6 +242,9 @@ export function createAdminSidebarComponent(ctx: any) {
     // ─── DASHBOARD ─────────────────────────────────────────────
 
 
+    const sidebarW = sidebarCollapsed ? 64 : 220;
+    const collapsed = sidebarCollapsed;
+
     const renderSidebar_admin = () => (
       <div style={{ width: sidebarW, minHeight: "100vh", background: C.white, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, transition: "width .2s ease", overflow: "hidden" }}>
         {/* Logo + toggle */}
