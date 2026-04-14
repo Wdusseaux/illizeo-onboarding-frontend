@@ -366,7 +366,15 @@ export function createAdminWorkflowsTemplates(ctx: any) {
 
 
     // ─── TEMPLATES EMAILS ─────────────────────────────────────
-    const TPL_TRIGGERS = ["Création du parcours", "J-7 avant deadline documents", "Tous documents validés", "J+0", "Parcours complété à 100%", "Action assignée", "Document refusé"];
+    const TPL_TRIGGERS = [
+      { value: "Création du parcours", label: t('tpl.trigger_parcours_created') },
+      { value: "J-7 avant deadline documents", label: t('tpl.trigger_docs_deadline') },
+      { value: "Tous documents validés", label: t('tpl.trigger_all_docs') },
+      { value: "J+0", label: t('tpl.trigger_day0') },
+      { value: "Parcours complété à 100%", label: t('tpl.trigger_complete') },
+      { value: "Action assignée", label: t('tpl.trigger_action_assigned') },
+      { value: "Document refusé", label: t('tpl.trigger_doc_refused') },
+    ];
     const TPL_VARIABLES = ["{{prenom}}", "{{nom}}", "{{date_debut}}", "{{site}}", "{{poste}}", "{{departement}}", "{{parcours_nom}}", "{{nb_docs_manquants}}", "{{date_limite}}", "{{manager}}", "{{adresse}}"];
 
 
@@ -411,22 +419,22 @@ export function createAdminWorkflowsTemplates(ctx: any) {
             <div key={tpl.id} className="iz-card iz-fade-up" style={{ ...sCard, cursor: "pointer", position: "relative" }} onClick={() => { setTplPanelData({ id: tpl.id, nom: tpl.nom, sujet: tpl.sujet, declencheur: tpl.declencheur, variables: tpl.variables || [], actif: tpl.actif, contenu: tpl.contenu || "" }); setContentTranslations(tpl.translations || {}); setTplPanelMode("edit"); setTplPreview(false); }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                 <Mail size={18} color={tpl.actif ? C.pink : C.textMuted} />
-                <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{tpl.nom}</div>
+                <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{(lang !== "fr" && tpl.translations?.nom?.[lang]) || tpl.nom}</div>
                 <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: cat?.bg || C.bg, color: cat?.color || C.textMuted }}>{cat?.label || "Autre"}</span>
-                <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: tpl.actif ? C.greenLight : C.bg, color: tpl.actif ? C.green : C.textMuted }}>{tpl.actif ? "Actif" : "Inactif"}</span>
+                <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: tpl.actif ? C.greenLight : C.bg, color: tpl.actif ? C.green : C.textMuted }}>{tpl.actif ? t('tpl.status_active') : t('tpl.status_inactive')}</span>
               </div>
-              <div style={{ fontSize: 12, color: C.textLight, marginBottom: 4 }}>Sujet: {tpl.sujet}</div>
+              <div style={{ fontSize: 12, color: C.textLight, marginBottom: 4 }}>{t('tpl.subject_label')}: {(lang !== "fr" && tpl.translations?.sujet?.[lang]) || tpl.sujet}</div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: 11, color: C.textMuted }}>{t('common.trigger')}: {tpl.declencheur}</div>
+                <div style={{ fontSize: 11, color: C.textMuted }}>{t('common.trigger')}: {TPL_TRIGGERS.find(tr => tr.value === tpl.declencheur)?.label || tpl.declencheur}</div>
                 <div style={{ display: "flex", gap: 4 }} onClick={e => e.stopPropagation()}>
-                  <button onClick={async () => { try { await apiDuplicateEmailTpl(tpl.id); refetchActions(); addToast_admin("Template dupliqué"); } catch { addToast_admin(t('toast.error')); } }} title="Dupliquer" style={{ background: C.bg, border: "none", borderRadius: 4, padding: "3px 6px", cursor: "pointer" }}><FolderOpen size={12} color={C.textMuted} /></button>
+                  <button onClick={async () => { try { await apiDuplicateEmailTpl(tpl.id); refetchActions(); addToast_admin(t('tpl.duplicated')); } catch { addToast_admin(t('toast.error')); } }} title="Dupliquer" style={{ background: C.bg, border: "none", borderRadius: 4, padding: "3px 6px", cursor: "pointer" }}><FolderOpen size={12} color={C.textMuted} /></button>
                 </div>
               </div>
             </div>
             );
           })}
         </div>
-        {filteredTpls.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun template dans cette catégorie</div>}
+        {filteredTpls.length === 0 && <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('tpl.no_template')}</div>}
         {/* Template panel */}
         {tplPanelMode !== "closed" && (
           <>
@@ -437,8 +445,8 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   {tplPanelMode === "edit" && (
                     <div style={{ display: "flex", gap: 4, padding: 2, background: C.bg, borderRadius: 6 }}>
-                      <button onClick={() => setTplPreview(false)} style={{ padding: "4px 10px", borderRadius: 4, fontSize: 11, fontWeight: tplPreview ? 400 : 600, border: "none", cursor: "pointer", fontFamily: font, background: !tplPreview ? C.white : "transparent", color: !tplPreview ? C.text : C.textMuted, boxShadow: !tplPreview ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>Éditer</button>
-                      <button onClick={() => setTplPreview(true)} style={{ padding: "4px 10px", borderRadius: 4, fontSize: 11, fontWeight: tplPreview ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font, background: tplPreview ? C.white : "transparent", color: tplPreview ? C.text : C.textMuted, boxShadow: tplPreview ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>Aperçu</button>
+                      <button onClick={() => setTplPreview(false)} style={{ padding: "4px 10px", borderRadius: 4, fontSize: 11, fontWeight: tplPreview ? 400 : 600, border: "none", cursor: "pointer", fontFamily: font, background: !tplPreview ? C.white : "transparent", color: !tplPreview ? C.text : C.textMuted, boxShadow: !tplPreview ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>{t('tpl.edit')}</button>
+                      <button onClick={() => setTplPreview(true)} style={{ padding: "4px 10px", borderRadius: 4, fontSize: 11, fontWeight: tplPreview ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font, background: tplPreview ? C.white : "transparent", color: tplPreview ? C.text : C.textMuted, boxShadow: tplPreview ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>{t('tpl.preview_label')}</button>
                     </div>
                   )}
                   <button onClick={() => setTplPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
@@ -448,7 +456,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                 {!tplPreview ? (<>
                   <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.name')} *</label><TranslatableField value={tplPanelData.nom} onChange={v => setTplPanelData((p: any) => ({ ...p, nom: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
                   <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.subject')} *</label><TranslatableField value={tplPanelData.sujet} onChange={v => setTplPanelData((p: any) => ({ ...p, sujet: v }))} placeholder="Bienvenue chez Illizeo — {{prenom}}" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.sujet} onTranslationsChange={tr => setTr("sujet", tr)} /></div>
-                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.trigger')}</label><select value={tplPanelData.declencheur} onChange={e => setTplPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TPL_TRIGGERS.map(tr => <option key={tr} value={tr}>{tr}</option>)}</select></div>
+                  <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('tpl.trigger')}</label><select value={tplPanelData.declencheur} onChange={e => setTplPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{TPL_TRIGGERS.map(tr => <option key={tr.value} value={tr.value}>{tr.label}</option>)}</select></div>
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{t('tpl.email_body')}</label>
@@ -510,19 +518,19 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                       </div>
                       {/* Email subject */}
                       <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.border}`, background: C.bg }}>
-                        <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Sujet</div>
+                        <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>{t('tpl.subject_label')}</div>
                         <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>
                           {(tplPanelData.sujet || "").replace(/\{\{prenom\}\}/g, "Jean").replace(/\{\{nom\}\}/g, "Dupont").replace(/\{\{parcours_nom\}\}/g, "Onboarding Standard").replace(/\{\{action_nom\}\}/g, "Compléter le dossier")}
                         </div>
                       </div>
                       {/* Email body */}
                       <div style={{ padding: "24px", fontSize: 14, lineHeight: 1.7, color: C.text, minHeight: 200, whiteSpace: "pre-wrap" }}>
-                        {(tplPanelData.contenu || "Pas de contenu défini.").replace(/\{\{prenom\}\}/g, "Jean").replace(/\{\{nom\}\}/g, "Dupont").replace(/\{\{date_debut\}\}/g, "01/06/2026").replace(/\{\{site\}\}/g, "Genève").replace(/\{\{poste\}\}/g, "Chef de Projet").replace(/\{\{parcours_nom\}\}/g, "Onboarding Standard").replace(/\{\{manager\}\}/g, "Mehdi Kessler").replace(/\{\{nb_docs_manquants\}\}/g, "3").replace(/\{\{date_limite\}\}/g, "15/06/2026").replace(/\{\{lien\}\}/g, "https://app.illizeo.com").replace(/\{\{action_nom\}\}/g, "Compléter le dossier").replace(/\{\{document_nom\}\}/g, "Pièce d'identité").replace(/\{\{collab_nom\}\}/g, "Jean Dupont").replace(/\{\{montant\}\}/g, "500 CHF").replace(/\{\{annees\}\}/g, "1").replace(/\{\{date_depart\}\}/g, "30/06/2026").replace(/\{\{email\}\}/g, "jean.dupont@illizeo.com").replace(/\{\{date_fin_essai\}\}/g, "01/09/2026").replace(/\{\{candidat_nom\}\}/g, "Marc Dupont").replace(/\{\{departement\}\}/g, "Tech").replace(/\{\{adresse\}\}/g, "Rue du Marché 10, Genève")}
+                        {(tplPanelData.contenu || t('tpl.no_content')).replace(/\{\{prenom\}\}/g, "Jean").replace(/\{\{nom\}\}/g, "Dupont").replace(/\{\{date_debut\}\}/g, "01/06/2026").replace(/\{\{site\}\}/g, "Genève").replace(/\{\{poste\}\}/g, "Chef de Projet").replace(/\{\{parcours_nom\}\}/g, "Onboarding Standard").replace(/\{\{manager\}\}/g, "Mehdi Kessler").replace(/\{\{nb_docs_manquants\}\}/g, "3").replace(/\{\{date_limite\}\}/g, "15/06/2026").replace(/\{\{lien\}\}/g, "https://app.illizeo.com").replace(/\{\{action_nom\}\}/g, "Compléter le dossier").replace(/\{\{document_nom\}\}/g, "Pièce d'identité").replace(/\{\{collab_nom\}\}/g, "Jean Dupont").replace(/\{\{montant\}\}/g, "500 CHF").replace(/\{\{annees\}\}/g, "1").replace(/\{\{date_depart\}\}/g, "30/06/2026").replace(/\{\{email\}\}/g, "jean.dupont@illizeo.com").replace(/\{\{date_fin_essai\}\}/g, "01/09/2026").replace(/\{\{candidat_nom\}\}/g, "Marc Dupont").replace(/\{\{departement\}\}/g, "Tech").replace(/\{\{adresse\}\}/g, "Rue du Marché 10, Genève")}
                       </div>
                       {/* Email footer */}
                       <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, background: C.bg, textAlign: "center", fontSize: 11, color: C.textMuted }}>
-                        Cet email a été envoyé automatiquement par Illizeo.<br />
-                        Vous recevez cet email car vous faites partie d'un parcours d'intégration.<br />
+                        {t('tpl.footer_auto')}<br />
+                        {t('tpl.footer_reason')}<br />
                         <span style={{ color: C.pink }}>illizeo.com</span>
                       </div>
                     </div>
@@ -530,11 +538,11 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                     {tplPanelMode === "edit" && tplPanelData.id && (
                       <div style={{ marginTop: 16, padding: "14px 16px", background: C.bg, borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
                         <Send size={14} color={C.pink} />
-                        <span style={{ fontSize: 12, color: C.text, fontWeight: 500 }}>Envoyer un test :</span>
-                        <button onClick={() => showPrompt("Envoyer un email de test à :", async (email) => {
+                        <span style={{ fontSize: 12, color: C.text, fontWeight: 500 }}>{t('tpl.send_test')} :</span>
+                        <button onClick={() => showPrompt(t('tpl.send_test_to'), async (email) => {
                           try { const res = await sendTestEmail(tplPanelData.id, email); addToast_admin(res.message); }
-                          catch { addToast_admin("Erreur lors de l'envoi"); }
-                        }, { label: "Email destinataire", type: "email", defaultValue: auth.user?.email || "" })} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Send size={12} /> Envoyer un test</button>
+                          catch { addToast_admin(t('tpl.send_error')); }
+                        }, { label: t('tpl.recipient_email'), type: "email", defaultValue: auth.user?.email || "" })} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Send size={12} /> {t('tpl.send_test')}</button>
                       </div>
                     )}
                   </div>
@@ -542,16 +550,16 @@ export function createAdminWorkflowsTemplates(ctx: any) {
               </div>
               <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 12, justifyContent: "space-between" }}>
                 <div style={{ display: "flex", gap: 8 }}>
-                  {tplPanelMode === "edit" && <button onClick={() => { setConfirmDialog({ message: "Supprimer ce template ?", onConfirm: async () => { try { await apiDeleteEmailTpl(tplPanelData.id); addToast_admin("Template supprimé"); setTplPanelMode("closed"); refetchActions(); } catch {} setConfirmDialog(null); }}); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>}
-                  {tplPanelMode === "edit" && tplPanelData.id && <button onClick={async () => { try { await apiDuplicateEmailTpl(tplPanelData.id); addToast_admin("Template dupliqué"); refetchActions(); } catch {} }} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.duplicate')}</button>}
+                  {tplPanelMode === "edit" && <button onClick={() => { setConfirmDialog({ message: t('tpl.delete_confirm'), onConfirm: async () => { try { await apiDeleteEmailTpl(tplPanelData.id); addToast_admin(t('tpl.deleted')); setTplPanelMode("closed"); refetchActions(); } catch {} setConfirmDialog(null); }}); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>}
+                  {tplPanelMode === "edit" && tplPanelData.id && <button onClick={async () => { try { await apiDuplicateEmailTpl(tplPanelData.id); addToast_admin(t('tpl.duplicated')); refetchActions(); } catch {} }} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.duplicate')}</button>}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setTplPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button onClick={async () => {
                     try {
                       const payload: Record<string, any> = { nom: tplPanelData.nom, sujet: tplPanelData.sujet, declencheur: tplPanelData.declencheur, variables: tplPanelData.variables, actif: tplPanelData.actif, contenu: tplPanelData.contenu, translations: buildTranslationsPayload() };
-                      if (tplPanelMode === "create") { await apiCreateEmailTpl(payload); addToast_admin("Template créé"); }
-                      else { await apiUpdateEmailTpl(tplPanelData.id, payload); addToast_admin("Template modifié"); }
+                      if (tplPanelMode === "create") { await apiCreateEmailTpl(payload); addToast_admin(t('tpl.created')); }
+                      else { await apiUpdateEmailTpl(tplPanelData.id, payload); addToast_admin(t('tpl.updated')); }
                       setTplPanelMode("closed"); refetchActions();
                     } catch { addToast_admin(t('toast.error')); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13 }}>{tplPanelMode === "create" ? t('common.create') : t('common.save')}</button>
@@ -761,7 +769,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
   
     // ─── ENTREPRISE ────────────────────────────────────────────
     const BLOCK_TYPES = [
-      { type: "hero", label: "Bannière d'accueil", icon: Clapperboard },
+      { type: "hero", label: t('block.hero'), icon: Clapperboard },
       { type: "text", label: t('block.text'), icon: FileText },
       { type: "mission", label: t('block.mission'), icon: Target },
       { type: "stats", label: t('block.key_figures'), icon: BarChart3 },
@@ -825,7 +833,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                 const newBlock = await apiCreateBlock({ type: bt.type, titre: "Nouveau bloc", contenu: "", ordre: companyBlocks.length + 1, actif: true, data: {} });
                 setCompanyBlocks(prev => [...prev, newBlock]);
                 setEditingBlockId(newBlock.id);
-                addToast_admin("Bloc créé");
+                addToast_admin(t('block.created'));
               }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px dashed ${C.border}`, background: C.white, cursor: "pointer", fontFamily: font, fontSize: 11, fontWeight: 500, color: C.textLight, transition: "all .2s", whiteSpace: "nowrap" }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = C.pink; e.currentTarget.style.color = C.pink; e.currentTarget.style.background = C.pinkBg; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textLight; e.currentTarget.style.background = C.white; }}>
@@ -868,20 +876,20 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                 </div>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center" }}><BIcon size={16} color={C.pink} /></div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600 }}>{block.titre || bt?.label || block.type}</div>
-                  <div style={{ fontSize: 11, color: C.textLight }}>{bt?.label} · Ordre: {block.ordre}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{(lang !== "fr" && block.translations?.titre?.[lang]) || block.titre || bt?.label || block.type}</div>
+                  <div style={{ fontSize: 11, color: C.textLight }}>{bt?.label} · {t('block.order')}: {block.ordre}</div>
                 </div>
-                <div onClick={async () => { await apiUpdateBlock(block.id, { actif: !block.actif }); setCompanyBlocks(prev => prev.map(b => b.id === block.id ? { ...b, actif: !b.actif } : b)); addToast_admin(block.actif ? "Bloc désactivé" : "Bloc activé"); }}
+                <div onClick={async () => { await apiUpdateBlock(block.id, { actif: !block.actif }); setCompanyBlocks(prev => prev.map(b => b.id === block.id ? { ...b, actif: !b.actif } : b)); addToast_admin(block.actif ? t('block.disabled') : t('block.enabled')); }}
                   style={{ width: 40, height: 22, borderRadius: 11, background: block.actif ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s", flexShrink: 0 }}>
                   <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: block.actif ? 20 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
                 </div>
                 <button onClick={() => { setContentTranslations((block as any).translations || {}); setEditingBlockId(block.id === editingBlockId ? null : block.id); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>{t('common.edit')}</button>
                 <button onClick={() => {
-                  setConfirmDialog({ message: "Supprimer ce bloc ?", onConfirm: async () => {
+                  setConfirmDialog({ message: t('block.delete_confirm'), onConfirm: async () => {
                     await apiDeleteBlock(block.id);
                     setCompanyBlocks(prev => prev.filter(b => b.id !== block.id));
                     setConfirmDialog(null);
-                    addToast_admin("Bloc supprimé");
+                    addToast_admin(t('block.deleted'));
                   }});
                 }} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted }}><X size={16} /></button>
               </div>
@@ -911,6 +919,40 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.order')}</label>
                   <input type="number" value={editBlock.ordre} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, ordre: Number(e.target.value) } : b))} style={{ ...sInput, width: 80 }} />
                 </div>
+                {/* Video items editor — only for video blocks */}
+                {editBlock.type === "video" && (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{lang === "fr" ? "Vidéos" : "Videos"}</label>
+                    {(editBlock.data?.videos || []).map((v: any, vi: number) => (
+                      <div key={vi} style={{ padding: "12px", border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>{lang === "fr" ? "Titre" : "Title"}</label>
+                            <input value={v.title || ""} onChange={e => { const vids = [...(editBlock.data?.videos || [])]; vids[vi] = { ...vids[vi], title: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, videos: vids } } : b)); }} style={{ ...sInput, fontSize: 11 }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>YouTube ID</label>
+                            <input value={v.youtube_id || ""} onChange={e => { const vids = [...(editBlock.data?.videos || [])]; vids[vi] = { ...vids[vi], youtube_id: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, videos: vids } } : b)); }} placeholder="dQw4w9WgXcQ" style={{ ...sInput, fontSize: 11, fontFamily: "monospace" }} />
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 11 }}>
+                            <input type="checkbox" checked={v.dashboard_featured || false} onChange={e => {
+                              const vids = (editBlock.data?.videos || []).map((vid: any, idx: number) => ({ ...vid, dashboard_featured: idx === vi ? e.target.checked : false }));
+                              setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, videos: vids } } : b));
+                            }} style={{ accentColor: C.pink }} />
+                            <span style={{ fontWeight: v.dashboard_featured ? 600 : 400, color: v.dashboard_featured ? C.pink : C.textMuted }}>
+                              {lang === "fr" ? "Afficher sur le dashboard employé" : "Show on employee dashboard"}
+                            </span>
+                          </label>
+                          <button onClick={() => { const vids = (editBlock.data?.videos || []).filter((_: any, idx: number) => idx !== vi); setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, videos: vids } } : b)); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><X size={14} color={C.red} /></button>
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={() => { const vids = [...(editBlock.data?.videos || []), { title: "", youtube_id: "", dashboard_featured: false }]; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, videos: vids } } : b)); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>+ {lang === "fr" ? "Ajouter une vidéo" : "Add video"}</button>
+                  </div>
+                )}
+
                 {/* Preview */}
                 <div style={{ marginTop: 20, padding: "16px", background: C.bg, borderRadius: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 10 }}>{t('common.preview')}</div>

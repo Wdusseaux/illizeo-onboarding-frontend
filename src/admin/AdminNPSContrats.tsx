@@ -339,9 +339,16 @@ export function createAdminNPSContrats(ctx: any) {
                     <span>{s.responses_count || 0} {t('nps.response')}{(s.responses_count || 0) > 1 ? "s" : ""}</span>
                   </div>
                 </div>
-                <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
+                <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 6, alignItems: "center" }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => { setNpsPanelData({ id: s.id, titre: s.titre, description: s.description || "", type: s.type, declencheur: s.declencheur, questions: s.questions || [], actif: s.actif }); setContentTranslations((s as any).translations || {}); setNpsPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11 }}>{t('common.edit')}</button>
                   <button onClick={async () => { try { await apiSendNpsAll(s.id); addToast_admin(t('toast.saved')); } catch { addToast_admin(t('toast.error')); } }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Send size={11} /> {t('nps.send_all')}</button>
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
+                    <div onClick={async () => { try { await apiUpdateNps(s.id, { actif: !s.actif }); reloadNps(); addToast_admin(s.actif ? t('nps.deactivated') : t('nps.activated')); } catch { addToast_admin(t('toast.error')); } }}
+                      style={{ width: 36, height: 20, borderRadius: 10, background: s.actif ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s", flexShrink: 0 }}>
+                      <div style={{ width: 16, height: 16, borderRadius: 8, background: C.white, position: "absolute", top: 2, left: s.actif ? 18 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                    </div>
+                    <button onClick={() => showConfirm(t('nps.delete_confirm'), async () => { try { await apiDeleteNps(s.id); reloadNps(); addToast_admin(t('nps.deleted')); } catch { addToast_admin(t('toast.error')); } })} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><Trash size={13} color={C.red} /></button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -416,7 +423,7 @@ export function createAdminNPSContrats(ctx: any) {
                 <button onClick={() => setNpsPanelData((p: any) => ({ ...p, questions: [...(p.questions || []), { text: "", type: "text" }] }))} style={{ ...sBtn("outline"), fontSize: 12, display: "flex", alignItems: "center", gap: 4, alignSelf: "flex-start" }}><Plus size={12} /> {t('nps.add_question')}</button>
               </div>
               <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "space-between" }}>
-                <div>{npsPanelMode === "edit" && npsPanelData.id && <button onClick={() => showConfirm("Supprimer ce questionnaire ?", async () => { try { await apiDeleteNps(npsPanelData.id); reloadNps(); setNpsPanelMode("closed"); } catch {} })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red }}>{t('common.delete')}</button>}</div>
+                <div>{npsPanelMode === "edit" && npsPanelData.id && <button onClick={() => showConfirm(t('nps.delete_confirm'), async () => { try { await apiDeleteNps(npsPanelData.id); reloadNps(); setNpsPanelMode("closed"); addToast_admin(t('nps.deleted')); } catch { addToast_admin(t('toast.error')); } })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red }}>{t('common.delete')}</button>}</div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setNpsPanelMode("closed")} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
                   <button onClick={async () => {
@@ -671,6 +678,7 @@ export function createAdminNPSContrats(ctx: any) {
         { key: "api_key", label: lang === 'fr' ? "Clé API" : "API Key", type: "password" },
         { key: "company_id", label: "Company ID", type: "text" },
       ]},
+      taleez: { desc: t('integ.desc_taleez'), Icon: UserPlus, color: "#6C5CE7", apiKey: true, fields: [] } as any,
       sap: { desc: t('integ.desc_sap'), Icon: Building2, color: "#0FAAFF", sapConnect: true, fields: [] },
       personio: { desc: t('integ.desc_personio'), Icon: Users, color: "#4CAF50", apiKey: true, fields: [],
         connectEndpoint: "personio/connect", disconnectEndpoint: "personio/disconnect",

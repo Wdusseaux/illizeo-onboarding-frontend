@@ -183,7 +183,7 @@ export function createAdminPanels(ctx: any) {
                   <TranslatableField multiline rows={2} value={groupePanelData.description} onChange={v => setGroupePanelData(prev => ({ ...prev, description: v }))} placeholder="Description du groupe..." currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} />
                 </div>
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Couleur</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('phase.color')}</label>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {["#C2185B", "#1A73E8", "#4CAF50", "#F9A825", "#7B5EA7", "#E53935", "#00897B", "#F57C00"].map(col => (
                       <button key={col} onClick={() => setGroupePanelData(prev => ({ ...prev, couleur: col }))} style={{
@@ -717,7 +717,7 @@ export function createAdminPanels(ctx: any) {
                       }
                       setActionPanelMode("closed");
                       refetchActions();
-                    } catch { addToast_admin("Erreur lors de l'enregistrement"); }
+                    } catch { addToast_admin(t('phase.save_error')); }
                     finally { setActionPanelLoading(false); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, opacity: actionPanelLoading || !actionPanelData.titre.trim() ? 0.6 : 1 }}>
                     {actionPanelLoading ? "Enregistrement..." : actionPanelMode === "create" ? "Créer l'action" : "Enregistrer"}
@@ -741,10 +741,34 @@ export function createAdminPanels(ctx: any) {
                 <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: C.text }}>{promptModal.message}</h3>
               </div>
               {promptModal.label && <label style={{ fontSize: 12, color: C.textLight, marginBottom: 6, display: "block" }}>{promptModal.label}</label>}
-              <input type={promptModal.type} value={promptValue} onChange={e => setPromptValue(e.target.value)} style={{ ...sInput, marginBottom: 20 }} autoFocus onKeyDown={e => { if (e.key === "Enter" && promptValue) { promptModal.onSubmit(promptValue); setPromptModal(null); } }} />
+              {promptModal.options ? (
+                <>
+                  {promptModal.searchable && (
+                    <div style={{ position: "relative", marginBottom: 8 }}>
+                      <Search size={14} style={{ position: "absolute", left: 10, top: 10, color: C.textMuted }} />
+                      <input value={promptValue} onChange={e => setPromptValue(e.target.value)} placeholder={t('common.search')} style={{ ...sInput, paddingLeft: 30 }} autoFocus />
+                    </div>
+                  )}
+                  <div style={{ maxHeight: 240, overflow: "auto", border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 20 }}>
+                    {promptModal.options.filter(o => !promptValue || o.label.toLowerCase().includes(promptValue.toLowerCase())).map(o => (
+                      <div key={o.value} onClick={() => { promptModal.onSubmit(o.value); setPromptModal(null); setPromptValue(""); }}
+                        style={{ padding: "10px 14px", cursor: "pointer", borderBottom: `1px solid ${C.border}`, background: "transparent", transition: "all .15s", fontSize: 13 }}
+                        onMouseEnter={e => { e.currentTarget.style.background = C.pinkBg; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                        {o.label}
+                      </div>
+                    ))}
+                    {promptModal.options.filter(o => !promptValue || o.label.toLowerCase().includes(promptValue.toLowerCase())).length === 0 && (
+                      <div style={{ padding: "16px 14px", color: C.textMuted, fontSize: 12, textAlign: "center" }}>{t('common.no_results')}</div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <input type={promptModal.type} value={promptValue} onChange={e => setPromptValue(e.target.value)} style={{ ...sInput, marginBottom: 20 }} autoFocus onKeyDown={e => { if (e.key === "Enter" && promptValue) { promptModal.onSubmit(promptValue); setPromptModal(null); } }} />
+              )}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                <button onClick={() => setPromptModal(null)} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "9px 20px" }}>{t('common.cancel')}</button>
-                <button onClick={() => { if (promptValue) { promptModal.onSubmit(promptValue); setPromptModal(null); } }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "9px 20px" }}>Valider</button>
+                <button onClick={() => { setPromptModal(null); setPromptValue(""); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "9px 20px" }}>{t('common.cancel')}</button>
+                {!promptModal.options && <button onClick={() => { if (promptValue) { promptModal.onSubmit(promptValue); setPromptModal(null); } }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "9px 20px" }}>{t('common.validate')}</button>}
               </div>
             </div>
           </div>
@@ -788,6 +812,14 @@ export function createAdminPanels(ctx: any) {
               </div>
             );
             if (fc.field_key === "adresse") return <textarea value={val} onChange={e => onChange(e.target.value)} rows={2} style={{ ...sInput, fontSize: 12, resize: "vertical" }} />;
+            // Manager/HR Manager fields: render collaborateur select
+            if (fc.field_key === "manager_id" || fc.field_key === "hr_manager_id" || fc.field_key === "dotted_line_manager" || fc.field_key === "manager_nom") {
+              const useNameValue = fc.field_key === "manager_nom" || fc.field_key === "dotted_line_manager";
+              return <select value={val} onChange={e => onChange(e.target.value)} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                <option value="">—</option>
+                {COLLABORATEURS.filter((co: any) => co.id !== (collabPanelData as any).id).map((co: any) => <option key={co.id} value={useNameValue ? `${co.prenom} ${co.nom}` : co.id}>{co.prenom} {co.nom} — {co.poste || co.departement || ""}</option>)}
+              </select>;
+            }
             return <input value={val} onChange={e => onChange(e.target.value)} style={{ ...sInput, fontSize: 12 }} />;
           };
           return (
@@ -902,7 +934,7 @@ export function createAdminPanels(ctx: any) {
                       if (collabPanelMode === "create") { await apiCreateCollab(payload); addToast_admin("Collaborateur créé"); }
                       else { await apiUpdateCollab(collabPanelData.id!, payload); addToast_admin("Collaborateur modifié"); }
                       setCollabPanelMode("closed"); refetchCollaborateurs();
-                    } catch { addToast_admin("Erreur lors de l'enregistrement"); }
+                    } catch { addToast_admin(t('phase.save_error')); }
                     finally { setCollabPanelLoading(false); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, opacity: collabPanelLoading || !collabPanelData.prenom.trim() || !collabPanelData.nom.trim() ? 0.6 : 1 }}>
                     {collabPanelLoading ? "..." : collabPanelMode === "create" ? "Créer le collaborateur" : "Enregistrer"}
@@ -915,6 +947,13 @@ export function createAdminPanels(ctx: any) {
         })()}
     </>
   );
+
+  const PARCOURS_CAT_META: Record<ParcoursCategorie, { label: string; Icon: React.FC<any>; color: string; bg: string }> = {
+    onboarding: { label: "Onboarding", Icon: UserPlus, color: "#4CAF50", bg: C.greenLight },
+    offboarding: { label: "Offboarding", Icon: LogOut, color: "#E53935", bg: C.redLight },
+    crossboarding: { label: "Crossboarding", Icon: ArrowRight, color: "#1A73E8", bg: C.blueLight },
+    reboarding: { label: "Reboarding", Icon: Hand, color: "#7B5EA7", bg: C.purple + "15" },
+  };
 
   const renderParcoursPanel = () => (
     <>
@@ -995,7 +1034,7 @@ export function createAdminPanels(ctx: any) {
                       }
                       setParcoursPanelMode("closed");
                       refetchParcours();
-                    } catch { addToast_admin("Erreur lors de l'enregistrement"); }
+                    } catch { addToast_admin(t('phase.save_error')); }
                     finally { setParcoursPanelLoading(false); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, opacity: parcoursPanelLoading || !parcoursPanelData.nom.trim() ? 0.6 : 1 }}>
                     {parcoursPanelLoading ? "Enregistrement..." : parcoursPanelMode === "create" ? "Créer le parcours" : "Enregistrer"}
@@ -1016,17 +1055,17 @@ export function createAdminPanels(ctx: any) {
             <div onClick={() => setPhasePanelMode("closed")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
             <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 500, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "24px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{phasePanelMode === "create" ? "Nouvelle phase" : "Modifier la phase"}</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{phasePanelMode === "create" ? t('parcours.new_phase') : t('phase.edit_title')}</h2>
                 <button onClick={() => setPhasePanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
               </div>
               <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom de la phase *</label>
-                  <TranslatableField value={phasePanelData.nom} onChange={v => setPhasePanelData(prev => ({ ...prev, nom: v }))} placeholder="Ex: Première semaine" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} />
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('phase.name_label')}</label>
+                  <TranslatableField value={phasePanelData.nom} onChange={v => setPhasePanelData(prev => ({ ...prev, nom: v }))} placeholder={t('phase.name_placeholder')} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} />
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Délai début</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('phase.delay_start')}</label>
                     <select value={phasePanelData.delaiDebut || "J+0"} onChange={e => setPhasePanelData(prev => ({ ...prev, delaiDebut: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>
                       <option value="J-90">J-90</option><option value="J-60">J-60</option><option value="J-45">J-45</option>
                       <option value="J-30">J-30</option><option value="J-21">J-21</option><option value="J-14">J-14</option>
@@ -1038,7 +1077,7 @@ export function createAdminPanels(ctx: any) {
                     </select>
                   </div>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Délai fin</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('phase.delay_end')}</label>
                     <select value={phasePanelData.delaiFin || "J+0"} onChange={e => setPhasePanelData(prev => ({ ...prev, delaiFin: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>
                       <option value="J-90">J-90</option><option value="J-60">J-60</option><option value="J-45">J-45</option>
                       <option value="J-30">J-30</option><option value="J-21">J-21</option><option value="J-14">J-14</option>
@@ -1051,7 +1090,7 @@ export function createAdminPanels(ctx: any) {
                   </div>
                 </div>
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Couleur</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('phase.color')}</label>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {["#4CAF50", "#1A73E8", "#F9A825", "#C2185B", "#7B5EA7", "#E53935", "#00897B", "#F57C00"].map(col => (
                       <button key={col} onClick={() => setPhasePanelData(prev => ({ ...prev, couleur: col }))} style={{
@@ -1062,7 +1101,7 @@ export function createAdminPanels(ctx: any) {
                   </div>
                 </div>
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Parcours associés</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('phase.associated_paths')}</label>
                   <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, maxHeight: 180, overflow: "auto" }}>
                     {PARCOURS_TEMPLATES.map(p => {
                       const checked = (phasePanelData.parcoursIds || []).includes(p.id);
@@ -1082,8 +1121,23 @@ export function createAdminPanels(ctx: any) {
                     })}
                   </div>
                   {(phasePanelData.parcoursIds || []).length === 0 && (
-                    <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Aucun parcours sélectionné (phase globale)</div>
+                    <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{t('phase.no_path_selected')}</div>
                   )}
+                </div>
+                <div style={{ marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: (phasePanelData as any).active === false ? C.bgLight : "transparent" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{t('phase.active')}</div>
+                    <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{t('phase.active_desc')}</div>
+                  </div>
+                  <button onClick={() => setPhasePanelData(prev => ({ ...prev, active: !(prev as any).active !== false ? false : true } as any))} style={{
+                    width: 44, height: 24, borderRadius: 12, border: "none", cursor: "pointer", position: "relative", transition: "all .2s",
+                    background: (phasePanelData as any).active === false ? C.border : C.pink,
+                  }}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: 9, background: C.white, position: "absolute", top: 3,
+                      left: (phasePanelData as any).active === false ? 3 : 23, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+                    }} />
+                  </button>
                 </div>
               </div>
               <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 12, justifyContent: "space-between" }}>
@@ -1092,8 +1146,8 @@ export function createAdminPanels(ctx: any) {
                     <button onClick={() => {
                       if (!phasePanelData.id) return;
                       const id = phasePanelData.id;
-                      setConfirmDialog({ message: "Supprimer cette phase ? Les actions associées seront détachées.", onConfirm: async () => {
-                        try { await apiDeletePhase(id); addToast_admin("Phase supprimée"); setPhasePanelMode("closed"); refetchPhases(); } catch { addToast_admin("Erreur lors de la suppression"); }
+                      setConfirmDialog({ message: t('phase.delete_confirm'), onConfirm: async () => {
+                        try { await apiDeletePhase(id); addToast_admin(t('phase.deleted')); setPhasePanelMode("closed"); refetchPhases(); } catch { addToast_admin(t('phase.delete_error')); }
                         setConfirmDialog(null);
                       }});
                     }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>
@@ -1103,21 +1157,21 @@ export function createAdminPanels(ctx: any) {
                   <button onClick={() => setPhasePanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button disabled={phasePanelLoading || !phasePanelData.nom.trim()} onClick={async () => {
                     setPhasePanelLoading(true);
-                    const payload: Record<string, any> = { nom: phasePanelData.nom.trim(), delai_debut: phasePanelData.delaiDebut, delai_fin: phasePanelData.delaiFin, couleur: phasePanelData.couleur, parcours_ids: phasePanelData.parcoursIds, translations: buildTranslationsPayload() };
+                    const payload: Record<string, any> = { nom: phasePanelData.nom.trim(), delai_debut: phasePanelData.delaiDebut, delai_fin: phasePanelData.delaiFin, couleur: phasePanelData.couleur, parcours_ids: phasePanelData.parcoursIds, active: (phasePanelData as any).active !== false, translations: buildTranslationsPayload() };
                     try {
                       if (phasePanelMode === "create") {
                         await apiCreatePhase(payload);
-                        addToast_admin("Phase créée avec succès");
+                        addToast_admin(t('phase.created'));
                       } else {
                         await apiUpdatePhase(phasePanelData.id!, payload);
-                        addToast_admin("Phase modifiée avec succès");
+                        addToast_admin(t('phase.updated'));
                       }
                       setPhasePanelMode("closed");
                       refetchPhases();
-                    } catch { addToast_admin("Erreur lors de l'enregistrement"); }
+                    } catch { addToast_admin(t('phase.save_error')); }
                     finally { setPhasePanelLoading(false); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, opacity: phasePanelLoading || !phasePanelData.nom.trim() ? 0.6 : 1 }}>
-                    {phasePanelLoading ? "Enregistrement..." : phasePanelMode === "create" ? "Créer la phase" : "Enregistrer"}
+                    {phasePanelLoading ? t('phase.saving') : phasePanelMode === "create" ? t('phase.create_title') : t('common.save')}
                   </button>
                 </div>
               </div>

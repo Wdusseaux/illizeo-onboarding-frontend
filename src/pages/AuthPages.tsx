@@ -55,7 +55,7 @@ import {
   exportAllData, exportCollaborateursCSV, exportAuditLog, rgpdDeleteCollaborateur, rgpdDeleteAccount,
   get2FAStatus, setup2FA, confirm2FA, disable2FA, regenerate2FARecoveryCodes,
   registerTenant, checkTenantAvailability,
-  getCompanySettings, updateCompanySettings,
+  getCompanySettings, updateCompanySettings, getPasswordPolicy, type PasswordPolicy,
   getBadges, getMyBadges, getBadgeTemplates, createBadgeTemplate as apiCreateBadgeTpl, updateBadgeTemplate as apiUpdateBadgeTpl, deleteBadgeTemplate as apiDeleteBadgeTpl, awardBadge, revokeBadge,
   type Badge, type BadgeTemplate,
   getPlans, type PlanData,
@@ -159,9 +159,52 @@ export function createAuthPages(ctx: any) {
     handleEmployeeSubmitDoc, handleRHValidateDoc, handleRHRefuseDoc, handleCompleteAction, handleRelance, docsSubmitted, docsValidated, docsTotal,
     docsMissing, employeeProgression, getLiveCollaborateurs, getLiveDocCategories, msgEndRef, bannerRef, messageRef, toastIdRef,
     handleBannerFileUpload, handleSendMessage, renderActionCard, renderCompanyBlock, renderMessagerie, SIDEBAR_ITEMS, markSetupStepDone, finishSetupWizard,
+    pwdPolicy, setPwdPolicy,
   } = ctx;
 
+  // Load password policy from public endpoint (no auth required)
+  const loadPwdPolicy = () => {
+    if (pwdPolicy) return;
+    getPasswordPolicy().then((p: PasswordPolicy) => setPwdPolicy(p)).catch(() => {
+      setPwdPolicy({ min_length: 8, uppercase: true, lowercase: true, number: true, special: false, no_common: true, no_name: false, max_attempts: 5, history_count: 3, expiry_days: 0 });
+    });
+  };
+
+  /** Check each password rule against the current value */
+  const checkPwdRules = (pwd: string, policy: PasswordPolicy | null) => {
+    if (!policy) return [];
+    const rules: { key: string; label: string; met: boolean }[] = [];
+    rules.push({ key: "min_length", label: `Minimum ${policy.min_length} caract\u00e8res`, met: pwd.length >= policy.min_length });
+    if (policy.uppercase) rules.push({ key: "uppercase", label: "Une majuscule (A-Z)", met: /[A-Z]/.test(pwd) });
+    if (policy.lowercase) rules.push({ key: "lowercase", label: "Une minuscule (a-z)", met: /[a-z]/.test(pwd) });
+    if (policy.number) rules.push({ key: "number", label: "Un chiffre (0-9)", met: /[0-9]/.test(pwd) });
+    if (policy.special) rules.push({ key: "special", label: "Un caract\u00e8re sp\u00e9cial (!@#$...)", met: /[!@#$%^&*(),.?":{}|<>]/.test(pwd) });
+    return rules;
+  };
+
+  /** Render the password checklist */
+  const renderPwdChecklist = (pwd: string, policy: PasswordPolicy | null) => {
+    const rules = checkPwdRules(pwd, policy);
+    if (rules.length === 0) return null;
+    return (
+      <div style={{ marginTop: 6, marginBottom: 4 }}>
+        {rules.map(r => (
+          <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, lineHeight: 1.8, color: r.met ? C.green : C.red }}>
+            {r.met ? <Check size={12} /> : <X size={12} />}
+            <span>{r.label}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  /** Check if all rules pass */
+  const allPwdRulesMet = (pwd: string, policy: PasswordPolicy | null) => {
+    return checkPwdRules(pwd, policy).every(r => r.met);
+  };
+
   const renderResetPassword = () => {
+    loadPwdPolicy();
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)` }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
@@ -182,7 +225,7 @@ export function createAuthPages(ctx: any) {
           ) : (
             <form onSubmit={async (e) => {
               e.preventDefault();
-              if (resetPassword.length < 8) return;
+              if (!allPwdRulesMet(resetPassword, pwdPolicy)) return;
               if (resetPassword !== resetConfirm) return;
               setResetLoading(true);
               try {
@@ -193,16 +236,17 @@ export function createAuthPages(ctx: any) {
             }}>
               <div style={{ marginBottom: 16 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nouveau mot de passe</label>
-                <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder="Minimum 8 caractères" required minLength={8}
+                <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder={`Minimum ${pwdPolicy?.min_length ?? 8} caract\u00e8res`} required
                   style={{ ...sInput, background: C.bg }} />
+                {resetPassword && renderPwdChecklist(resetPassword, pwdPolicy)}
               </div>
               <div style={{ marginBottom: 20 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Confirmer le mot de passe</label>
-                <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} placeholder="Répétez le mot de passe" required
+                <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} placeholder="R\u00e9p\u00e9tez le mot de passe" required
                   style={{ ...sInput, background: C.bg }} />
                 {resetConfirm && resetPassword !== resetConfirm && <div style={{ fontSize: 11, color: C.red, marginTop: 4 }}>Les mots de passe ne correspondent pas</div>}
               </div>
-              <button type="submit" disabled={resetLoading || resetPassword.length < 8 || resetPassword !== resetConfirm}
+              <button type="submit" disabled={resetLoading || !allPwdRulesMet(resetPassword, pwdPolicy) || resetPassword !== resetConfirm}
                 className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", padding: "12px 0", fontSize: 15, opacity: resetLoading ? 0.6 : 1 }}>
                 {resetLoading ? "Enregistrement..." : "Enregistrer le mot de passe"}
               </button>
@@ -429,6 +473,9 @@ export function createAuthPages(ctx: any) {
     );
   };
 
+  // Default policy for tenant registration (no tenant context yet)
+  const defaultPolicy: PasswordPolicy = { min_length: 8, uppercase: true, lowercase: true, number: true, special: false, no_common: true, no_name: false, max_attempts: 5, history_count: 3, expiry_days: 0 };
+
   const renderRegister = () => {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)` }}>
@@ -482,18 +529,21 @@ export function createAuthPages(ctx: any) {
               <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Email professionnel *</label>
               <input type="email" value={regData.admin_email} onChange={e => setRegData(p => ({ ...p, admin_email: e.target.value }))} placeholder="vous@entreprise.com" required style={sInput} />
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Mot de passe *</label>
-                <input type="password" value={regData.password} onChange={e => setRegData(p => ({ ...p, password: e.target.value }))} placeholder="Min. 8 caractères" required minLength={8} style={sInput} />
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Mot de passe *</label>
+                  <input type="password" value={regData.password} onChange={e => setRegData(p => ({ ...p, password: e.target.value }))} placeholder={`Min. ${defaultPolicy.min_length} caract\u00e8res`} required style={sInput} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Confirmer *</label>
+                  <input type="password" value={regData.password_confirmation} onChange={e => setRegData(p => ({ ...p, password_confirmation: e.target.value }))} placeholder="R\u00e9p\u00e9ter" required style={sInput} />
+                  {regData.password_confirmation && regData.password !== regData.password_confirmation && <div style={{ fontSize: 10, color: C.red, marginTop: 2 }}>Non identiques</div>}
+                </div>
               </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Confirmer *</label>
-                <input type="password" value={regData.password_confirmation} onChange={e => setRegData(p => ({ ...p, password_confirmation: e.target.value }))} placeholder="Répéter" required style={sInput} />
-                {regData.password_confirmation && regData.password !== regData.password_confirmation && <div style={{ fontSize: 10, color: C.red, marginTop: 2 }}>Non identiques</div>}
-              </div>
+              {regData.password && renderPwdChecklist(regData.password, defaultPolicy)}
             </div>
-            <button type="submit" disabled={regLoading || !regData.company_name || !regData.admin_prenom || !regData.admin_nom || !regData.admin_email || regData.password.length < 8 || regData.password !== regData.password_confirmation}
+            <button type="submit" disabled={regLoading || !regData.company_name || !regData.admin_prenom || !regData.admin_nom || !regData.admin_email || !allPwdRulesMet(regData.password, defaultPolicy) || regData.password !== regData.password_confirmation}
               className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", padding: "12px 0", fontSize: 15, opacity: regLoading ? 0.6 : 1 }}>
               {regLoading ? "Création en cours..." : "Créer mon espace Illizeo"}
             </button>

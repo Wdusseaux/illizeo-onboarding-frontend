@@ -242,6 +242,14 @@ export function createAdminCooptation(ctx: any) {
     // ─── DASHBOARD ─────────────────────────────────────────────
 
 
+    const COOPT_STATUS_META: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+      en_attente: { label: t('coopt.pending'), color: C.amber, bg: C.amberLight, icon: Hourglass },
+      embauche: { label: t('coopt.hired'), color: C.blue, bg: C.blueLight, icon: UserCheck },
+      valide: { label: t('coopt.validated'), color: C.green, bg: C.greenLight, icon: CheckCircle2 },
+      recompense_versee: { label: t('coopt.rewarded'), color: "#7B5EA7", bg: C.purple + "15", icon: Gift },
+      refuse: { label: t('coopt.refused'), color: C.red, bg: C.redLight, icon: Ban },
+    };
+
     const renderCooptation = () => {
       const filtered = cooptations.filter(c => (cooptFilter === "all" || c.statut === cooptFilter) && (cooptCampaignFilter === "all" || c.campaign_id === cooptCampaignFilter));
       const reloadCoopt = () => {

@@ -130,6 +130,7 @@ export function createAdminSidebarComponent(ctx: any) {
     tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData,
     lang, setLangState, darkMode, setDarkMode, activeLanguages, setActiveLanguages, contentTranslations, setContentTranslations,
     fieldConfig, setFieldConfig, translateFieldId, setTranslateFieldId, translateEN, setTranslateEN, adminUsers, setAdminUsers,
+    hasPermission, isSuperAdmin,
     userPanelMode, setUserPanelMode, userPanelData, setUserPanelData, userPanelLoading, setUserPanelLoading, userSearch, setUserSearch,
     userRoleFilter, setUserRoleFilter, gedTab, setGedTab, gedSearch, setGedSearch, gedCatFilter, setGedCatFilter,
     tplPanelOpen, setTplPanelOpen, tplPanelDoc, setTplPanelDoc, selectedDocsForValidation, setSelectedDocsForValidation, realDocs, setRealDocs,
@@ -212,6 +213,9 @@ export function createAdminSidebarComponent(ctx: any) {
         { id: "admin_documents" as AdminPage, label: t('admin.documents'), icon: FileText },
         { id: "admin_equipes" as AdminPage, label: t('admin.teams_groups'), icon: Users },
         { id: "admin_messagerie" as AdminPage, label: t('admin.messaging'), icon: MessageCircle },
+        { id: "admin_calendar" as AdminPage, label: t('calendar.title'), icon: CalendarDays },
+        { id: "admin_orgchart" as AdminPage, label: t('org.title'), icon: Users },
+        { id: "admin_buddy" as AdminPage, label: t('buddy.title'), icon: Handshake },
       ]},
       { section: t('admin.automation'), items: [
         { id: "admin_workflows" as AdminPage, label: t('admin.workflows'), icon: Zap },
@@ -229,10 +233,12 @@ export function createAdminSidebarComponent(ctx: any) {
         { id: "admin_integrations" as AdminPage, label: t('admin.integrations'), icon: Link },
       ]},
       { section: t('admin.settings'), items: [
+        { id: "admin_audit" as AdminPage, label: t('audit.title'), icon: ClipboardCheck },
         { id: "admin_users" as AdminPage, label: t('admin.users_roles'), icon: ShieldCheck },
+        { id: "admin_roles" as AdminPage, label: t('roles.title'), icon: Crown },
         { id: "admin_fields" as AdminPage, label: t('admin.collab_fields'), icon: ClipboardList },
         { id: "admin_apparence" as AdminPage, label: t('admin.appearance'), icon: Palette },
-        { id: "admin_2fa" as AdminPage, label: t('admin.security'), icon: ShieldCheck },
+        { id: "admin_password_policy" as AdminPage, label: lang === "fr" ? "Sécurité" : "Security", icon: ShieldCheck },
         { id: "admin_donnees" as AdminPage, label: t('admin.data_rgpd'), icon: DatabaseBackup },
         { id: "admin_provisioning" as AdminPage, label: t('prov.title'), icon: Download },
         ...(!isEditorTenant ? [{ id: "admin_abonnement" as AdminPage, label: t('admin.subscription'), icon: CircleDollarSign }] : []),
@@ -331,6 +337,9 @@ export function createAdminSidebarComponent(ctx: any) {
                   }}>{LANG_META[l].flag} {l.toUpperCase()}</button>
                 ))}
               </div>
+              <button onClick={() => setAdminPage("admin_2fa" as any)} className="iz-sidebar-item" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "none", background: adminPage === "admin_2fa" ? C.pinkBg : "transparent", cursor: "pointer", fontFamily: font, fontSize: 11, color: adminPage === "admin_2fa" ? C.pink : C.textMuted, width: "100%", transition: "all .15s" }}>
+                <ShieldCheck size={13} /> {lang === "fr" ? "Mon 2FA" : "My 2FA"}
+              </button>
               <button onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `${window.location.pathname}?tenant=${tid}` : window.location.pathname; }); }} className="iz-sidebar-item" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", fontFamily: font, fontSize: 11, color: C.textMuted, width: "100%", transition: "all .15s" }}>
                 <LogOut size={13} /> {t('auth.logout')}
               </button>

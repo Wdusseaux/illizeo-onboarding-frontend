@@ -16,6 +16,8 @@ import {
   createEmailTemplate as apiCreateEmailTpl, updateEmailTemplate as apiUpdateEmailTpl, deleteEmailTemplate as apiDeleteEmailTpl,
   createContrat as apiCreateContrat, updateContrat as apiUpdateContrat, deleteContrat as apiDeleteContrat,
   getUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser,
+  getRoles, createRole as apiCreateRole, updateRole as apiUpdateRole, deleteRole as apiDeleteRole, assignRoleUser, removeRoleUser, duplicateRole as apiDuplicateRole, getEffectivePermissions, getMyPermissions, getMyCollaborateur,
+  completeMyActionByActionId as apiCompleteByAction, reactivateMyActionByActionId as apiReactivateByAction,
   getFieldConfig, updateFieldConfig as apiUpdateFieldConfig, createFieldConfig as apiCreateFieldConfig, deleteFieldConfig as apiDeleteFieldConfig,
   getOnboardingTeams, createOnboardingTeam as apiCreateTeam, updateOnboardingTeam as apiUpdateTeam, deleteOnboardingTeam as apiDeleteTeam,
   getADGroupMappings, createADGroupMapping, deleteADGroupMapping, syncADUsers, getADGroups,
@@ -60,6 +62,7 @@ import {
   uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures,
   type SignatureDoc, type DocAcknowledgement,
   checkDossier, validateDossier, exportDossier, resetDossier, type DossierCheck,
+  completeMyAction as apiCompleteMyAction, reactivateMyAction as apiReactivateMyAction,
 } from "./api/endpoints";
 import {
   Users, FileText, MessageCircle, Bell, Building2, LayoutDashboard, Zap,
@@ -234,6 +237,32 @@ export default function OnboardingModule() {
   });
   const [setupCompleted, setSetupCompleted] = useState<string[]>([]);
 
+  // ═══ PERMISSIONS ═══════════════════════════════════════════════
+  const [userPermissions, setUserPermissions] = useState<Record<string, string>>({});
+  const [userRoleSlugs, setUserRoleSlugs] = useState<string[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [myCollabProfile, setMyCollabProfile] = useState<any>(null);
+  useEffect(() => {
+    if (auth.isAuthenticated) {
+      getMyCollaborateur().then(c => { if (c) setMyCollabProfile(c); }).catch(() => {});
+      getMyPermissions().then(res => {
+        setUserPermissions(res.permissions || {});
+        setUserRoleSlugs(res.roles || []);
+        setIsSuperAdmin(res.is_super_admin || false);
+      }).catch(() => {
+        // Fallback: admin users get full access if endpoint not available yet
+        if (auth.isAdmin) setIsSuperAdmin(true);
+      });
+    }
+  }, [auth.isAuthenticated]);
+
+  const PERM_LEVEL_VALUES: Record<string, number> = { admin: 3, edit: 2, view: 1, none: 0 };
+  const hasPermission = (module: string, requiredLevel: string = "view"): boolean => {
+    if (isSuperAdmin || auth.isAdmin) return true; // Super admin / legacy admin bypass
+    const userLevel = userPermissions[module] || "none";
+    return (PERM_LEVEL_VALUES[userLevel] || 0) >= (PERM_LEVEL_VALUES[requiredLevel] || 0);
+  };
+
   // ═══ API DATA (fallback-first — only fetch when authenticated) ═══
   const apiEnabled = { enabled: auth.isAuthenticated };
   // Only show mock data for the editor tenant (illizeo). Other tenants get empty arrays.
@@ -263,12 +292,12 @@ export default function OnboardingModule() {
   const [toast, setToast] = useState<string | null>(null);
   const addToast_admin = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
   const showConfirm = (message: string, onConfirm: () => void) => setConfirmDialog({ message, onConfirm });
-  const [promptModal, setPromptModal] = useState<{ message: string; label: string; type: string; defaultValue: string; onSubmit: (val: string) => void } | null>(null);
+  const [promptModal, setPromptModal] = useState<{ message: string; label: string; type: string; defaultValue: string; options?: { value: string; label: string }[]; searchable?: boolean; onSubmit: (val: string) => void } | null>(null);
   const [promptValue, setPromptValue] = useState("");
-  const showPrompt = (message: string, onSubmit: (val: string) => void, opts?: { label?: string; type?: string; defaultValue?: string }) => {
+  const showPrompt = (message: string, onSubmit: (val: string) => void, opts?: { label?: string; type?: string; defaultValue?: string; options?: { value: string; label: string }[]; searchable?: boolean }) => {
     const dv = opts?.defaultValue || "";
     setPromptValue(dv);
-    setPromptModal({ message, label: opts?.label || "", type: opts?.type || "text", defaultValue: dv, onSubmit });
+    setPromptModal({ message, label: opts?.label || "", type: opts?.type || "text", defaultValue: dv, options: opts?.options, searchable: opts?.searchable, onSubmit });
   };
   const [selectedCollab, setSelectedCollab] = useState<number | null>(null);
   const [selectedParcours, setSelectedParcours] = useState<number>(1);
@@ -320,7 +349,13 @@ export default function OnboardingModule() {
   const [integrationPanelId, setIntegrationPanelId] = useState<number | null>(null);
   const [integrationConfig, setIntegrationConfig] = useState<Record<string, any>>({});
   const [integrationSaving, setIntegrationSaving] = useState(false);
+  const [integrationMappings, setIntegrationMappings] = useState<any[]>([]);
+  const [integrationMappingTab, setIntegrationMappingTab] = useState<"fields" | "values" | "parcours">("fields");
   const [apiKeyInput, setApiKeyInput] = useState("");
+  const [apiTab, setApiTab] = useState<"keys" | "webhooks" | "docs" | "logs">("keys");
+  const [apiKeys, setApiKeys] = useState<any[]>([]);
+  const [apiWebhooks, setApiWebhooks] = useState<any[]>([]);
+  const [apiLogs, setApiLogs] = useState<any[]>([]);
   // Confirm dialog
   // Suivi filters
   const [suiviFilter, setSuiviFilter] = useState<"all" | "en_cours" | "en_retard" | "termine">("all");
@@ -377,6 +412,39 @@ export default function OnboardingModule() {
   const [translateEN, setTranslateEN] = useState("");
   // User management
   const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [adminRoles, setAdminRoles] = useState<any[]>([]);
+  const [rolePanelMode, setRolePanelMode] = useState<"closed" | "create" | "edit">("closed");
+  const [rolePanelData, setRolePanelData] = useState<any>({});
+  const [roleTab, setRoleTab] = useState<"scope" | "exclusions" | "members" | "security" | "history">("scope");
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [permMatrixFilter, setPermMatrixFilter] = useState("");
+  const [visibleRoleIds, setVisibleRoleIds] = useState<number[]>([]);
+  const [rolesDropdownOpen, setRolesDropdownOpen] = useState(false);
+  const [effectivePermUserId, setEffectivePermUserId] = useState<number | null>(null);
+  const [securitySubTab, setSecuritySubTab] = useState<"2fa" | "password">("2fa");
+  const [pwdPolicy, setPwdPolicy] = useState<Record<string, any> | null>(null);
+  const [permissionLogs, setPermissionLogs] = useState<any[]>([]);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<"month" | "week" | "list">("month");
+  const [calendarListFilter, setCalendarListFilter] = useState("all");
+  const [orgView, setOrgView] = useState<"tree" | "list" | "dept">("tree");
+  const [orgSearch, setOrgSearch] = useState("");
+  const [auditFilter, setAuditFilter] = useState("all");
+  const [auditSearch, setAuditSearch] = useState("");
+  const [buddyPairs, setBuddyPairs] = useState<any[]>([]);
+  const [selectedBuddyPair, setSelectedBuddyPair] = useState<number | null>(null);
+  // Org chart states
+  const [orgExpandedNodes, setOrgExpandedNodes] = useState<string[]>(["ceo"]);
+  const [orgSortCol, setOrgSortCol] = useState("nom");
+  const [orgSortDir, setOrgSortDir] = useState<"asc" | "desc">("asc");
+  // Buddy states
+  const [buddyTab, setBuddyTab] = useState<"checklist" | "notes" | "feedback">("checklist");
+  const [buddyNoteInput, setBuddyNoteInput] = useState("");
+  const [buddyFeedbackRating, setBuddyFeedbackRating] = useState(0);
+  const [buddyFeedbackComment, setBuddyFeedbackComment] = useState("");
+  // Audit states
+  const [auditExpandedEntry, setAuditExpandedEntry] = useState<number | null>(null);
+  const [auditVisibleCount, setAuditVisibleCount] = useState(15);
   const [userPanelMode, setUserPanelMode] = useState<"closed" | "create" | "edit">("closed");
   const [userPanelData, setUserPanelData] = useState<{ id?: number; name: string; email: string; password: string; role: string }>({ name: "", email: "", password: "", role: "onboardee" });
   const [userPanelLoading, setUserPanelLoading] = useState(false);
@@ -464,7 +532,7 @@ export default function OnboardingModule() {
     { id: 5, nom: "Contrat d'alternance", type: "Alternance", juridiction: "France", variables: 16, derniereMaj: "12/01/2026", actif: false, fichier: "Alternance_v1.docx" },
     { id: 6, nom: "Avenant de mobilité", type: "Avenant", juridiction: "Multi", variables: 12, derniereMaj: "20/02/2026", actif: true, fichier: "Avenant_Mobilite_v2.docx" },
   ];
-  const { data: apiContrats } = useApiData(getContrats, isDemo ? _mockContrats : []);
+  const { data: apiContrats } = useApiData(getContrats, isDemo ? _mockContrats : [], { enabled: auth.isAuthenticated && auth.isAdmin });
   const [contrats, setContrats] = useState(_mockContrats);
   useEffect(() => { setContrats(apiContrats); }, [apiContrats]);
   const [contractTypes, setContractTypes] = useState<string[]>(TYPES_CONTRAT);
@@ -590,7 +658,7 @@ export default function OnboardingModule() {
   }, [addTimelineEntry, addToast]);
 
   // Employee completes an action
-  const handleCompleteAction = useCallback((actionId: number) => {
+  const handleCompleteAction = useCallback((actionId: number, assignmentId?: number) => {
     setCompletedActions(prev => new Set(prev).add(actionId));
     const action = ACTIONS.find(a => a.id === actionId);
     if (action) {
@@ -598,7 +666,28 @@ export default function OnboardingModule() {
       addToast(`Action "${action.title.substring(0, 40)}..." terminée`, "success");
       addToast(`${formData.prenom} a complété : ${action.title.substring(0, 40)}...`, "info", "rh");
     }
+    // Call API — use assignment ID if available, otherwise use action ID
+    if (assignmentId) {
+      apiCompleteMyAction(assignmentId).catch(() => {});
+    } else {
+      apiCompleteByAction(actionId).catch(() => {});
+    }
   }, [formData.prenom, addTimelineEntry, addToast]);
+
+  // Employee reactivates an action
+  const handleReactivateAction = useCallback((actionId: number, assignmentId?: number) => {
+    setCompletedActions(prev => { const s = new Set(prev); s.delete(actionId); return s; });
+    const action = ACTIONS.find(a => a.id === actionId);
+    if (action) {
+      addToast(`Action "${action.title.substring(0, 40)}..." réactivée`, "info");
+    }
+    // Call API — use assignment ID if available, otherwise use action ID
+    if (assignmentId) {
+      apiReactivateMyAction(assignmentId).catch(() => {});
+    } else {
+      apiReactivateByAction(actionId).catch(() => {});
+    }
+  }, [addToast]);
 
   // RH sends a relance
   const handleRelance = useCallback((collabName: string, motif: string) => {
@@ -648,7 +737,7 @@ export default function OnboardingModule() {
     addToast_admin, showConfirm, showPrompt, switchLang, toggleDarkMode,
     resetTr, setTr, buildTranslationsPayload,
     addToast, addTimelineEntry, handleEmployeeSubmitDoc, handleRHValidateDoc,
-    handleRHRefuseDoc, handleCompleteAction, handleRelance,
+    handleRHRefuseDoc, handleCompleteAction, handleReactivateAction, handleRelance,
     // Computed
     docsSubmitted, docsValidated, docsTotal, docsMissing, employeeProgression,
     getLiveCollaborateurs,
@@ -783,7 +872,9 @@ export default function OnboardingModule() {
     integrationPanelId, setIntegrationPanelId,
     integrationConfig, setIntegrationConfig,
     integrationSaving, setIntegrationSaving,
+    integrationMappings, setIntegrationMappings, integrationMappingTab, setIntegrationMappingTab,
     apiKeyInput, setApiKeyInput,
+    apiTab, setApiTab, apiKeys, setApiKeys, apiWebhooks, setApiWebhooks, apiLogs, setApiLogs,
     suiviFilter, setSuiviFilter,
     suiviSearch, setSuiviSearch,
     suiviParcoursFilter, setSuiviParcoursFilter,
@@ -808,6 +899,16 @@ export default function OnboardingModule() {
     translateFieldId, setTranslateFieldId,
     translateEN, setTranslateEN,
     adminUsers, setAdminUsers,
+    adminRoles, setAdminRoles, rolePanelMode, setRolePanelMode, rolePanelData, setRolePanelData,
+    hasPermission, isSuperAdmin, userPermissions, userRoleSlugs, myCollabProfile,
+    roleTab, setRoleTab, selectedRoleId, setSelectedRoleId, permMatrixFilter, setPermMatrixFilter,
+    visibleRoleIds, setVisibleRoleIds, rolesDropdownOpen, setRolesDropdownOpen, effectivePermUserId, setEffectivePermUserId,
+    permissionLogs, setPermissionLogs, securitySubTab, setSecuritySubTab, pwdPolicy, setPwdPolicy,
+    calendarMonth, setCalendarMonth, calendarView, setCalendarView, calendarListFilter, setCalendarListFilter,
+    orgView, setOrgView, orgSearch, setOrgSearch, auditFilter, setAuditFilter, auditSearch, setAuditSearch, buddyPairs, setBuddyPairs, selectedBuddyPair, setSelectedBuddyPair,
+    orgExpandedNodes, setOrgExpandedNodes, orgSortCol, setOrgSortCol, orgSortDir, setOrgSortDir,
+    buddyTab, setBuddyTab, buddyNoteInput, setBuddyNoteInput, buddyFeedbackRating, setBuddyFeedbackRating, buddyFeedbackComment, setBuddyFeedbackComment,
+    auditExpandedEntry, setAuditExpandedEntry, auditVisibleCount, setAuditVisibleCount,
     userPanelMode, setUserPanelMode,
     userPanelData, setUserPanelData,
     userPanelLoading, setUserPanelLoading,
@@ -1153,6 +1254,14 @@ export default function OnboardingModule() {
   useEffect(() => {
     if (auth.isAuthenticated && auth.isAdmin && (adminPage === "admin_users" || adminPage === "admin_equipes")) {
       getUsers().then(setAdminUsers).catch(() => {});
+      getRoles().then(setAdminRoles).catch(() => {});
+    }
+  }, [auth.isAuthenticated, adminPage]);
+
+  // ─── Roles effects ──────────────────────────────────────────
+  useEffect(() => {
+    if (auth.isAuthenticated && auth.isAdmin && adminPage === "admin_roles") {
+      getRoles().then(setAdminRoles).catch(() => {});
     }
   }, [auth.isAuthenticated, adminPage]);
 
@@ -1666,6 +1775,7 @@ export default function OnboardingModule() {
         {adminPage === "admin_fields" && adminInline.renderAdminFields()}
         {adminPage === "admin_apparence" && adminInline.renderAdminApparence()}
         {adminPage === "admin_2fa" && adminInline.renderAdmin2FA()}
+        {adminPage === "admin_password_policy" && adminInline.renderAdminPasswordPolicy()}
         {/* ═══ EQUIPMENT MANAGEMENT ═══════════════════════════════ */}
         {adminPage === "admin_equipements" && adminInline.renderAdminEquipements()}
 
@@ -1674,6 +1784,16 @@ export default function OnboardingModule() {
 
         {adminPage === "admin_donnees" && adminInline.renderAdminDonnees()}
         {adminPage === "admin_provisioning" && adminInline.renderAdminProvisioning()}
+        {/* ═══ ROLES & PERMISSIONS ═════════════════════════════════ */}
+        {adminPage === "admin_roles" && adminInline.renderAdminRoles()}
+        {/* ═══ CALENDAR ═══════════════════════════════════════════ */}
+        {adminPage === "admin_calendar" && adminInline.renderAdminCalendar()}
+        {/* ═══ ORG CHART ═══════════════════════════════════════════ */}
+        {adminPage === "admin_orgchart" && adminInline.renderAdminOrgChart()}
+        {/* ═══ BUDDY / PARRAIN ════════════════════════════════════ */}
+        {adminPage === "admin_buddy" && adminInline.renderAdminBuddy()}
+        {/* ═══ AUDIT LOG ═══════════════════════════════════════════ */}
+        {adminPage === "admin_audit" && adminInline.renderAdminAuditLog()}
         </div>{/* end content wrapper */}
         </div>{/* end column container */}
         {/* Translation modal */}
@@ -2014,13 +2134,22 @@ export default function OnboardingModule() {
           )}
         </div>
       )}
-      {dashPage === "suivi" && (
+      {dashPage === "suivi" && (() => {
+        const _myCollab = myCollabProfile || COLLABORATEURS.find((c: any) => c.email === auth.user?.email);
+        const _myParcours = _myCollab ? PARCOURS_TEMPLATES.find((p: any) => p.id === _myCollab.parcours_id) : null;
+        const _myParcoursName = (_myCollab as any)?.parcours_nom || _myParcours?.nom || "Onboarding Standard";
+        const _myProfileActions = (_myCollab as any)?.parcours_actions || [];
+        const _myActionTpls = _myProfileActions.length > 0 ? _myProfileActions : ACTION_TEMPLATES.filter((a: any) => a.parcours === _myParcoursName);
+        const _myActions = _myActionTpls.length > 0 ? _myActionTpls.map((a: any, i: number) => ({
+          id: a.id || i + 1, title: a.titre, subtitle: a.description || "",
+        })) : ACTIONS;
+        return (
         <div style={{ flex: 1, padding: "32px 40px" }}>
           <h1 style={{ fontSize: 24, fontWeight: 600, color: C.text, margin: "0 0 20px" }}>{t('emp.tracking_title')}</h1>
           {/* Progression card */}
           <div className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 20 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Onboarding Standard</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{_myParcoursName}</h3>
               <span style={{ padding: "4px 12px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: employeeProgression === 100 ? C.greenLight : C.blueLight, color: employeeProgression === 100 ? C.green : C.blue }}>{employeeProgression === 100 ? t('emp.completed') : t('emp.in_progress')}</span>
             </div>
             <div style={{ height: 10, background: C.bg, borderRadius: 5, overflow: "hidden", marginBottom: 12 }}>
@@ -2030,7 +2159,7 @@ export default function OnboardingModule() {
               {[
                 { label: t('emp.docs_validated'), value: `${docsValidated}/${docsTotal}`, color: C.blue },
                 { label: t('emp.docs_pending'), value: `${Object.values(employeeDocs).filter(s => s === "en_attente").length}`, color: C.amber },
-                { label: t('emp.actions_completed'), value: `${completedActions.size}/${ACTIONS.length}`, color: C.green },
+                { label: t('emp.actions_completed'), value: `${completedActions.size}/${_myActions.length}`, color: C.green },
                 { label: t('emp.progression'), value: `${employeeProgression}%`, color: C.pink },
               ].map((s, i) => (
                 <div key={i} style={{ textAlign: "center", padding: "10px 8px", background: C.bg, borderRadius: 8 }}>
@@ -2044,24 +2173,27 @@ export default function OnboardingModule() {
           {/* Phases with actions inside */}
           <div className="iz-card iz-fade-up iz-stagger-1" style={{ ...sCard, marginBottom: 20 }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px" }}>{t('emp.detailed_path')}</h3>
-            {phases.map((ph, phIdx) => {
+            {((_myCollab as any)?.parcours_phases?.length > 0
+              ? (_myCollab as any).parcours_phases.map((p: any) => ({ id: p.id, nom: p.nom, delaiDebut: p.delai_debut, delaiFin: p.delai_fin, couleur: p.couleur }))
+              : phases
+            ).map((ph: any, phIdx: number) => {
               const PhIcon = PHASE_ICONS[ph.nom];
-              // Match actions to phases via ACTION_TEMPLATES
-              const phaseActionTpls = ACTION_TEMPLATES.filter(t => t.phase === ph.nom && t.parcours === "Onboarding Standard");
-              const phaseActions = ACTIONS.filter(a => {
+              // Match actions to phases
+              const phaseActionTpls = _myActionTpls.filter((t: any) => t.phase === ph.nom);
+              const phaseActions = _myActions.filter(a => {
                 const tpl = ACTION_TEMPLATES.find(t => t.titre === a.title);
                 return tpl && tpl.phase === ph.nom;
               });
               // Combine: employee ACTIONS that match + remaining templates
               const allPhaseItems = phaseActionTpls.map(tpl => {
-                const empAction = ACTIONS.find(a => a.title === tpl.titre);
+                const empAction = _myActions.find(a => a.title === tpl.titre);
                 return { tpl, empAction, isDone: empAction ? completedActions.has(empAction.id) : false };
               });
               const allDone = allPhaseItems.length > 0 && allPhaseItems.every(a => a.isDone);
               const someDone = allPhaseItems.some(a => a.isDone);
               const isCurrent = !allDone && (phIdx === 0 || phases.slice(0, phIdx).every((_, prevIdx) => {
-                const prevTpls = ACTION_TEMPLATES.filter(t => t.phase === phases[prevIdx].nom && t.parcours === "Onboarding Standard");
-                const prevActions = prevTpls.map(t => ACTIONS.find(a => a.title === t.titre)).filter(Boolean);
+                const prevTpls = ACTION_TEMPLATES.filter(t => t.phase === phases[prevIdx].nom && t.parcours === _myParcoursName);
+                const prevActions = prevTpls.map(t => _myActions.find(a => a.title === t.titre)).filter(Boolean);
                 return prevActions.length > 0 && prevActions.every(a => a && completedActions.has(a.id));
               }));
               const isPast = allDone;
@@ -2170,7 +2302,8 @@ export default function OnboardingModule() {
             ))}
           </div>
         </div>
-      )}
+        );
+      })()}
       {dashPage === "notifications" && (
         <div style={{ flex: 1, padding: "32px 40px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>

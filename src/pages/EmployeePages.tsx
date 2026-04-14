@@ -155,10 +155,69 @@ export function createEmployeeRenders(ctx: any) {
     ACTION_TEMPLATES, refetchActions, GROUPES, refetchGroupes, PHASE_DEFAULTS, refetchPhases, WORKFLOW_RULES, EMAIL_TEMPLATES,
     ADMIN_DOC_CATEGORIES, NOTIFICATIONS_LIST, integrations, refetchIntegrations, apiContrats, authRole, addToast_admin, showConfirm,
     showPrompt, switchLang, toggleDarkMode, resetTr, setTr, buildTranslationsPayload, addToast, addTimelineEntry,
-    handleEmployeeSubmitDoc, handleRHValidateDoc, handleRHRefuseDoc, handleCompleteAction, handleRelance, docsSubmitted, docsValidated, docsTotal,
+    handleEmployeeSubmitDoc, handleRHValidateDoc, handleRHRefuseDoc, handleCompleteAction, handleReactivateAction, handleRelance, docsSubmitted, docsValidated, docsTotal,
     docsMissing, employeeProgression, getLiveCollaborateurs, getLiveDocCategories, msgEndRef, bannerRef, messageRef, toastIdRef,
     SIDEBAR_ITEMS, markSetupStepDone, finishSetupWizard,
   } = ctx;
+
+  // ─── EMPLOYEE ACTIONS (from real parcours) ────────────────
+  const { myCollabProfile } = ctx;
+  const myCollab = myCollabProfile || COLLABORATEURS.find((c: any) => c.email === auth.user?.email);
+  const myParcours = myCollab ? PARCOURS_TEMPLATES.find((p: any) => p.id === myCollab.parcours_id) : null;
+  const myParcoursName = (myCollab as any)?.parcours_nom || myParcours?.nom || "Onboarding Standard";
+  const myParcoursCategorie = (myCollab as any)?.parcours_categorie || myParcours?.categorie || "onboarding";
+  const CAT_LABELS_MAP: Record<string, string> = { onboarding: "Onboarding", offboarding: "Offboarding", crossboarding: "Crossboarding", reboarding: "Reboarding" };
+  // Use actions from /me/collaborateur first, fallback to ACTION_TEMPLATES filtered by parcours name
+  const myProfileActions = (myCollab as any)?.parcours_actions || [];
+  const myActions = myProfileActions.length > 0 ? myProfileActions : ACTION_TEMPLATES.filter((a: any) => a.parcours === myParcoursName);
+  const ACTION_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
+    document: { bg: C.redLight, color: C.red },
+    signature: { bg: "#FFF8E1", color: "#F9A825" },
+    formation: { bg: C.greenLight, color: C.green },
+    questionnaire: { bg: C.blueLight, color: C.blue },
+    tache: { bg: C.bg, color: C.textMuted },
+    formulaire: { bg: C.pinkBg, color: C.pink },
+    lecture: { bg: C.blueLight, color: C.blue },
+    entretien: { bg: "#F3E5F5", color: "#7B5EA7" },
+    visite: { bg: C.greenLight, color: "#00897B" },
+    passation: { bg: "#FFF3E0", color: "#E65100" },
+    checklist_it: { bg: C.amberLight, color: C.amber },
+    message: { bg: C.blueLight, color: C.blue },
+  };
+  const EMPLOYEE_ACTIONS = myActions.length > 0 ? myActions.map((a: any, i: number) => {
+    const actionType = a.type || "tache";
+    const typeColors = ACTION_TYPE_COLORS[actionType] || { bg: C.bg, color: C.textMuted };
+    return {
+      id: a.id || i + 1,
+      title: a.titre,
+      subtitle: a.description || "",
+      date: a.delaiRelatif || a.delai_relatif,
+      badge: CAT_LABELS_MAP[myParcoursCategorie] || myParcoursName,
+      iconBg: typeColors.bg,
+      iconColor: typeColors.color,
+      urgent: i === 0,
+      type: ("task") as "admin" | "task" | "future",
+      actionType: actionType,
+      icon: null,
+      assignment_id: a.assignment_id || null,
+      assignment_status: a.assignment_status || "a_faire",
+    };
+  }) : ACTIONS;
+
+  // Pre-populate completedActions from backend assignment_status (no hooks — sync inline)
+  if (EMPLOYEE_ACTIONS.length > 0 && !(EMPLOYEE_ACTIONS as any)._synced) {
+    const doneIds = EMPLOYEE_ACTIONS.filter((a: any) => a.assignment_status === "termine").map((a: any) => a.id);
+    if (doneIds.length > 0) {
+      const current = completedActions;
+      const needsUpdate = doneIds.some((id: number) => !current.has(id));
+      if (needsUpdate) {
+        const updated = new Set(current);
+        doneIds.forEach((id: number) => updated.add(id));
+        setCompletedActions(updated);
+      }
+    }
+    (EMPLOYEE_ACTIONS as any)._synced = true;
+  }
 
   // ─── RENDER SIDEBAR ──────────────────────────────────────
   const renderSidebar = () => (
@@ -289,7 +348,7 @@ export function createEmployeeRenders(ctx: any) {
       </div>
       {action.urgent && !isDone && <button className="iz-btn-pink" onClick={e => { e.stopPropagation(); setShowDocPanel("admin"); }} style={{ ...sBtn("dark"), padding: "8px 20px", fontSize: 13 }}>{t('emp.complete_btn')}</button>}
       {showCheckbox && (
-        <div onClick={e => { e.stopPropagation(); if (!isDone) handleCompleteAction(action.id); }} style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${isDone ? C.green : C.border}`, background: isDone ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all .2s", cursor: "pointer" }}>
+        <div onClick={e => { e.stopPropagation(); if (isDone) { handleReactivateAction(action.id, (action as any).assignment_id); } else { handleCompleteAction(action.id, (action as any).assignment_id); } }} style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${isDone ? C.green : C.border}`, background: isDone ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all .2s", cursor: "pointer" }}>
           {isDone && <Check size={14} color={C.white} />}
         </div>
       )}
@@ -363,7 +422,7 @@ export function createEmployeeRenders(ctx: any) {
           {/* Phase progress */}
           <div className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 24 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: C.text, margin: 0 }}>{t('emp.current_phase')} Avant date d'arrivée</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: C.text, margin: 0 }}>{t('emp.current_phase')} {myCollab?.phase || "Avant date d'arrivée"}</h3>
               <span style={{ fontSize: 13, fontWeight: 600, color: employeeProgression === 100 ? C.green : C.pink }}>{employeeProgression}%</span>
             </div>
             <div style={{ height: 8, background: C.bg, borderRadius: 4, overflow: "hidden" }}>
@@ -375,22 +434,28 @@ export function createEmployeeRenders(ctx: any) {
           <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
             {t('emp.asap')} <AlertTriangle size={14} color={C.amber} />
           </div>
-          {ACTIONS.filter(a => a.urgent).map((a, i) => renderActionCard(a, false, i))}
+          {EMPLOYEE_ACTIONS.filter(a => a.urgent).map((a, i) => renderActionCard(a, false, i))}
           <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 12, marginTop: 24 }}>{t('emp.this_week')}</div>
-          {ACTIONS.filter(a => a.type === "task").map((a, i) => renderActionCard(a, true, i + 1))}
+          {EMPLOYEE_ACTIONS.filter(a => a.type === "task").map((a, i) => renderActionCard(a, true, i + 1))}
           <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 12, marginTop: 24 }}>{t('emp.in_2_weeks')}</div>
-          {ACTIONS.filter(a => a.type === "future").slice(0, 1).map((a, i) => renderActionCard(a, true, i + 3))}
+          {EMPLOYEE_ACTIONS.filter(a => a.type === "future").slice(0, 1).map((a, i) => renderActionCard(a, true, i + 3))}
           <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 12, marginTop: 24 }}>{t('emp.in_7_weeks')}</div>
-          {ACTIONS.filter(a => a.type === "future").slice(1).map((a, i) => renderActionCard(a, true, i + 4))}
-          {/* Video section */}
-          <div style={{ ...sCard, marginTop: 24, padding: 0, overflow: "hidden" }}>
-            <div style={{ height: 240, background: "#1a1a2e", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(255,255,255,.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Play size={24} color={C.white} fill={C.white} />
+          {EMPLOYEE_ACTIONS.filter(a => a.type === "future").slice(1).map((a, i) => renderActionCard(a, true, i + 4))}
+          {/* Video section — from company blocks with dashboard_featured flag */}
+          {(() => {
+            const videoBlock = (companyBlocks || []).find((b: any) => b.type === "video" && b.actif);
+            const videos = videoBlock?.data?.videos || [];
+            const featured = videos.find((v: any) => v.dashboard_featured) || videos[0];
+            if (!featured?.youtube_id) return null;
+            return (
+              <div style={{ ...sCard, marginTop: 24, padding: 0, overflow: "hidden" }}>
+                <div style={{ width: "100%", aspectRatio: "16/9" }}>
+                  <iframe src={`https://www.youtube.com/embed/${featured.youtube_id}`} title={featured.title || ""} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ width: "100%", height: "100%", border: "none" }} />
+                </div>
+                {featured.title && <div style={{ padding: "10px 16px", fontSize: 13, fontWeight: 500 }}>{featured.title}</div>}
               </div>
-              <div style={{ position: "absolute", bottom: 12, left: 16, color: C.white, fontSize: 12 }}>▶ 0:00 / 1:21</div>
-            </div>
-          </div>
+            );
+          })()}
           {/* See all actions link */}
           <div style={{ ...sCard, marginTop: 16, display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setDashPage("mes_actions")}>
             <div style={{ width: 32, height: 32, borderRadius: "50%", background: C.greenLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -487,7 +552,7 @@ export function createEmployeeRenders(ctx: any) {
       <div style={{ display: "flex", gap: 24, marginBottom: 24, borderBottom: `2px solid ${C.border}` }}>
         {(["toutes", "onboarding"] as DashboardTab[]).map(tab => (
           <button key={tab} onClick={() => setActionTab(tab)} style={{ padding: "8px 0 12px", fontSize: 14, fontWeight: actionTab === tab ? 600 : 400, color: actionTab === tab ? C.pink : C.textLight, background: "none", border: "none", borderBottom: actionTab === tab ? `3px solid ${C.pink}` : "3px solid transparent", cursor: "pointer", fontFamily: font, textTransform: "capitalize" }}>
-            {tab === "toutes" ? t('emp.all_actions_tab') : "Onboarding"}
+            {tab === "toutes" ? t('emp.all_actions_tab') : (CAT_LABELS_MAP[myParcoursCategorie] || myParcoursName)}
           </button>
         ))}
       </div>
@@ -509,7 +574,7 @@ export function createEmployeeRenders(ctx: any) {
         </div>
       </div>
       <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 12 }}>{t('emp.this_week')}</div>
-      {ACTIONS.filter(a => a.type === "task" || a.urgent).map((a, i) => renderActionCard(a, true, i))}
+      {EMPLOYEE_ACTIONS.map((a, i) => renderActionCard(a, true, i))}
     </div>
   );
 
@@ -1109,17 +1174,21 @@ export function createEmployeeRenders(ctx: any) {
   // ─── ACTION DETAIL PANEL ─────────────────────────────────
   const renderActionDetail = () => {
     if (!showActionDetail) return null;
-    const action = ACTIONS.find(a => a.id === showActionDetail);
+    const action = EMPLOYEE_ACTIONS.find((a: any) => a.id === showActionDetail) || ACTIONS.find(a => a.id === showActionDetail);
     if (!action) return null;
     const isDone = completedActions.has(action.id);
+    const assignmentId = (action as any).assignment_id;
     // Find matching template for richer data
     const tpl = ACTION_TEMPLATES.find(t => t.titre === action.title);
     const meta = tpl ? ACTION_TYPE_META[tpl.type] : null;
     return (
+      <>
+      <div onClick={() => setShowActionDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.2)", zIndex: 1000 }} />
       <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 480, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
         <div style={{ padding: "24px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 16, fontWeight: 600, color: C.text, margin: 0, lineHeight: 1.4 }}>{action.title}</h2>
+            {action.subtitle && <div style={{ fontSize: 13, color: C.textLight, marginTop: 4 }}>{action.subtitle}</div>}
             {meta && <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}><meta.Icon size={14} color={meta.color} /><span style={{ fontSize: 13, color: meta.color, fontWeight: 500 }}>{meta.label}</span></div>}
           </div>
           <button onClick={() => setShowActionDetail(null)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
@@ -1130,7 +1199,8 @@ export function createEmployeeRenders(ctx: any) {
             <span style={{ color: C.textLight }}>Date</span>
             <span style={{ fontWeight: 500, color: C.text }}>{action.date || "—"}</span>
             <span style={{ color: C.textLight }}>Statut</span>
-            <span style={{ fontWeight: 500, color: isDone ? C.green : action.urgent ? C.red : C.text }}>{isDone ? "Terminé" : action.urgent ? "En retard" : "À faire"}</span>
+            <span><span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 10px", borderRadius: 12, fontSize: 12, fontWeight: 600, background: isDone ? C.greenLight : action.urgent ? C.redLight : C.bg, color: isDone ? C.green : action.urgent ? C.red : C.text }}>{isDone ? "Terminé" : action.urgent ? "En retard" : "À faire"}</span></span>
+            {action.badge && <><span style={{ color: C.textLight }}>Parcours</span><span><span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 10px", borderRadius: 12, background: C.pinkLight, fontSize: 11, fontWeight: 600, color: C.pink }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: C.pink }} />{action.badge}</span></span></>}
             {tpl && <><span style={{ color: C.textLight }}>Phase</span><span style={{ fontWeight: 500 }}>{tpl.phase}</span></>}
             {tpl && <><span style={{ color: C.textLight }}>Délai</span><span style={{ fontWeight: 500 }}>{tpl.delaiRelatif}</span></>}
             {tpl && tpl.dureeEstimee && <><span style={{ color: C.textLight }}>Durée estimée</span><span style={{ fontWeight: 500 }}>{tpl.dureeEstimee}</span></>}
@@ -1143,7 +1213,7 @@ export function createEmployeeRenders(ctx: any) {
             </div>
           )}
           {/* Action-specific content */}
-          {action.type === "admin" && !isDone && (
+          {((action as any).actionType === "document" || action.type === "admin") && !isDone && (
             <div style={{ padding: "14px 16px", background: C.redLight, borderRadius: 10, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
               <AlertTriangle size={18} color={C.red} />
               <div>
@@ -1218,15 +1288,16 @@ export function createEmployeeRenders(ctx: any) {
         </div>
         <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 10, justifyContent: "flex-end" }}>
           {isDone ? (
-            <button className="iz-btn-outline" onClick={() => { setCompletedActions(prev => { const s = new Set(prev); s.delete(action.id); return s; }); }} style={sBtn("outline")}>Rouvrir l'action</button>
+            <button className="iz-btn-outline" onClick={() => { handleReactivateAction(action.id, assignmentId); }} style={sBtn("outline")}>Réactiver</button>
           ) : (
             <>
-              {action.type === "admin" && <button onClick={() => { setShowActionDetail(null); setShowDocPanel("admin"); }} className="iz-btn-outline" style={sBtn("outline")}>Compléter les documents</button>}
-              <button className="iz-btn-pink" onClick={() => { handleCompleteAction(action.id); }} style={{ ...sBtn("pink"), padding: "10px 28px" }}>Marquer comme fait</button>
+              {((action as any).actionType === "document" || action.type === "admin") && <button onClick={() => { setShowActionDetail(null); setShowDocPanel("admin"); }} className="iz-btn-outline" style={sBtn("outline")}>{lang === "fr" ? "Compléter les documents" : "Complete documents"}</button>}
+              <button className="iz-btn-pink" onClick={() => { handleCompleteAction(action.id, assignmentId); }} style={{ ...sBtn("pink"), padding: "10px 28px" }}>Marquer comme terminé</button>
             </>
           )}
         </div>
       </div>
+      </>
     );
   };
 

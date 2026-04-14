@@ -339,7 +339,7 @@ export function createAdminParcoursDocs(ctx: any) {
               const PhIcon = PHASE_ICONS[ph.nom];
               const phActions = ACTION_TEMPLATES.filter(a => a.phase === ph.nom);
               return (
-                <div key={ph.id} className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 12, display: "flex", alignItems: "center", gap: 16 }}>
+                <div key={ph.id} className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 12, display: "flex", alignItems: "center", gap: 16, opacity: ph.active === false ? 0.5 : 1 }}>
                   <div style={{ width: 44, height: 44, borderRadius: 12, background: ph.couleur, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {PhIcon ? <PhIcon size={20} color={C.white} /> : <CheckCircle size={20} color={C.white} />}
                   </div>
@@ -347,7 +347,8 @@ export function createAdminParcoursDocs(ctx: any) {
                     <div style={{ fontSize: 15, fontWeight: 600 }}>{ph.nom}</div>
                     <div style={{ fontSize: 12, color: C.textLight }}>{ph.delaiDebut} → {ph.delaiFin} · {phActions.length} actions</div>
                   </div>
-                  <button onClick={() => { setPhasePanelData({ id: ph.id, nom: ph.nom, delaiDebut: ph.delaiDebut, delaiFin: ph.delaiFin, couleur: ph.couleur, parcoursIds: ph.parcoursIds || [] }); setContentTranslations(ph.translations || {}); setPhasePanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
+                  {ph.active === false && <span style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, padding: "2px 8px", borderRadius: 4, background: C.bg }}>{t('common.inactive')}</span>}
+                  <button onClick={() => { setPhasePanelData({ id: ph.id, nom: ph.nom, delaiDebut: ph.delaiDebut, delaiFin: ph.delaiFin, couleur: ph.couleur, parcoursIds: ph.parcoursIds || [], active: ph.active !== false }); setContentTranslations(ph.translations || {}); setPhasePanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
                   {phActions.length > 0 ? (
                     <span title={`Impossible de supprimer : ${phActions.length} action(s) associée(s)`} style={{ padding: 4, cursor: "not-allowed", opacity: 0.3 }}><Trash size={14} color={C.textMuted} /></span>
                   ) : (

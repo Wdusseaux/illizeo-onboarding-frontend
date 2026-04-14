@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Fragment } from "react";
 import { t, getLang, setLang, getAllLangs, LANG_META, type Lang } from "../i18n";
 import {
   Users, FileText, MessageCircle, Bell, Building2, LayoutDashboard, Zap,
@@ -80,8 +80,15 @@ import {
   uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures,
   type SignatureDoc, type DocAcknowledgement,
   checkDossier, validateDossier, exportDossier, resetDossier, type DossierCheck,
+  getRoles, createRole as apiCreateRole, updateRole as apiUpdateRole, deleteRole as apiDeleteRole, assignRoleUser, removeRoleUser, duplicateRole as apiDuplicateRole, getEffectivePermissions,
+  type ApiRole,
 } from "../api/endpoints";
 import { apiFetch } from "../api/client";
+import { createAdminRoles } from './pages/AdminRoles';
+import { createAdminCalendar } from './pages/AdminCalendar';
+import { createAdminOrgChart } from './pages/AdminOrgChart';
+import { createAdminBuddy } from './pages/AdminBuddy';
+import { createAdminAuditLog } from './pages/AdminAuditLog';
 
 
 /**
@@ -127,6 +134,14 @@ export function createAdminInlinePages(ctx: any) {
     tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData,
     lang, setLangState, darkMode, setDarkMode, activeLanguages, setActiveLanguages, contentTranslations, setContentTranslations,
     fieldConfig, setFieldConfig, translateFieldId, setTranslateFieldId, translateEN, setTranslateEN, adminUsers, setAdminUsers,
+    adminRoles, setAdminRoles, rolePanelMode, setRolePanelMode, rolePanelData, setRolePanelData,
+    roleTab, setRoleTab, selectedRoleId, setSelectedRoleId, permMatrixFilter, setPermMatrixFilter,
+    securitySubTab, setSecuritySubTab, pwdPolicy, setPwdPolicy,
+    calendarMonth, setCalendarMonth, calendarView, setCalendarView, calendarListFilter, setCalendarListFilter,
+    orgView, setOrgView, orgSearch, setOrgSearch, auditFilter, setAuditFilter, auditSearch, setAuditSearch, buddyPairs, setBuddyPairs, selectedBuddyPair, setSelectedBuddyPair,
+    orgExpandedNodes, setOrgExpandedNodes, orgSortCol, setOrgSortCol, orgSortDir, setOrgSortDir,
+    buddyTab, setBuddyTab, buddyNoteInput, setBuddyNoteInput, buddyFeedbackRating, setBuddyFeedbackRating, buddyFeedbackComment, setBuddyFeedbackComment,
+    auditExpandedEntry, setAuditExpandedEntry, auditVisibleCount, setAuditVisibleCount,
     userPanelMode, setUserPanelMode, userPanelData, setUserPanelData, userPanelLoading, setUserPanelLoading, userSearch, setUserSearch,
     userRoleFilter, setUserRoleFilter, gedTab, setGedTab, gedSearch, setGedSearch, gedCatFilter, setGedCatFilter,
     tplPanelOpen, setTplPanelOpen, tplPanelDoc, setTplPanelDoc, selectedDocsForValidation, setSelectedDocsForValidation, realDocs, setRealDocs,
@@ -387,13 +402,16 @@ export function createAdminInlinePages(ctx: any) {
   };
 
   const renderAdminUsers = () => {
-          const ROLE_META: Record<string, { label: string; color: string; bg: string }> = {
-            super_admin: { label: t('role.super_admin'), color: "#E53935", bg: C.redLight },
-            admin: { label: t('role.admin'), color: "#7B5EA7", bg: C.purple + "15" },
-            admin_rh: { label: t('role.admin_rh'), color: "#C2185B", bg: C.pinkBg },
-            manager: { label: t('role.manager'), color: "#1A73E8", bg: C.blueLight },
-            onboardee: { label: t('role.onboardee'), color: "#4CAF50", bg: C.greenLight },
-          };
+          // Build ROLE_META from API roles (adminRoles) with fallback to hardcoded
+          const ROLE_META: Record<string, { label: string; color: string; bg: string }> = adminRoles.length > 0
+            ? Object.fromEntries(adminRoles.filter((r: any) => r.actif).map((r: any) => [r.slug, { label: r.nom, color: r.couleur, bg: r.couleur + "15" }]))
+            : {
+              super_admin: { label: t('role.super_admin'), color: "#E53935", bg: C.redLight },
+              admin: { label: t('role.admin'), color: "#7B5EA7", bg: C.purple + "15" },
+              admin_rh: { label: t('role.admin_rh'), color: "#C2185B", bg: C.pinkBg },
+              manager: { label: t('role.manager'), color: "#1A73E8", bg: C.blueLight },
+              onboardee: { label: t('role.onboardee'), color: "#4CAF50", bg: C.greenLight },
+            };
           const filteredUsers = adminUsers
             .filter(u => userRoleFilter === "all" || u.role === userRoleFilter)
             .filter(u => !userSearch || `${u.name} ${u.email}`.toLowerCase().includes(userSearch.toLowerCase()));
@@ -443,12 +461,12 @@ export function createAdminInlinePages(ctx: any) {
 
             {/* User rows */}
             {filteredUsers.map(u => {
-              const rm = ROLE_META[u.role] || ROLE_META.onboardee;
+              const rm = ROLE_META[u.role] || ROLE_META.collaborateur || ROLE_META.onboardee || { label: u.role || "—", color: "#78909C", bg: "#78909C15" };
               const initials = u.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
               const isOwner = u.role === "super_admin";
               return (
               <div key={u.id} style={{ display: "grid", gridTemplateColumns: "2.5fr 1.8fr 1.2fr 1fr 1fr 40px", gap: 0, padding: "14px 16px", borderBottom: `1px solid ${C.border}`, alignItems: "center", cursor: "pointer" }}
-                className="iz-sidebar-item" onClick={() => { setUserPanelData({ id: u.id, name: u.name, email: u.email, password: "", role: u.role }); setUserPanelMode("edit"); }}>
+                className="iz-sidebar-item" onClick={() => { setUserPanelData({ id: u.id, name: u.name, email: u.email, password: "", role: u.role, roles: u.roles || [u.role] }); setUserPanelMode("edit"); }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ position: "relative", flexShrink: 0 }}>
                     <div style={{ width: 36, height: 36, borderRadius: "50%", background: rm.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: C.white }}>{initials}</div>
@@ -460,10 +478,12 @@ export function createAdminInlinePages(ctx: any) {
                   </div>
                 </div>
                 <div style={{ fontSize: 13, color: C.textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.email}</div>
-                <div style={{ fontSize: 13, color: C.textLight }}>{rm.label}</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {(u.roles || [u.role]).map((r: string) => { const m = ROLE_META[r]; return m ? <span key={r} style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: m.bg, color: m.color }}>{m.label}</span> : null; })}
+                </div>
                 <div style={{ fontSize: 12, color: C.textMuted }}>{fmtDateShort(u.updated_at || u.created_at)}</div>
                 <div style={{ fontSize: 12, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{/* invited by — not tracked yet */}—</div>
-                <button onClick={e => { e.stopPropagation(); setUserPanelData({ id: u.id, name: u.name, email: u.email, password: "", role: u.role }); setUserPanelMode("edit"); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted, padding: 4, display: "flex", alignItems: "center" }}><MoreHorizontal size={16} /></button>
+                <button onClick={e => { e.stopPropagation(); setUserPanelData({ id: u.id, name: u.name, email: u.email, password: "", role: u.role, roles: u.roles || [u.role] }); setUserPanelMode("edit"); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted, padding: 4, display: "flex", alignItems: "center" }}><MoreHorizontal size={16} /></button>
               </div>
               );
             })}
@@ -503,28 +523,35 @@ export function createAdminInlinePages(ctx: any) {
                       </div>
                     </div>
                     <div style={{ marginBottom: 20 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 10 }}>{t('users.role')} *</label>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>{t('users.role')} *</label>
+                      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>{lang === "fr" ? "Sélectionnez un ou plusieurs rôles (cumulatifs)" : "Select one or more roles (cumulative)"}</div>
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        {Object.entries(ROLE_META).map(([role, meta]) => {
-                          const active = userPanelData.role === role;
-                          const descriptions: Record<string, string> = {
-                            super_admin: t('role.super_admin_desc'),
-                            admin: t('role.admin_desc'),
-                            admin_rh: t('role.admin_rh_desc'),
-                            manager: t('role.manager_desc'),
-                            onboardee: t('role.onboardee_desc'),
-                          };
+                        {(adminRoles.length > 0 ? adminRoles.filter((r: any) => r.actif) : Object.entries(ROLE_META).map(([slug, meta]) => ({ slug, nom: meta.label, couleur: meta.color, description: "" }))).map((role: any) => {
+                          const slug = role.slug;
+                          const userRoles: string[] = Array.isArray(userPanelData.roles) ? userPanelData.roles : (userPanelData.role ? [userPanelData.role] : ["collaborateur"]);
+                          const active = userRoles.includes(slug);
+                          const color = role.couleur || "#78909C";
+                          const apiRole = adminRoles.find((r: any) => r.slug === slug);
                           return (
-                            <button key={role} onClick={() => setUserPanelData(prev => ({ ...prev, role }))} style={{
-                              padding: "12px 14px", borderRadius: 10, border: `2px solid ${active ? meta.color : C.border}`, background: active ? meta.bg : C.white,
+                            <button key={slug} onClick={() => {
+                              const current: string[] = Array.isArray(userPanelData.roles) ? userPanelData.roles : (userPanelData.role ? [userPanelData.role] : ["collaborateur"]);
+                              const next = active ? current.filter(r => r !== slug) : [...current, slug];
+                              if (next.length === 0) next.push("collaborateur");
+                              setUserPanelData((prev: any) => ({ ...prev, roles: next, role: next[0] }));
+                            }} style={{
+                              padding: "12px 14px", borderRadius: 10, border: `2px solid ${active ? color : C.border}`, background: active ? color + "12" : C.white,
                               cursor: "pointer", display: "flex", alignItems: "center", gap: 12, fontFamily: font, textAlign: "left", transition: "all .15s",
                             }}>
-                              <div style={{ width: 36, height: 36, borderRadius: 8, background: active ? meta.color : C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <ShieldCheck size={16} color={active ? C.white : meta.color} />
+                              <div style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${active ? color : C.border}`, background: active ? color : C.white, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s", flexShrink: 0 }}>
+                                {active && <Check size={14} color={C.white} />}
                               </div>
-                              <div>
-                                <div style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? meta.color : C.text }}>{meta.label}</div>
-                                <div style={{ fontSize: 11, color: C.textMuted }}>{descriptions[role]}</div>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{ fontSize: 13, fontWeight: active ? 600 : 400, color: active ? color : C.text }}>{role.nom}</span>
+                                  {apiRole?.is_system && <span style={{ fontSize: 8, padding: "1px 5px", borderRadius: 3, background: color + "20", color, fontWeight: 700, textTransform: "uppercase" }}>{t('roles.system')}</span>}
+                                  {apiRole?.is_default && <span style={{ fontSize: 8, padding: "1px 5px", borderRadius: 3, background: C.greenLight, color: C.green, fontWeight: 700 }}>{lang === "fr" ? "Défaut" : "Default"}</span>}
+                                </div>
+                                {role.description && <div style={{ fontSize: 11, color: C.textMuted }}>{role.description}</div>}
                               </div>
                             </button>
                           );
@@ -551,10 +578,12 @@ export function createAdminInlinePages(ctx: any) {
                         setUserPanelLoading(true);
                         try {
                           if (userPanelMode === "create") {
-                            await apiCreateUser({ name: userPanelData.name, email: userPanelData.email, password: userPanelData.password, role: userPanelData.role });
+                            const roles = Array.isArray(userPanelData.roles) ? userPanelData.roles : [userPanelData.role || "collaborateur"];
+                            await apiCreateUser({ name: userPanelData.name, email: userPanelData.email, password: userPanelData.password, role: roles[0], roles });
                             addToast_admin(t('users.created'));
                           } else {
-                            const payload: any = { name: userPanelData.name, email: userPanelData.email, role: userPanelData.role };
+                            const roles = Array.isArray(userPanelData.roles) ? userPanelData.roles : [userPanelData.role || "collaborateur"];
+                            const payload: any = { name: userPanelData.name, email: userPanelData.email, role: roles[0], roles };
                             if (userPanelData.password) payload.password = userPanelData.password;
                             await apiUpdateUser(userPanelData.id!, payload);
                             addToast_admin(t('users.updated'));
@@ -1618,11 +1647,13 @@ export function createAdminInlinePages(ctx: any) {
               <div style={{ display: "flex", gap: 8 }}>
                 {equipTab === "inventaire" && <button onClick={() => { resetTr(); setEquipPanel({ mode: "create", data: { equipment_type_id: equipTypes[0]?.id || "", nom: "", numero_serie: "", marque: "", modele: "", etat: "disponible", date_achat: "", valeur: "", notes: "" } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.add')}</button>}
                 {equipTab === "packages" && <button onClick={() => { resetTr(); setPkgPanel({ mode: "create", data: { nom: "", description: "", icon: "package", couleur: "#C2185B", items: [{ equipment_type_id: equipTypes[0]?.id || "", quantite: 1, notes: "" }] } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.new_package')}</button>}
-                {equipTab === "types" && <button onClick={async () => {
-                  const nom = prompt(t('equip.type_prompt'));
-                  if (!nom) return;
-                  const cat = prompt(t('equip.cat_prompt'), "materiel");
-                  try { await apiCreateEquipType({ nom, categorie: cat === "licence" ? "licence" : "materiel", icon: cat === "licence" ? "key" : "package" }); reloadEquip(); addToast_admin("Type créé"); } catch { addToast_admin(t('toast.error')); }
+                {equipTab === "types" && <button onClick={() => {
+                  showPrompt(t('equip.type_prompt'), (nom) => {
+                    if (!nom) return;
+                    showPrompt(t('equip.cat_prompt'), async (cat) => {
+                      try { await apiCreateEquipType({ nom, categorie: cat === "licence" ? "licence" : "materiel", icon: cat === "licence" ? "key" : "package" }); reloadEquip(); addToast_admin(t('equip.type_created')); } catch { addToast_admin(t('toast.error')); }
+                    }, { label: t('equip.cat_label'), defaultValue: "materiel" });
+                  });
                 }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.new_type')}</button>}
               </div>
             </div>
@@ -1697,9 +1728,10 @@ export function createAdminInlinePages(ctx: any) {
                     <div style={{ display: "flex", gap: 4 }}>
                       {eq.etat === "disponible" && (
                         <button onClick={() => {
-                          const collabId = prompt("ID du collaborateur à attribuer :");
-                          if (collabId) apiAssignEquip(eq.id, Number(collabId)).then(reloadEquip).catch(() => addToast_admin(t('toast.error')));
-                        }} title="Attribuer" style={{ background: C.blueLight, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><UserPlus size={12} color={C.blue} /></button>
+                          showPrompt(t('equip.assign_prompt'), (collabId) => {
+                            if (collabId) apiAssignEquip(eq.id, Number(collabId)).then(reloadEquip).catch(() => addToast_admin(t('toast.error')));
+                          }, { options: COLLABORATEURS.map(c => ({ value: String(c.id), label: `${c.prenom} ${c.nom} — ${c.poste || c.departement || ""}` })), searchable: true });
+                        }} title={t('equip.assign')} style={{ background: C.blueLight, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><UserPlus size={12} color={C.blue} /></button>
                       )}
                       {eq.etat === "attribue" && (
                         <button onClick={() => apiUnassignEquip(eq.id).then(reloadEquip).catch(() => addToast_admin(t('toast.error')))} title="Restituer" style={{ background: C.amberLight, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><RotateCcw size={12} color={C.amber} /></button>
@@ -1748,10 +1780,11 @@ export function createAdminInlinePages(ctx: any) {
                       ))}
                     </div>
                     <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, background: C.bg }}>
-                      <button onClick={async () => {
-                        const collabId = prompt("ID du collaborateur à provisionner :");
-                        if (!collabId) return;
-                        try { const res = await apiProvisionPkg(pkg.id, Number(collabId)); reloadEquip(); addToast_admin(res.message); } catch { addToast_admin(t('toast.error')); }
+                      <button onClick={() => {
+                        showPrompt(t('equip.provision_prompt'), async (collabId) => {
+                          if (!collabId) return;
+                          try { const res = await apiProvisionPkg(pkg.id, Number(collabId)); reloadEquip(); addToast_admin(res.message); } catch { addToast_admin(t('toast.error')); }
+                        }, { options: COLLABORATEURS.map(c => ({ value: String(c.id), label: `${c.prenom} ${c.nom} — ${c.poste || c.departement || ""}` })), searchable: true });
                       }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px", display: "flex", alignItems: "center", gap: 4 }}><UserPlus size={12} /> {t('equip.provision')}</button>
                     </div>
                   </div>
@@ -2219,6 +2252,140 @@ export function createAdminInlinePages(ctx: any) {
           );
   };
 
+  const renderAdminRoles = createAdminRoles(ctx);
+  const renderAdminPasswordPolicy = () => {
+    const roles = adminRoles.length > 0 ? adminRoles : [];
+    const secTab = securitySubTab;
+    return (
+      <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
+        <div style={{ marginBottom: 20 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{lang === "fr" ? "Sécurité — Politique de mot de passe" : "Security — Password Policy"}</h1>
+          <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>{lang === "fr" ? "Ces règles s'appliquent à tous les utilisateurs lors de l'inscription, la connexion et la réinitialisation." : "These rules apply to all users during sign-up, sign-in, and password reset."}</p>
+        </div>
+
+        {(() => {
+          // Load password policy from API on first render
+          if (!pwdPolicy) {
+            getCompanySettings().then((settings: any) => {
+              try {
+                const raw = settings.password_policy;
+                const parsed = typeof raw === "string" ? JSON.parse(raw) : (raw || {});
+                setPwdPolicy({ min_length: 8, expiry_days: 0, max_attempts: 5, history_count: 3, uppercase: true, lowercase: true, number: true, special: false, no_common: true, no_name: false, ...parsed });
+              } catch {
+                setPwdPolicy({ min_length: 8, expiry_days: 0, max_attempts: 5, history_count: 3, uppercase: true, lowercase: true, number: true, special: false, no_common: true, no_name: false });
+              }
+            }).catch(() => {
+              setPwdPolicy({ min_length: 8, expiry_days: 0, max_attempts: 5, history_count: 3, uppercase: true, lowercase: true, number: true, special: false, no_common: true, no_name: false });
+            });
+            return <div style={{ padding: 40, textAlign: "center", color: C.textMuted, fontSize: 13 }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>;
+          }
+          const pol = pwdPolicy;
+          const save = (patch: any) => {
+            const updated = { ...pol, ...patch };
+            setPwdPolicy(updated);
+            updateCompanySettings({ password_policy: JSON.stringify(updated) }).then(() => {
+              addToast_admin(lang === "fr" ? "Politique mise à jour" : "Policy updated");
+            }).catch(() => {
+              addToast_admin(lang === "fr" ? "Erreur lors de la sauvegarde" : "Save error");
+            });
+          };
+          return (
+            <div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+                <div style={{ padding: "16px", background: C.bg, borderRadius: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <Lock size={14} color={C.text} />
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{lang === "fr" ? "Longueur minimale" : "Minimum length"}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input type="number" min={6} max={32} value={pol.min_length} onChange={e => save({ min_length: Number(e.target.value) })} style={{ ...sInput, width: 70, fontSize: 16, fontWeight: 700, textAlign: "center" }} />
+                    <span style={{ fontSize: 12, color: C.textMuted }}>{lang === "fr" ? "caractères" : "characters"}</span>
+                  </div>
+                </div>
+                <div style={{ padding: "16px", background: C.bg, borderRadius: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <Clock size={14} color={C.text} />
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{lang === "fr" ? "Expiration du mot de passe" : "Password expiration"}</span>
+                  </div>
+                  <select value={pol.expiry_days} onChange={e => save({ expiry_days: Number(e.target.value) })} style={{ ...sInput, fontSize: 13, cursor: "pointer" }}>
+                    <option value={0}>{lang === "fr" ? "Jamais" : "Never"}</option>
+                    <option value={30}>30 {lang === "fr" ? "jours" : "days"}</option>
+                    <option value={60}>60 {lang === "fr" ? "jours" : "days"}</option>
+                    <option value={90}>90 {lang === "fr" ? "jours" : "days"}</option>
+                    <option value={180}>180 {lang === "fr" ? "jours" : "days"}</option>
+                    <option value={365}>365 {lang === "fr" ? "jours" : "days"}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{lang === "fr" ? "Règles de complexité" : "Complexity rules"}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+                {[
+                  { key: "uppercase", label: lang === "fr" ? "Au moins une majuscule (A-Z)" : "At least one uppercase letter (A-Z)" },
+                  { key: "lowercase", label: lang === "fr" ? "Au moins une minuscule (a-z)" : "At least one lowercase letter (a-z)" },
+                  { key: "number", label: lang === "fr" ? "Au moins un chiffre (0-9)" : "At least one number (0-9)" },
+                  { key: "special", label: lang === "fr" ? "Au moins un caractère spécial (!@#$...)" : "At least one special character (!@#$...)" },
+                  { key: "no_common", label: lang === "fr" ? "Interdire les mots de passe courants (top 10 000)" : "Reject common passwords (top 10,000)" },
+                  { key: "no_name", label: lang === "fr" ? "Ne peut pas contenir le nom ou l'email" : "Cannot contain name or email" },
+                ].map(rule => {
+                  const active = pol[rule.key];
+                  return (
+                    <div key={rule.key} onClick={() => save({ [rule.key]: !active })} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: active ? C.bg : C.white, borderRadius: 8, cursor: "pointer", border: `1.5px solid ${active ? C.green + "40" : C.border}`, transition: "all .15s" }}>
+                      <div style={{ width: 24, height: 24, borderRadius: 6, border: `2px solid ${active ? C.green : C.border}`, background: active ? C.green : C.white, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s", flexShrink: 0 }}>{active && <Check size={14} color={C.white} />}</div>
+                      <span style={{ fontSize: 13, fontWeight: active ? 500 : 400, color: active ? C.text : C.textMuted }}>{rule.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>{lang === "fr" ? "Historique et verrouillage" : "History & lockout"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+                <div style={{ padding: "16px", background: C.bg, borderRadius: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <RotateCcw size={14} color={C.text} />
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{lang === "fr" ? "Historique de mots de passe" : "Password history"}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input type="number" min={0} max={24} value={pol.history_count} onChange={e => save({ history_count: Number(e.target.value) })} style={{ ...sInput, width: 60, fontSize: 16, fontWeight: 700, textAlign: "center" }} />
+                    <span style={{ fontSize: 11, color: C.textMuted }}>{lang === "fr" ? "derniers mots de passe interdits" : "last passwords forbidden"}</span>
+                  </div>
+                </div>
+                <div style={{ padding: "16px", background: C.bg, borderRadius: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <Lock size={14} color={C.red} />
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{lang === "fr" ? "Verrouillage après échecs" : "Lockout after failures"}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input type="number" min={0} max={20} value={pol.max_attempts} onChange={e => save({ max_attempts: Number(e.target.value) })} style={{ ...sInput, width: 60, fontSize: 16, fontWeight: 700, textAlign: "center" }} />
+                    <span style={{ fontSize: 11, color: C.textMuted }}>{lang === "fr" ? "tentatives (0 = illimité)" : "attempts (0 = unlimited)"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: "16px", background: "#1a1a2e08", border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{lang === "fr" ? "Aperçu (affiché à l'utilisateur)" : "Preview (shown to user)"}</div>
+                <div style={{ fontSize: 12, color: C.textLight, lineHeight: 1.8 }}>
+                  • {lang === "fr" ? "Minimum" : "Minimum"} {pol.min_length} {lang === "fr" ? "caractères" : "characters"}<br/>
+                  {pol.uppercase && <span>• {lang === "fr" ? "Une majuscule" : "One uppercase"}<br/></span>}
+                  {pol.lowercase && <span>• {lang === "fr" ? "Une minuscule" : "One lowercase"}<br/></span>}
+                  {pol.number && <span>• {lang === "fr" ? "Un chiffre" : "One number"}<br/></span>}
+                  {pol.special && <span>• {lang === "fr" ? "Un caractère spécial" : "One special character"}<br/></span>}
+                  {pol.expiry_days > 0 && <span>• {lang === "fr" ? `Expire tous les ${pol.expiry_days} jours` : `Expires every ${pol.expiry_days} days`}<br/></span>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    );
+  };
+
+  const renderAdminCalendar = createAdminCalendar(ctx);
+  const renderAdminOrgChart = createAdminOrgChart(ctx);
+  const renderAdminBuddy = createAdminBuddy(ctx);
+  const renderAdminAuditLog = createAdminAuditLog(ctx);
+
   return {
     renderAdminGamification,
     renderAdminUsers,
@@ -2226,9 +2393,16 @@ export function createAdminInlinePages(ctx: any) {
     renderAdminFields,
     renderAdminApparence,
     renderAdmin2FA,
+    renderAdminPasswordPolicy,
     renderAdminEquipements,
     renderAdminSignatures,
     renderAdminDonnees,
     renderAdminProvisioning,
+    renderAdminRoles,
+    renderAdminCalendar,
+    renderAdminOrgChart,
+    renderAdminBuddy,
+    renderAdminAuditLog,
   };
 }
+/* END OF createAdminInlinePages — extracted pages are in ./pages/ */

@@ -62,7 +62,21 @@ interface ApiCollaborateur {
   progression: number; status: string; docs_valides: number; docs_total: number;
   actions_completes: number; actions_total: number; initials: string;
   couleur: string; photo: string | null; parcours_id: number | null;
+  manager_id: number | null; hr_manager_id: number | null;
+  manager?: { id: number; prenom: string; nom: string } | null;
+  hr_manager?: { id: number; prenom: string; nom: string } | null;
   parcours?: any; groupes?: any[];
+  // Extended fields
+  civilite?: string; date_naissance?: string; nationalite?: string; numero_avs?: string;
+  telephone?: string; adresse?: string; ville?: string; code_postal?: string; pays?: string; iban?: string;
+  type_contrat?: string; salaire_brut?: string; devise?: string; taux_activite?: string;
+  periode_essai?: string; date_fin_essai?: string;
+  matricule?: string; manager_nom?: string;
+  job_title?: string; job_family?: string; job_code?: string; job_level?: string;
+  employment_type?: string; date_fin_contrat?: string; motif_embauche?: string;
+  position_title?: string; position_code?: string; business_unit?: string; division?: string;
+  cost_center?: string; location_code?: string; work_schedule?: string; fte?: string;
+  [key: string]: any;
 }
 
 export function transformCollaborateur(c: ApiCollaborateur) {
@@ -72,7 +86,24 @@ export function transformCollaborateur(c: ApiCollaborateur) {
     progression: c.progression, status: c.status as "en_cours" | "en_retard" | "termine",
     docsValides: c.docs_valides, docsTotal: c.docs_total,
     actionsCompletes: c.actions_completes, actionsTotal: c.actions_total,
-    initials: c.initials, color: c.couleur,
+    initials: c.initials, color: c.couleur, parcours_id: c.parcours_id ?? undefined,
+    managerId: c.manager_id, hrManagerId: c.hr_manager_id,
+    manager: c.manager ?? null, hrManager: c.hr_manager ?? null,
+    // Extended fields — pass through as-is
+    civilite: c.civilite || null, date_naissance: c.date_naissance || null, nationalite: c.nationalite || null,
+    numero_avs: c.numero_avs || null, telephone: c.telephone || null, adresse: c.adresse || null,
+    ville: c.ville || null, code_postal: c.code_postal || null, pays: c.pays || null, iban: c.iban || null,
+    type_contrat: c.type_contrat || null, salaire_brut: c.salaire_brut || null, devise: c.devise || null,
+    taux_activite: c.taux_activite || null, periode_essai: c.periode_essai || null,
+    date_fin_essai: c.date_fin_essai || null,
+    matricule: c.matricule || null, manager_nom: c.manager_nom || null,
+    job_title: c.job_title || null, job_family: c.job_family || null, job_code: c.job_code || null,
+    job_level: c.job_level || null, employment_type: c.employment_type || null,
+    date_fin_contrat: c.date_fin_contrat || null, motif_embauche: c.motif_embauche || null,
+    position_title: c.position_title || null, position_code: c.position_code || null,
+    business_unit: c.business_unit || null, division: c.division || null,
+    cost_center: c.cost_center || null, location_code: c.location_code || null,
+    work_schedule: c.work_schedule || null, fte: c.fte || null,
   };
 }
 
@@ -184,6 +215,7 @@ export async function deleteAction(id: number) {
 interface ApiPhase {
   id: number; nom: string; delai_debut: string; delai_fin: string;
   couleur: string; icone: string; actions_defaut: number; ordre: number;
+  active?: boolean;
   parcours_id: number | null;
   parcours?: { id: number; nom: string }[];
 }
@@ -192,6 +224,7 @@ export function transformPhase(ph: ApiPhase) {
   return {
     id: ph.id, nom: ph.nom, delaiDebut: ph.delai_debut, delaiFin: ph.delai_fin,
     couleur: ph.couleur, iconName: ph.icone as any, actionsDefaut: ph.actions_defaut,
+    active: ph.active !== false,
     parcoursIds: ph.parcours ? ph.parcours.map(p => p.id) : [],
     parcoursNoms: ph.parcours ? ph.parcours.map(p => p.nom) : [],
   };
@@ -467,6 +500,18 @@ export async function getMyActions() {
 
 export async function completeMyAction(assignmentId: number, responseData?: any) {
   return apiFetch<any>(`/my-actions/${assignmentId}/complete`, { method: 'POST', body: JSON.stringify({ response_data: responseData }) });
+}
+
+export async function reactivateMyAction(assignmentId: number) {
+  return apiFetch<any>(`/my-actions/${assignmentId}/reactivate`, { method: 'POST' });
+}
+
+export async function completeMyActionByActionId(actionId: number) {
+  return apiFetch<any>(`/my-actions/by-action/${actionId}/complete`, { method: 'POST' });
+}
+
+export async function reactivateMyActionByActionId(actionId: number) {
+  return apiFetch<any>(`/my-actions/by-action/${actionId}/reactivate`, { method: 'POST' });
 }
 
 // ─── Company Blocks ─────────────────────────────────────────
@@ -1051,8 +1096,26 @@ export async function getCompanySettings() {
   return apiFetch<Record<string, string>>('/company-settings');
 }
 
-export async function updateCompanySettings(settings: Record<string, string>) {
+export async function updateCompanySettings(settings: Record<string, any>) {
   return apiFetch<{ message: string }>('/company-settings', { method: 'PUT', body: JSON.stringify({ settings }) });
+}
+
+// ─── Password Policy (public, no auth) ─────────────────────
+export interface PasswordPolicy {
+  min_length: number;
+  uppercase: boolean;
+  lowercase: boolean;
+  number: boolean;
+  special: boolean;
+  no_common: boolean;
+  no_name: boolean;
+  max_attempts: number;
+  history_count: number;
+  expiry_days: number;
+}
+
+export async function getPasswordPolicy(): Promise<PasswordPolicy> {
+  return apiFetch<PasswordPolicy>('/password-policy');
 }
 
 // ─── Tenant Registration ────────────────────────────────────
@@ -1173,4 +1236,116 @@ export async function getSignatureUsage() {
 
 export async function getStorageUsage() {
   return apiFetch<{ used_bytes: number; used_formatted: string; max_bytes: number; max_formatted: string; percent: number; file_count: number; db_size: string }>('/storage-usage');
+}
+
+// ─── Roles & Permissions ──────────────────────────────────────
+export interface ApiRole {
+  id: number;
+  nom: string;
+  slug: string;
+  description: string | null;
+  couleur: string;
+  is_system: boolean;
+  is_default: boolean;
+  scope_type: 'global' | 'site' | 'departement' | 'equipe';
+  scope_values: string[] | null;
+  temporary: boolean;
+  expires_at: string | null;
+  permissions: Record<string, string>;
+  ordre: number;
+  actif: boolean;
+  users_count?: number;
+  users?: any[];
+}
+
+export async function getRoles() {
+  return apiFetch<ApiRole[]>('/roles');
+}
+
+export async function createRole(data: Record<string, any>) {
+  return apiFetch<ApiRole>('/roles', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function getRole(id: number) {
+  return apiFetch<ApiRole>('/roles/' + id);
+}
+
+export async function updateRole(id: number, data: Record<string, any>) {
+  return apiFetch<ApiRole>('/roles/' + id, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteRole(id: number) {
+  return apiFetch<void>('/roles/' + id, { method: 'DELETE' });
+}
+
+export async function assignRoleUser(roleId: number, userId: number) {
+  return apiFetch<any>(`/roles/${roleId}/assign`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+}
+
+export async function removeRoleUser(roleId: number, userId: number) {
+  return apiFetch<any>(`/roles/${roleId}/remove`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+}
+
+export async function duplicateRole(roleId: number) {
+  return apiFetch<ApiRole>(`/roles/${roleId}/duplicate`, { method: 'POST' });
+}
+
+export async function getMyCollaborateur() {
+  const raw = await apiFetch<any>('/me/collaborateur');
+  if (!raw) return null;
+  const collab = transformCollaborateur(raw);
+  // Attach phases and actions from the parcours
+  (collab as any).parcours_phases = raw.parcours_phases || [];
+  (collab as any).parcours_actions = (raw.parcours_actions || []).map((a: any) => ({
+    id: a.id, titre: a.titre, type: a.type, phase: a.phase_nom || a.phase, delaiRelatif: a.delai_relatif,
+    obligatoire: a.obligatoire, description: a.description, parcours: raw.parcours?.nom || "",
+    parcours_id: a.parcours_id,
+    assignment_id: a.assignment_id || null,
+    assignment_status: a.assignment_status || 'a_faire',
+    completed_at: a.completed_at || null,
+  }));
+  (collab as any).parcours_nom = raw.parcours?.nom || null;
+  (collab as any).parcours_categorie = raw.parcours?.categorie?.slug || raw.parcours?.categorie || null;
+  return collab;
+}
+
+export async function getMyPermissions() {
+  return apiFetch<{ permissions: Record<string, string>; roles: string[]; is_super_admin: boolean }>('/me/permissions');
+}
+
+export async function getPermissionsSchema() {
+  return apiFetch<{ modules: { key: string; label: string }[]; levels: string[] }>('/permissions/schema');
+}
+
+export async function getEffectivePermissions(userId: number) {
+  return apiFetch<{ permissions: Record<string, string>; roles: string[] }>(`/permissions/effective?user_id=${userId}`);
+}
+
+export async function getPermissionLogs() {
+  return apiFetch<any[]>('/permissions/logs');
+}
+
+// ─── Buddy Pairs ──────────────────────────────────────────────
+export async function getBuddyPairs() {
+  return apiFetch<any[]>('/buddy-pairs');
+}
+
+export async function createBuddyPair(data: { newcomer_id: number; buddy_id: number }) {
+  return apiFetch<any>('/buddy-pairs', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateBuddyPair(id: number, data: Record<string, any>) {
+  return apiFetch<any>(`/buddy-pairs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteBuddyPair(id: number) {
+  return apiFetch<void>(`/buddy-pairs/${id}`, { method: 'DELETE' });
+}
+
+export async function addBuddyNote(id: number, text: string) {
+  return apiFetch<any>(`/buddy-pairs/${id}/note`, { method: 'POST', body: JSON.stringify({ text }) });
+}
+
+export async function completeBuddyPair(id: number) {
+  return apiFetch<any>(`/buddy-pairs/${id}/complete`, { method: 'POST' });
 }

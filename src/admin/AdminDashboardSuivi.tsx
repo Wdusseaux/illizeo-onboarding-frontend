@@ -600,10 +600,10 @@ export function createAdminDashboardSuivi(ctx: any) {
                 <div style={{ position: "absolute", right: 0, top: "100%", marginTop: 4, background: C.white, borderRadius: 10, boxShadow: "0 4px 24px rgba(0,0,0,.12)", border: `1px solid ${C.border}`, minWidth: 220, zIndex: 100, padding: "6px 0", fontFamily: font }}
                   onClick={e => e.stopPropagation()}>
                   {[
-                    { icon: <Eye size={14} />, label: t('common.edit'), action: () => { setCollabPanelData({ id: c.id, prenom: c.prenom, nom: c.nom, email: c.email || "", poste: c.poste, site: c.site, departement: c.departement, dateDebut: c.dateDebut }); setCollabPanelMode("edit"); } },
-                    { icon: <Route size={14} />, label: t('menu.assign_journey'), action: () => { setCollabPanelData({ id: c.id, prenom: c.prenom, nom: c.nom, email: c.email || "", poste: c.poste, site: c.site, departement: c.departement, dateDebut: c.dateDebut }); setCollabPanelMode("edit"); } },
-                    { icon: <Users size={14} />, label: t('menu.assign_team'), action: () => { setCollabPanelData({ id: c.id, prenom: c.prenom, nom: c.nom, email: c.email || "", poste: c.poste, site: c.site, departement: c.departement, dateDebut: c.dateDebut }); setCollabPanelMode("edit"); } },
-                    { icon: <FileSignature size={14} />, label: t('menu.send_contract'), action: () => { setCollabPanelData({ id: c.id, prenom: c.prenom, nom: c.nom, email: c.email || "", poste: c.poste, site: c.site, departement: c.departement, dateDebut: c.dateDebut }); setCollabPanelMode("edit"); } },
+                    { icon: <Eye size={14} />, label: t('common.edit'), action: () => { setCollabPanelData({ ...c, email: c.email || "" }); setCollabPanelMode("edit"); } },
+                    { icon: <Route size={14} />, label: t('menu.assign_journey'), action: () => { setCollabPanelData({ ...c, email: c.email || "" }); setCollabPanelMode("edit"); } },
+                    { icon: <Users size={14} />, label: t('menu.assign_team'), action: () => { setCollabPanelData({ ...c, email: c.email || "" }); setCollabPanelMode("edit"); } },
+                    { icon: <FileSignature size={14} />, label: t('menu.send_contract'), action: () => { setCollabPanelData({ ...c, email: c.email || "" }); setCollabPanelMode("edit"); } },
                     { icon: <Send size={14} />, label: t('menu.send_message'), action: () => { setAdminPage("admin_messagerie"); } },
                     { icon: <RefreshCw size={14} />, label: t('menu.remind'), action: () => { addToast_admin(`Relance envoyée à ${c.prenom} ${c.nom}`); } },
                     { divider: true },
@@ -640,7 +640,10 @@ export function createAdminDashboardSuivi(ctx: any) {
       if (collabProfileId && realDocs.filter(d => d.collaborateur_id === collabProfileId).length === 0) {
         getDocuments({ collaborateur_id: collabProfileId }).then(docs => setRealDocs(prev => [...prev.filter(d => d.collaborateur_id !== collabProfileId), ...docs])).catch(() => {});
       }
-      const collabActions = ACTION_TEMPLATES.filter(a => a.parcours === "Onboarding Standard");
+      const collabParcours = PARCOURS_TEMPLATES.find(p => p.id === (collab as any).parcours_id) || null;
+      const collabActions = collabParcours
+        ? ACTION_TEMPLATES.filter(a => a.parcours === collabParcours.nom)
+        : ACTION_TEMPLATES.filter(a => a.parcours === "Onboarding Standard");
       const profileTabs: { key: typeof collabProfileTab; label: string; icon: JSX.Element }[] = [
         { key: "apercu", label: t('tab.overview'), icon: <LayoutDashboard size={14} /> },
         { key: "infos", label: t('tab.informations'), icon: <ClipboardList size={14} /> },
@@ -660,7 +663,7 @@ export function createAdminDashboardSuivi(ctx: any) {
           <div style={{ padding: "24px 32px", borderBottom: `1px solid ${C.border}`, background: C.bg }}>
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
               <button onClick={() => setCollabProfileId(null)} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: C.text, fontFamily: font }}><ChevronLeft size={16} /> {t('misc.return')}</button>
-              <button onClick={() => { setCollabPanelData({ id: collab.id, prenom: collab.prenom, nom: collab.nom, email: collab.email || "", poste: collab.poste, site: collab.site, departement: collab.departement, dateDebut: collab.dateDebut }); setCollabPanelMode("edit"); }} style={{ ...sBtn("pink"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><FilePen size={14} /> Modifier</button>
+              <button onClick={() => { setCollabPanelData({ ...collab, email: collab.email || "" }); setCollabPanelMode("edit"); }} style={{ ...sBtn("pink"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><FilePen size={14} /> Modifier</button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
               <div style={{ width: 64, height: 64, borderRadius: "50%", background: collab.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: C.white, flexShrink: 0 }}>{collab.initials}</div>
@@ -743,21 +746,50 @@ export function createAdminDashboardSuivi(ctx: any) {
                 </div>
                 <div style={{ ...sCard }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 12 }}>Parcours assigné</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: C.pinkBg, borderRadius: 10, marginBottom: 16 }}>
-                    <Route size={18} color={C.pink} />
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Onboarding Standard</div>
-                      <div style={{ fontSize: 11, color: C.textLight }}>{collabActions.length} actions · 4 phases</div>
-                    </div>
-                  </div>
+                  {(() => {
+                    const catMeta = collabParcours ? PARCOURS_CAT_META[collabParcours.categorie as ParcoursCategorie] : null;
+                    const parcoursName = collabParcours?.nom || "Aucun parcours";
+                    const phaseCount = collabParcours?.phases?.length || 0;
+                    return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: catMeta?.bg || C.pinkBg, borderRadius: 10, marginBottom: 16 }}>
+                        <Route size={18} color={catMeta?.color || C.pink} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{parcoursName}</div>
+                            {catMeta && <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: catMeta.bg, color: catMeta.color }}>{catMeta.label}</span>}
+                          </div>
+                          <div style={{ fontSize: 11, color: C.textLight }}>{collabActions.length} actions · {phaseCount} phases</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 8 }}>Équipe d'accompagnement</div>
-                  {EQUIPE_ROLES.filter(r => r.obligatoire).map((role, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: i < 2 ? `1px solid ${C.border}` : "none" }}>
-                      <UserCheck size={13} color={C.textMuted} />
-                      <div style={{ fontSize: 12, color: C.text }}>{role.role}</div>
-                      <div style={{ fontSize: 11, color: C.textMuted, marginLeft: "auto" }}>{role.description}</div>
-                    </div>
-                  ))}
+                  {(() => {
+                    const mgr = (collab as any).manager;
+                    const hrbp = (collab as any).hrManager;
+                    const teamEntries: { label: string; name: string | null }[] = [
+                      { label: "Manager", name: mgr ? `${mgr.prenom} ${mgr.nom}` : null },
+                      { label: "HRBP", name: hrbp ? `${hrbp.prenom} ${hrbp.nom}` : null },
+                    ];
+                    const hasReal = teamEntries.some(e => e.name);
+                    if (hasReal) {
+                      return (<>
+                        {teamEntries.filter(e => e.name).map((entry, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: i < teamEntries.filter(e => e.name).length - 1 ? `1px solid ${C.border}` : "none" }}>
+                            <UserCheck size={13} color={C.pink} />
+                            <div style={{ fontSize: 12, fontWeight: 500, color: C.text }}>{entry.label}: {entry.name}</div>
+                          </div>
+                        ))}
+                      </>);
+                    }
+                    return EQUIPE_ROLES.filter(r => r.obligatoire).map((role, i) => (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: i < 2 ? `1px solid ${C.border}` : "none" }}>
+                        <UserCheck size={13} color={C.textMuted} />
+                        <div style={{ fontSize: 12, color: C.text }}>{role.role}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted, marginLeft: "auto" }}>{role.description}</div>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
 
@@ -809,16 +841,18 @@ export function createAdminDashboardSuivi(ctx: any) {
             {collabProfileTab === "infos" && (() => {
               const activeFields = fieldConfig.filter(f => f.actif);
               const fieldSections = [
-                { key: "personal", label: "Informations personnelles", icon: Users, color: "#C2185B" },
-                { key: "contract", label: "Informations contractuelles", icon: FileSignature, color: "#1A73E8" },
-                { key: "org", label: "Informations organisationnelles", icon: Building2, color: "#7B5EA7" },
+                { key: "personal", label: lang === "fr" ? "Informations personnelles" : "Personal information", icon: Users, color: "#C2185B" },
+                { key: "contract", label: lang === "fr" ? "Informations contractuelles" : "Contract information", icon: FileSignature, color: "#1A73E8" },
+                { key: "job", label: "Job Information", icon: ClipboardList, color: "#E65100" },
+                { key: "position", label: "Position Information", icon: Navigation, color: "#00897B" },
+                { key: "org", label: lang === "fr" ? "Informations organisationnelles" : "Organizational information", icon: Building2, color: "#7B5EA7" },
               ];
               const collabData = (collab as any).custom_fields || {};
               return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                   {/* Edit button */}
                   <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <button onClick={() => { setCollabPanelData({ id: collab.id, prenom: collab.prenom, nom: collab.nom, email: collab.email || "", poste: collab.poste, site: collab.site, departement: collab.departement, dateDebut: collab.dateDebut, custom_fields: (collab as any).custom_fields || {} }); setCollabPanelMode("edit"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><FilePen size={13} /> Modifier les informations</button>
+                    <button onClick={() => { setCollabPanelData({ ...collab, email: collab.email || "", custom_fields: (collab as any).custom_fields || {} }); setCollabPanelMode("edit"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><FilePen size={13} /> Modifier les informations</button>
                   </div>
                   {/* Base info card */}
                   <div style={{ ...sCard }}>
@@ -853,7 +887,12 @@ export function createAdminDashboardSuivi(ctx: any) {
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
                           {fields.map(fc => {
                             const isCustom = fc.field_key.startsWith("custom_");
-                            const val = isCustom ? (collabData[fc.field_key] || "") : ((collab as any)[fc.field_key] || "");
+                            let val = isCustom ? (collabData[fc.field_key] || "") : ((collab as any)[fc.field_key] || "");
+                            // Resolve manager IDs to names
+                            if ((fc.field_key === "manager_id" || fc.field_key === "hr_manager_id") && val) {
+                              const mgr = COLLABORATEURS.find((co: any) => String(co.id) === String(val));
+                              if (mgr) val = `${mgr.prenom} ${mgr.nom}`;
+                            }
                             const displayVal = fc.field_type === "boolean" ? (val === "true" ? "Oui" : val === "false" ? "Non" : "—") : (val || "—");
                             return (
                               <div key={fc.id}>
@@ -963,7 +1002,7 @@ export function createAdminDashboardSuivi(ctx: any) {
                               <div style={{ fontSize: 10, color: C.textMuted }}>{m.type === "field" ? "Champ obligatoire non rempli" : m.type === "document" ? `Document ${m.status || "non validé"}` : "Signature en attente"}</div>
                             </div>
                             {m.type === "field" && (
-                              <button onClick={() => { setCollabPanelData({ id: collab.id, prenom: collab.prenom, nom: collab.nom, email: collab.email || "", poste: collab.poste, site: collab.site, departement: collab.departement, dateDebut: collab.dateDebut, custom_fields: (collab as any).custom_fields || {} }); setCollabPanelMode("edit"); }} style={{ ...sBtn("outline"), fontSize: 10, padding: "3px 8px" }}>Compléter</button>
+                              <button onClick={() => { setCollabPanelData({ ...collab, email: collab.email || "", custom_fields: (collab as any).custom_fields || {} }); setCollabPanelMode("edit"); }} style={{ ...sBtn("outline"), fontSize: 10, padding: "3px 8px" }}>Compléter</button>
                             )}
                           </div>
                         ))}
@@ -1105,17 +1144,57 @@ export function createAdminDashboardSuivi(ctx: any) {
 
             {/* ── Équipe ── */}
             {collabProfileTab === "equipe" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
-                {EQUIPE_ROLES.map((role, i) => (
-                  <div key={i} style={{ ...sCard, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "28px 20px" }}>
-                    <div style={{ width: 52, height: 52, borderRadius: "50%", background: role.obligatoire ? C.pinkBg : C.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
-                      <UserCheck size={22} color={role.obligatoire ? C.pink : C.textMuted} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {/* Real team members from API */}
+                {(() => {
+                  const mgr = (collab as any).manager;
+                  const hrbp = (collab as any).hrManager;
+                  const realMembers: { name: string; role: string; initials: string; color: string }[] = [];
+                  if (mgr) realMembers.push({ name: `${mgr.prenom} ${mgr.nom}`, role: "Manager", initials: `${mgr.prenom[0]}${mgr.nom[0]}`, color: "#4CAF50" });
+                  if (hrbp) realMembers.push({ name: `${hrbp.prenom} ${hrbp.nom}`, role: "HRBP", initials: `${hrbp.prenom[0]}${hrbp.nom[0]}`, color: "#8D6E63" });
+                  if (realMembers.length === 0) return null;
+                  return (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 12 }}>Équipe assignée</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                        {realMembers.map((m, i) => (
+                          <div key={i} style={{ ...sCard, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "28px 20px" }}>
+                            <div style={{ width: 52, height: 52, borderRadius: "50%", background: m.color + "20", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12, fontSize: 18, fontWeight: 700, color: m.color }}>
+                              {m.initials}
+                            </div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>{m.name}</div>
+                            <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>{m.role}</div>
+                            <span style={{ fontSize: 9, fontWeight: 600, color: C.green, background: C.greenLight, padding: "3px 10px", borderRadius: 6 }}>Assigné</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>{role.role}</div>
-                    <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>{role.description}</div>
-                    {role.obligatoire && <span style={{ fontSize: 9, fontWeight: 600, color: C.pink, background: C.pinkBg, padding: "3px 10px", borderRadius: 6 }}>{t('dash.obligatory')}</span>}
+                  );
+                })()}
+                {/* Generic roles (unfilled positions) */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 12 }}>
+                    {(collab as any).manager || (collab as any).hrManager ? "Rôles à pourvoir" : "Rôles d'accompagnement"}
                   </div>
-                ))}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                    {EQUIPE_ROLES
+                      .filter(role => {
+                        if ((collab as any).manager && role.role === "Manager") return false;
+                        if ((collab as any).hrManager && role.role === "HRBP") return false;
+                        return true;
+                      })
+                      .map((role, i) => (
+                      <div key={i} style={{ ...sCard, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "28px 20px" }}>
+                        <div style={{ width: 52, height: 52, borderRadius: "50%", background: role.obligatoire ? C.pinkBg : C.bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                          <UserCheck size={22} color={role.obligatoire ? C.pink : C.textMuted} />
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>{role.role}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>{role.description}</div>
+                        {role.obligatoire && <span style={{ fontSize: 9, fontWeight: 600, color: C.pink, background: C.pinkBg, padding: "3px 10px", borderRadius: 6 }}>{t('dash.obligatory')}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 

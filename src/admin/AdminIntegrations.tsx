@@ -15,7 +15,7 @@ import {
   Palette, Trash, DatabaseBackup, Languages, ChevronsRight, ChevronsLeft, Settings, Crown, Lock,
   Phone, Linkedin, Paperclip, TrendingUp, Percent, FileCheck2, CalendarCheck, Rocket, Heart, Gem,
   Laptop, Monitor, Headphones, KeyRound, Mouse, Car, Armchair, Boxes, RotateCcw, PenLine,
-  Moon, Sun
+  Moon, Sun, Code, Copy, Activity, Key, ExternalLink, Webhook
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode } from '../constants';
@@ -124,7 +124,9 @@ export function createAdminIntegrations(ctx: any) {
     collabPanelMode, setCollabPanelMode, collabPanelData, setCollabPanelData, collabPanelLoading, setCollabPanelLoading, collabProfileId, setCollabProfileId,
     collabProfileTab, setCollabProfileTab, dossierCheck, setDossierCheck, groupePanelMode, setGroupePanelMode, groupePanelData, setGroupePanelData,
     groupePanelLoading, setGroupePanelLoading, integrationPanelId, setIntegrationPanelId, integrationConfig, setIntegrationConfig, integrationSaving, setIntegrationSaving,
-    apiKeyInput, setApiKeyInput, suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, collabMenuId, setCollabMenuId,
+    integrationMappings, setIntegrationMappings, integrationMappingTab, setIntegrationMappingTab,
+    apiKeyInput, setApiKeyInput, apiTab, setApiTab, apiKeys, setApiKeys, apiWebhooks, setApiWebhooks, apiLogs, setApiLogs,
+    suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, collabMenuId, setCollabMenuId,
     adMappings, setAdMappings, adGroups, setAdGroups, syncLoading, setSyncLoading, obTeams, setObTeams,
     teamPanelMode, setTeamPanelMode, teamPanelData, setTeamPanelData, wfPanelMode, setWfPanelMode, wfPanelData, setWfPanelData,
     tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData,
@@ -242,6 +244,48 @@ export function createAdminIntegrations(ctx: any) {
     // ─── DASHBOARD ─────────────────────────────────────────────
 
 
+    const CAT_LABELS: Record<string, string> = { identity: t('integ.cat_identity'), signature: t('integ.cat_signature'), communication: t('integ.cat_communication'), ats: t('integ.cat_ats'), sirh: t('integ.cat_sirh') };
+
+    const INTEGRATION_META: Record<string, { desc: string; Icon: React.FC<any>; color: string; oauth?: boolean; apiKey?: boolean; sapConnect?: boolean; teamsConnect?: boolean; fields: { key: string; label: string; type: "text" | "password" | "select"; options?: string[] }[] }> = {
+      docusign: { desc: t('integ.desc_docusign'), Icon: FileSignature, color: "#FFD700", oauth: true, fields: [
+        { key: "integration_key", label: "Integration Key (Client ID)", type: "text" },
+        { key: "secret_key", label: "Secret Key", type: "password" },
+        { key: "account_id", label: "Account ID", type: "text" },
+        { key: "environment", label: "Environment", type: "select", options: ["demo", "production_na", "production_eu"] },
+      ] },
+      ugosign: { desc: t('integ.desc_ugosign'), Icon: PenTool, color: "#1A73E8", apiKey: true, fields: [] },
+      native: { desc: t('integ.desc_native'), Icon: ShieldCheck, color: "#4CAF50", fields: [] },
+      entra_id: { desc: t('integ.desc_entra'), Icon: ShieldCheck, color: "#0078D4", apiKey: true, fields: [] } as any,
+      teams: { desc: t('integ.desc_teams'), Icon: Users, color: "#6264A7", teamsConnect: true, fields: [] },
+      slack: { desc: t('integ.desc_slack'), Icon: MessageSquare, color: "#611F69", apiKey: true, fields: [] } as any,
+      teamtailor: { desc: t('integ.desc_teamtailor'), Icon: UserPlus, color: "#4834D4", apiKey: true, fields: [] } as any,
+      smartrecruiters: { desc: t('integ.desc_smartrecruiters'), Icon: ClipboardList, color: "#FF6B35", fields: [
+        { key: "api_key", label: "API Key", type: "password" },
+        { key: "company_id", label: "Company ID", type: "text" },
+      ]},
+      taleez: { desc: t('integ.desc_taleez'), Icon: UserPlus, color: "#6C5CE7", apiKey: true, fields: [],
+        connectEndpoint: "taleez/connect", disconnectEndpoint: "taleez/disconnect",
+        configFields: [
+          { key: "api_key", label: lang === 'fr' ? "Clé API" : "API Key", type: "password" },
+          { key: "company_slug", label: lang === 'fr' ? "Slug entreprise (optionnel)" : "Company slug (optional)", type: "text" },
+        ],
+        guide: lang === 'fr' ? [
+          { title: "1. Accéder aux paramètres API", text: "Taleez → Paramètres → Intégrations → API" },
+          { title: "2. Générer une clé API", text: "Cliquez 'Générer une clé API' → Copiez la clé générée" },
+          { title: "3. Fonctionnalité", text: "Import automatique des candidats embauchés pour déclencher l'onboarding. Synchronisation des offres d'emploi et du statut des candidatures." },
+        ] : [
+          { title: "1. Access API settings", text: "Taleez → Settings → Integrations → API" },
+          { title: "2. Generate an API key", text: "Click 'Generate API key' → Copy the generated key" },
+          { title: "3. Feature", text: "Automatic import of hired candidates to trigger onboarding. Job offers and application status synchronization." },
+        ],
+      } as any,
+      sap: { desc: t('integ.desc_sap'), Icon: Building2, color: "#0FAAFF", sapConnect: true, fields: [] },
+      personio: { desc: t('integ.desc_personio'), Icon: Users, color: "#4CAF50", apiKey: true, fields: [] } as any,
+      bamboohr: { desc: t('integ.desc_bamboohr'), Icon: Users, color: "#73C41D", apiKey: true, fields: [] } as any,
+      workday: { desc: t('integ.desc_workday'), Icon: Building2, color: "#F68D2E", apiKey: true, fields: [] } as any,
+      lucca: { desc: t('integ.desc_lucca'), Icon: Calendar, color: "#FF6B35", apiKey: true, fields: [] } as any,
+    };
+
     const renderIntegrations = () => {
       const categories = [...new Set((integrations || []).map((i: any) => i.categorie))];
       const selectedIntegration = integrations?.find((i: any) => i.id === integrationPanelId);
@@ -317,6 +361,310 @@ export function createAdminIntegrations(ctx: any) {
           </div>
           );
         })}
+
+        {/* ─── API & WEBHOOKS SECTION ──────────────────────── */}
+        {(() => {
+          const mockKeys = apiKeys.length > 0 ? apiKeys : [
+            { id: 1, name: "Production App", key: "ilz_live_sk_7f3a9b2c...d4e8", prefix: "ilz_live_sk_7f3a", scopes: ["collaborateurs:read", "parcours:read", "documents:read", "actions:read"], created_at: "2026-03-15", last_used: "2026-04-13T14:32:00", active: true },
+            { id: 2, name: "Staging/Test", key: "ilz_test_sk_2b8c4d6e...a1f3", prefix: "ilz_test_sk_2b8c", scopes: ["collaborateurs:read", "collaborateurs:write", "parcours:read", "parcours:write"], created_at: "2026-04-01", last_used: null, active: true },
+            { id: 3, name: "Legacy Integration", key: "ilz_live_sk_9e1f...deprecated", prefix: "ilz_live_sk_9e1f", scopes: ["collaborateurs:read"], created_at: "2025-11-20", last_used: "2026-01-15T09:00:00", active: false },
+          ];
+          const mockWebhooks = apiWebhooks.length > 0 ? apiWebhooks : [
+            { id: 1, url: "https://erp.example.com/api/illizeo/webhook", events: ["collaborateur.created", "collaborateur.updated", "document.validated"], secret: "whsec_a8f3...b2c1", active: true, last_triggered: "2026-04-13T10:15:00", success_rate: 98.5 },
+            { id: 2, url: "https://slack-bot.internal/onboarding-events", events: ["parcours.completed", "action.overdue"], secret: "whsec_d4e7...f6a9", active: true, last_triggered: "2026-04-12T16:45:00", success_rate: 100 },
+          ];
+          const mockLogs = apiLogs.length > 0 ? apiLogs : [
+            { id: 1, method: "GET", endpoint: "/api/v1/collaborateurs", status: 200, response_time_ms: 45, api_key_name: "Production App", timestamp: "2026-04-13T14:32:00" },
+            { id: 2, method: "POST", endpoint: "/api/v1/collaborateurs", status: 201, response_time_ms: 120, api_key_name: "Production App", timestamp: "2026-04-13T14:30:12" },
+            { id: 3, method: "GET", endpoint: "/api/v1/parcours", status: 200, response_time_ms: 38, api_key_name: "Production App", timestamp: "2026-04-13T14:28:55" },
+            { id: 4, method: "GET", endpoint: "/api/v1/documents", status: 200, response_time_ms: 52, api_key_name: "Staging/Test", timestamp: "2026-04-13T14:25:00" },
+            { id: 5, method: "PUT", endpoint: "/api/v1/collaborateurs/42", status: 200, response_time_ms: 89, api_key_name: "Production App", timestamp: "2026-04-13T14:20:30" },
+            { id: 6, method: "POST", endpoint: "/api/v1/documents/upload", status: 201, response_time_ms: 340, api_key_name: "Production App", timestamp: "2026-04-13T14:15:00" },
+            { id: 7, method: "GET", endpoint: "/api/v1/collaborateurs/99", status: 404, response_time_ms: 12, api_key_name: "Staging/Test", timestamp: "2026-04-13T14:10:00" },
+            { id: 8, method: "GET", endpoint: "/api/v1/actions", status: 200, response_time_ms: 41, api_key_name: "Production App", timestamp: "2026-04-13T14:05:22" },
+            { id: 9, method: "POST", endpoint: "/api/v1/nps-surveys/3/send", status: 200, response_time_ms: 210, api_key_name: "Production App", timestamp: "2026-04-13T13:55:00" },
+            { id: 10, method: "GET", endpoint: "/api/v1/equipments", status: 200, response_time_ms: 33, api_key_name: "Staging/Test", timestamp: "2026-04-13T13:50:00" },
+            { id: 11, method: "GET", endpoint: "/api/v1/collaborateurs", status: 401, response_time_ms: 8, api_key_name: "Legacy Integration", timestamp: "2026-04-13T13:45:00" },
+            { id: 12, method: "POST", endpoint: "/api/v1/parcours", status: 201, response_time_ms: 156, api_key_name: "Production App", timestamp: "2026-04-13T13:40:00" },
+            { id: 13, method: "GET", endpoint: "/api/v1/nps-surveys", status: 200, response_time_ms: 29, api_key_name: "Staging/Test", timestamp: "2026-04-13T13:35:00" },
+            { id: 14, method: "PUT", endpoint: "/api/v1/collaborateurs/15", status: 400, response_time_ms: 15, api_key_name: "Production App", timestamp: "2026-04-13T13:30:00" },
+            { id: 15, method: "GET", endpoint: "/api/v1/parcours", status: 500, response_time_ms: 2100, api_key_name: "Production App", timestamp: "2026-04-13T13:25:00" },
+            { id: 16, method: "GET", endpoint: "/api/v1/documents", status: 200, response_time_ms: 47, api_key_name: "Staging/Test", timestamp: "2026-04-13T13:20:00" },
+            { id: 17, method: "POST", endpoint: "/api/v1/collaborateurs", status: 403, response_time_ms: 10, api_key_name: "Legacy Integration", timestamp: "2026-04-13T13:15:00" },
+            { id: 18, method: "GET", endpoint: "/api/v1/actions", status: 200, response_time_ms: 36, api_key_name: "Production App", timestamp: "2026-04-13T13:10:00" },
+            { id: 19, method: "DELETE", endpoint: "/api/v1/collaborateurs/101", status: 200, response_time_ms: 65, api_key_name: "Production App", timestamp: "2026-04-13T13:05:00" },
+            { id: 20, method: "GET", endpoint: "/api/v1/collaborateurs", status: 200, response_time_ms: 42, api_key_name: "Staging/Test", timestamp: "2026-04-13T13:00:00" },
+          ];
+
+          const SCOPE_COLORS: Record<string, string> = { "collaborateurs:read": "#4CAF50", "collaborateurs:write": "#E53935", "parcours:read": "#1A73E8", "parcours:write": "#7B5EA7", "documents:read": "#F9A825", "documents:write": "#E65100", "actions:read": "#00BCD4" };
+          const METHOD_COLORS: Record<string, string> = { GET: "#4CAF50", POST: "#1A73E8", PUT: "#F9A825", DELETE: "#E53935", PATCH: "#7B5EA7" };
+          const STATUS_COLOR = (s: number) => s >= 200 && s < 300 ? C.green : s >= 400 && s < 500 ? "#F9A825" : s >= 500 ? C.red : C.textMuted;
+          const STATUS_BG = (s: number) => s >= 200 && s < 300 ? C.greenLight : s >= 400 && s < 500 ? "#FFF8E1" : s >= 500 ? C.redLight : C.bg;
+
+          const tabs: { key: "keys" | "webhooks" | "docs" | "logs"; label: string; Icon: React.FC<any> }[] = [
+            { key: "keys", label: t('api.keys'), Icon: Key },
+            { key: "webhooks", label: t('api.webhooks'), Icon: Webhook },
+            { key: "docs", label: t('api.docs'), Icon: BookOpen },
+            { key: "logs", label: t('api.logs'), Icon: Activity },
+          ];
+
+          const endpoints = [
+            { module: "Collaborateurs", items: [
+              { method: "GET", path: "/collaborateurs", desc: lang === 'fr' ? "Lister tous les collaborateurs" : "List all employees" },
+              { method: "POST", path: "/collaborateurs", desc: lang === 'fr' ? "Creer un collaborateur" : "Create employee" },
+              { method: "GET", path: "/collaborateurs/{id}", desc: lang === 'fr' ? "Obtenir un collaborateur" : "Get employee" },
+              { method: "PUT", path: "/collaborateurs/{id}", desc: lang === 'fr' ? "Mettre a jour un collaborateur" : "Update employee" },
+            ]},
+            { module: "Parcours", items: [
+              { method: "GET", path: "/parcours", desc: lang === 'fr' ? "Lister tous les parcours" : "List all paths" },
+              { method: "POST", path: "/parcours", desc: lang === 'fr' ? "Creer un parcours" : "Create path" },
+            ]},
+            { module: "Documents", items: [
+              { method: "GET", path: "/documents", desc: lang === 'fr' ? "Lister les documents" : "List documents" },
+              { method: "POST", path: "/documents/upload", desc: lang === 'fr' ? "Uploader un document" : "Upload document" },
+            ]},
+            { module: "Actions", items: [
+              { method: "GET", path: "/actions", desc: lang === 'fr' ? "Lister les actions" : "List actions" },
+            ]},
+            { module: "NPS & Surveys", items: [
+              { method: "GET", path: "/nps-surveys", desc: lang === 'fr' ? "Lister les enquetes" : "List surveys" },
+              { method: "POST", path: "/nps-surveys/{id}/send", desc: lang === 'fr' ? "Envoyer une enquete" : "Send survey" },
+            ]},
+            { module: "Equipment", items: [
+              { method: "GET", path: "/equipments", desc: lang === 'fr' ? "Lister les equipements" : "List equipment" },
+            ]},
+          ];
+
+          const webhookEvents = [
+            { group: "Collaborateur", events: ["collaborateur.created", "collaborateur.updated", "collaborateur.deleted"] },
+            { group: "Document", events: ["document.submitted", "document.validated", "document.refused"] },
+            { group: "Parcours", events: ["parcours.created", "parcours.completed"] },
+            { group: "Action", events: ["action.assigned", "action.completed", "action.overdue"] },
+          ];
+
+          return (
+            <div style={{ marginTop: 12, marginBottom: 28 }}>
+              {/* Section header */}
+              <div className="iz-card" style={{ ...sCard, marginBottom: 16, padding: "20px 24px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: `${C.pink}15`, display: "flex", alignItems: "center", justifyContent: "center" }}><Code size={20} color={C.pink} /></div>
+                  <div>
+                    <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{t('api.title')}</h2>
+                    <div style={{ fontSize: 12, color: C.textLight }}>{t('api.desc')}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div style={{ display: "flex", gap: 4, padding: 3, background: C.bg, borderRadius: 8, marginBottom: 16 }}>
+                {tabs.map(tb => (
+                  <button key={tb.key} onClick={() => setApiTab(tb.key)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px", borderRadius: 6, fontSize: 12, fontWeight: apiTab === tb.key ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font, background: apiTab === tb.key ? C.white : "transparent", color: apiTab === tb.key ? C.pink : C.textMuted, boxShadow: apiTab === tb.key ? "0 1px 3px rgba(0,0,0,.1)" : "none", transition: "all .2s" }}>
+                    <tb.Icon size={14} /> {tb.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Tab: API Keys ── */}
+              {apiTab === "keys" && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                    <button onClick={() => {
+                      const newKey = { id: Date.now(), name: "New Key", key: "ilz_live_sk_" + Math.random().toString(36).slice(2, 10) + "...", prefix: "ilz_live_sk_" + Math.random().toString(36).slice(2, 6), scopes: ["collaborateurs:read"], created_at: new Date().toISOString().slice(0, 10), last_used: null, active: true };
+                      setApiKeys([newKey, ...mockKeys]);
+                      addToast_admin(t('api.new_key'));
+                    }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('api.new_key')}</button>
+                  </div>
+                  {mockKeys.length === 0 ? (
+                    <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}><Key size={28} style={{ marginBottom: 8, opacity: .4 }} /><div>{t('api.no_keys')}</div></div>
+                  ) : mockKeys.map((k: any) => (
+                    <div key={k.id} className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 10, padding: "16px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: k.active ? C.greenLight : C.redLight, display: "flex", alignItems: "center", justifyContent: "center" }}><Key size={16} color={k.active ? C.green : C.red} /></div>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>{k.name}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+                              <code style={{ fontSize: 11, fontFamily: "monospace", color: C.textMuted, background: C.bg, padding: "2px 6px", borderRadius: 4 }}>{k.prefix}...</code>
+                              <button onClick={() => { navigator.clipboard.writeText(k.key); addToast_admin(t('api.copied')); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><Copy size={12} color={C.textMuted} /></button>
+                            </div>
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 4, background: k.active ? C.greenLight : C.redLight, color: k.active ? C.green : C.red }}>{k.active ? t('api.active') : t('api.revoked')}</span>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+                        {(k.scopes || []).map((s: string) => (
+                          <span key={s} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: `${SCOPE_COLORS[s] || C.textMuted}15`, color: SCOPE_COLORS[s] || C.textMuted, fontWeight: 500 }}>{s}</span>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: C.textMuted }}>
+                        <div style={{ display: "flex", gap: 16 }}>
+                          <span>{t('api.created_at')}: {fmtDate(k.created_at)}</span>
+                          <span>{t('api.last_used')}: {k.last_used ? fmtDateTime(k.last_used) : t('api.never')}</span>
+                        </div>
+                        {k.active && (
+                          <button onClick={() => {
+                            showConfirm(t('api.revoke_confirm'), () => {
+                              const updated = mockKeys.map((mk: any) => mk.id === k.id ? { ...mk, active: false } : mk);
+                              setApiKeys(updated);
+                              addToast_admin(t('api.revoke'));
+                            });
+                          }} style={{ ...sBtn("outline"), fontSize: 11, color: C.red, borderColor: C.red, padding: "4px 12px" }}>{t('api.revoke')}</button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Tab: Webhooks ── */}
+              {apiTab === "webhooks" && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                    <button onClick={() => {
+                      const newWh = { id: Date.now(), url: "https://", events: [], secret: "whsec_" + Math.random().toString(36).slice(2, 10), active: true, last_triggered: null, success_rate: 100 };
+                      setApiWebhooks([newWh, ...mockWebhooks]);
+                      addToast_admin(t('api.new_webhook'));
+                    }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('api.new_webhook')}</button>
+                  </div>
+                  {mockWebhooks.length === 0 ? (
+                    <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}><Webhook size={28} style={{ marginBottom: 8, opacity: .4 }} /><div>{t('api.no_webhooks')}</div></div>
+                  ) : mockWebhooks.map((wh: any) => (
+                    <div key={wh.id} className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 10, padding: "16px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: wh.active ? C.greenLight : C.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Webhook size={16} color={wh.active ? C.green : C.textMuted} /></div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 12, fontFamily: "monospace", color: C.text, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{wh.url}</div>
+                            <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{t('api.webhook_secret')}: {wh.secret}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                          <div onClick={() => {
+                            const updated = mockWebhooks.map((w: any) => w.id === wh.id ? { ...w, active: !w.active } : w);
+                            setApiWebhooks(updated);
+                          }} style={{ width: 36, height: 20, borderRadius: 10, background: wh.active ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s" }}>
+                            <div style={{ width: 16, height: 16, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: wh.active ? 18 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 4, background: wh.success_rate >= 99 ? C.greenLight : wh.success_rate >= 90 ? "#FFF8E1" : C.redLight, color: wh.success_rate >= 99 ? C.green : wh.success_rate >= 90 ? "#F9A825" : C.red }}>{wh.success_rate}%</span>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+                        {(wh.events || []).map((ev: string) => (
+                          <span key={ev} style={{ fontSize: 10, padding: "2px 8px", borderRadius: 10, background: `${C.blue}12`, color: C.blue, fontWeight: 500 }}>{ev}</span>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: C.textMuted }}>
+                        <span>{t('api.last_triggered')}: {wh.last_triggered ? fmtDateTime(wh.last_triggered) : t('api.never')}</span>
+                        <button onClick={() => {
+                          showConfirm(lang === 'fr' ? "Supprimer ce webhook ?" : "Delete this webhook?", () => {
+                            const updated = mockWebhooks.filter((w: any) => w.id !== wh.id);
+                            setApiWebhooks(updated);
+                            addToast_admin(t('api.delete'));
+                          });
+                        }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash2 size={14} color={C.red} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── Tab: Documentation ── */}
+              {apiTab === "docs" && (
+                <div>
+                  {/* Reference card */}
+                  <div className="iz-card" style={{ ...sCard, marginBottom: 16, padding: "20px 24px" }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px" }}>{lang === 'fr' ? "Reference API" : "API Reference"}</h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                      <div style={{ padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
+                        <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{t('api.base_url')}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <code style={{ fontSize: 12, fontFamily: "monospace", color: C.pink, fontWeight: 500 }}>https://onboarding.illizeo.com/api/v1</code>
+                          <button onClick={() => { navigator.clipboard.writeText("https://onboarding.illizeo.com/api/v1"); addToast_admin(t('api.copied')); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><Copy size={12} color={C.textMuted} /></button>
+                        </div>
+                      </div>
+                      <div style={{ padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
+                        <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{t('api.version')}</div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>v1</span>
+                      </div>
+                      <div style={{ padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
+                        <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{t('api.auth_header')}</div>
+                        <code style={{ fontSize: 11, fontFamily: "monospace", color: C.text }}>Authorization: Bearer {'{'}<span style={{ color: C.pink }}>api_key</span>{'}'}</code>
+                      </div>
+                      <div style={{ padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
+                        <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{t('api.rate_limit')}</div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>1 000 {lang === 'fr' ? "requetes/heure" : "requests/hour"}</span>
+                      </div>
+                    </div>
+
+                    {/* Endpoints by module */}
+                    <h4 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 12px", color: C.text }}>Endpoints</h4>
+                    {endpoints.map(mod => (
+                      <div key={mod.module} style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>{mod.module}</div>
+                        {mod.items.map((ep, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", background: i % 2 === 0 ? C.bg : "transparent", borderRadius: 6, fontSize: 12 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: `${METHOD_COLORS[ep.method]}15`, color: METHOD_COLORS[ep.method], minWidth: 44, textAlign: "center", fontFamily: "monospace" }}>{ep.method}</span>
+                            <code style={{ fontFamily: "monospace", fontSize: 11, color: C.text, fontWeight: 500 }}>{ep.path}</code>
+                            <span style={{ color: C.textMuted, fontSize: 11, marginLeft: "auto" }}>{ep.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+
+                    {/* Webhook events reference */}
+                    <h4 style={{ fontSize: 13, fontWeight: 600, margin: "16px 0 12px", color: C.text }}>Webhook Events</h4>
+                    {webhookEvents.map(grp => (
+                      <div key={grp.group} style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, marginBottom: 4 }}>{grp.group}</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {grp.events.map(ev => (
+                            <code key={ev} style={{ fontSize: 10, fontFamily: "monospace", padding: "3px 8px", borderRadius: 4, background: `${C.blue}10`, color: C.blue }}>{ev}</code>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Tab: Call Logs ── */}
+              {apiTab === "logs" && (
+                <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: C.bg, borderBottom: `1px solid ${C.border}` }}>
+                        <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: C.textMuted, fontSize: 10, textTransform: "uppercase" }}>{t('api.method')}</th>
+                        <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: C.textMuted, fontSize: 10, textTransform: "uppercase" }}>{t('api.endpoint')}</th>
+                        <th style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600, color: C.textMuted, fontSize: 10, textTransform: "uppercase" }}>{t('api.status')}</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: C.textMuted, fontSize: 10, textTransform: "uppercase" }}>{t('api.response_time')}</th>
+                        <th style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: C.textMuted, fontSize: 10, textTransform: "uppercase" }}>{t('api.key_name')}</th>
+                        <th style={{ padding: "10px 12px", textAlign: "right", fontWeight: 600, color: C.textMuted, fontSize: 10, textTransform: "uppercase" }}>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mockLogs.map((log: any) => (
+                        <tr key={log.id} style={{ borderBottom: `1px solid ${C.border}`, background: log.status >= 500 ? `${C.red}06` : log.status >= 200 && log.status < 300 ? "transparent" : "transparent" }}>
+                          <td style={{ padding: "8px 12px" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: `${METHOD_COLORS[log.method] || C.textMuted}15`, color: METHOD_COLORS[log.method] || C.textMuted, fontFamily: "monospace" }}>{log.method}</span>
+                          </td>
+                          <td style={{ padding: "8px 12px" }}>
+                            <code style={{ fontSize: 11, fontFamily: "monospace", color: C.text }}>{log.endpoint}</code>
+                          </td>
+                          <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: STATUS_BG(log.status), color: STATUS_COLOR(log.status) }}>{log.status}</span>
+                          </td>
+                          <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace", fontSize: 11, color: log.response_time_ms > 1000 ? C.red : C.textMuted }}>{log.response_time_ms}ms</td>
+                          <td style={{ padding: "8px 12px", fontSize: 11, color: C.textMuted }}>{log.api_key_name}</td>
+                          <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 11, color: C.textMuted }}>{fmtDateTime(log.timestamp)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Integration config panel */}
         {selectedIntegration && selectedMeta && (
@@ -546,147 +894,183 @@ export function createAdminIntegrations(ctx: any) {
                         <div style={{ fontSize: 12, color: C.text }}>{integrationConfig.company_name || integrationConfig.company_id || "SAP SuccessFactors"}</div>
                       </div>
                       <div style={{ padding: "16px", background: C.bg, borderRadius: 10, marginBottom: 16 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8 }}>Détails de connexion</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8 }}>{t('sap.connection_details')}</div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 12 }}>
                           <div><span style={{ color: C.textMuted }}>Company ID</span><div style={{ fontWeight: 500, marginTop: 2 }}>{integrationConfig.company_id || "—"}</div></div>
-                          <div><span style={{ color: C.textMuted }}>Pays</span><div style={{ fontWeight: 500, marginTop: 2 }}>{integrationConfig.company_country || "—"}</div></div>
-                          <div><span style={{ color: C.textMuted }}>Utilisateur</span><div style={{ fontWeight: 500, marginTop: 2 }}>{integrationConfig.username || "—"}</div></div>
+                          <div><span style={{ color: C.textMuted }}>{t('sap.country')}</span><div style={{ fontWeight: 500, marginTop: 2 }}>{integrationConfig.company_country || "—"}</div></div>
+                          <div><span style={{ color: C.textMuted }}>{t('sap.user')}</span><div style={{ fontWeight: 500, marginTop: 2 }}>{integrationConfig.username || integrationConfig.saml_user || "—"}</div></div>
                           <div><span style={{ color: C.textMuted }}>{t('common.connected_on')}</span><div style={{ fontWeight: 500, marginTop: 2 }}>{fmtDate(integrationConfig.connected_at)}</div></div>
                         </div>
                       </div>
                       <div style={{ padding: "12px 16px", background: C.bg, borderRadius: 8, marginBottom: 16, fontSize: 11, color: C.textLight }}>
-                        Serveur : {integrationConfig.base_url || "—"}
+                        {t('sap.server')} : {integrationConfig.base_url || "—"}
                       </div>
                       <button onClick={async () => {
-                        setConfirmDialog({ message: "Déconnecter SAP SuccessFactors ?", onConfirm: async () => {
+                        setConfirmDialog({ message: t('sap.disconnect_confirm'), onConfirm: async () => {
                           try {
                             await apiFetch(`/integrations/${selectedIntegration.id}/sap/disconnect`, { method: "POST" });
-                            addToast_admin("SuccessFactors déconnecté");
+                            addToast_admin(t('sap.disconnected'));
                             refetchIntegrations(); setIntegrationPanelId(null);
                           } catch { addToast_admin(t('toast.error')); }
                           setConfirmDialog(null);
                         }});
                       }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13, width: "100%" }}>{t('common.disconnect')}</button>
                     </div>
-                  ) : (
+                  ) : (() => {
+                    const sapAuthMode = integrationConfig.auth_mode || "oauth2";
+                    const sapOAuthReady = sapAuthMode === "oauth2" && integrationConfig.base_url && integrationConfig.company_id && integrationConfig.client_id && integrationConfig.client_secret && integrationConfig.saml_user;
+                    const sapBasicReady = sapAuthMode === "basic" && integrationConfig.base_url && integrationConfig.company_id && integrationConfig.username && integrationConfig.password;
+                    return (
                     <div>
                       <div style={{ textAlign: "center", marginBottom: 20 }}>
                         <div style={{ width: 64, height: 64, borderRadius: 16, background: `${selectedMeta.color}15`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                           <selectedMeta.Icon size={32} color={selectedMeta.color} />
                         </div>
-                        <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px" }}>Connecter SAP SuccessFactors</h3>
-                        <p style={{ fontSize: 12, color: C.textLight, margin: 0 }}>Synchronisez vos employés depuis votre SIRH</p>
+                        <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px" }}>{t('sap.connect_title')}</h3>
+                        <p style={{ fontSize: 12, color: C.textLight, margin: 0 }}>{t('sap.connect_desc')}</p>
                       </div>
+
+                      {/* Auth mode toggle */}
                       <div style={{ marginBottom: 16 }}>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>URL du serveur API *</label>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('sap.auth_mode')}</label>
+                        <div style={{ display: "flex", gap: 4, padding: 2, background: C.bg, borderRadius: 6 }}>
+                          <button onClick={() => setIntegrationConfig(prev => ({ ...prev, auth_mode: "oauth2" }))} style={{ flex: 1, padding: "6px 10px", borderRadius: 4, fontSize: 11, fontWeight: sapAuthMode === "oauth2" ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font, background: sapAuthMode === "oauth2" ? C.white : "transparent", color: sapAuthMode === "oauth2" ? C.pink : C.textMuted, boxShadow: sapAuthMode === "oauth2" ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>{t('sap.auth_oauth')}</button>
+                          <button onClick={() => setIntegrationConfig(prev => ({ ...prev, auth_mode: "basic" }))} style={{ flex: 1, padding: "6px 10px", borderRadius: 4, fontSize: 11, fontWeight: sapAuthMode === "basic" ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font, background: sapAuthMode === "basic" ? C.white : "transparent", color: sapAuthMode === "basic" ? C.text : C.textMuted, boxShadow: sapAuthMode === "basic" ? "0 1px 3px rgba(0,0,0,.1)" : "none" }}>{t('sap.auth_basic')}</button>
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('sap.api_url')}</label>
                         <select value={integrationConfig.base_url || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, base_url: e.target.value }))} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
-                          <option value="">Sélectionner le datacenter...</option>
-                          <option value="https://api2.successfactors.eu">Europe (Rot) — api2.successfactors.eu</option>
-                          <option value="https://api4.successfactors.com">US East (Ashburn) — api4.successfactors.com</option>
-                          <option value="https://api012.successfactors.eu">Europe (Amsterdam) — api012.successfactors.eu</option>
-                          <option value="https://api15.sapsf.cn">Chine — api15.sapsf.cn</option>
-                          <option value="https://apisalesdemo2.successfactors.eu">Démo EU — apisalesdemo2.successfactors.eu</option>
-                          <option value="https://apisalesdemo8.successfactors.com">Démo US — apisalesdemo8.successfactors.com</option>
+                          <option value="">{t('sap.select_dc')}</option>
+                          <optgroup label="Production — Europe">
+                            <option value="https://api2.successfactors.eu">DC2 — Rot, Germany — api2.successfactors.eu</option>
+                            <option value="https://api012.successfactors.eu">DC12 — Amsterdam, Netherlands — api012.successfactors.eu</option>
+                            <option value="https://api55.successfactors.eu">DC55 — Frankfurt, Germany — api55.successfactors.eu</option>
+                          </optgroup>
+                          <optgroup label="Production — North America">
+                            <option value="https://api4.successfactors.com">DC4 — Ashburn, Virginia — api4.successfactors.com</option>
+                            <option value="https://api8.successfactors.com">DC8 — Chandler, Arizona — api8.successfactors.com</option>
+                            <option value="https://api10.successfactors.com">DC10 — Sterling, Virginia — api10.successfactors.com</option>
+                            <option value="https://api17.sapsf.com">DC17 — Colorado Springs — api17.sapsf.com</option>
+                            <option value="https://api18.sapsf.com">DC18 — Toronto, Canada — api18.sapsf.com</option>
+                          </optgroup>
+                          <optgroup label="Production — Asia Pacific">
+                            <option value="https://api16.sapsf.com">DC16 — Sydney, Australia — api16.sapsf.com</option>
+                            <option value="https://api19.sapsf.com">DC19 — Seoul, South Korea — api19.sapsf.com</option>
+                            <option value="https://api35.sapsf.com">DC35 — Tokyo, Japan — api35.sapsf.com</option>
+                            <option value="https://api45.sapsf.com">DC45 — Singapore — api45.sapsf.com</option>
+                          </optgroup>
+                          <optgroup label="Production — Middle East / Africa">
+                            <option value="https://api56.sapsf.com">DC56 — UAE (Riyadh) — api56.sapsf.com</option>
+                            <option value="https://api22.sapsf.com">DC22 — Riyadh, KSA — api22.sapsf.com</option>
+                          </optgroup>
+                          <optgroup label="Production — China">
+                            <option value="https://api15.sapsf.cn">DC15 — Shanghai — api15.sapsf.cn</option>
+                          </optgroup>
+                          <optgroup label="Production — Brazil">
+                            <option value="https://api28.sapsf.com">DC28 — São Paulo — api28.sapsf.com</option>
+                          </optgroup>
+                          <optgroup label="Demo / Sandbox">
+                            <option value="https://apisalesdemo2.successfactors.eu">Sales Demo EU — apisalesdemo2.successfactors.eu</option>
+                            <option value="https://apisalesdemo4.successfactors.com">Sales Demo US (DC4) — apisalesdemo4.successfactors.com</option>
+                            <option value="https://apisalesdemo8.successfactors.com">Sales Demo US (DC8) — apisalesdemo8.successfactors.com</option>
+                          </optgroup>
                         </select>
                       </div>
                       <div style={{ marginBottom: 16 }}>
                         <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Company ID *</label>
                         <input value={integrationConfig.company_id || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, company_id: e.target.value }))} placeholder="Ex: SFCPART000001" style={{ ...sInput, fontSize: 12 }} />
                       </div>
-                      <div style={{ marginBottom: 16 }}>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom d'utilisateur API *</label>
-                        <input value={integrationConfig.username || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, username: e.target.value }))} placeholder="Ex: sfadmin" style={{ ...sInput, fontSize: 12 }} />
-                      </div>
-                      <div style={{ marginBottom: 20 }}>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Mot de passe *</label>
-                        <input type="password" value={integrationConfig.password || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, password: e.target.value }))} style={{ ...sInput, fontSize: 12 }} />
-                      </div>
-                      <button disabled={integrationSaving || !integrationConfig.base_url || !integrationConfig.company_id || !integrationConfig.username || !integrationConfig.password} onClick={async () => {
+
+                      {sapAuthMode === "oauth2" ? (
+                        <>
+                          <div style={{ marginBottom: 16 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('sap.client_id')}</label>
+                            <input value={integrationConfig.client_id || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, client_id: e.target.value }))} style={{ ...sInput, fontSize: 12 }} />
+                          </div>
+                          <div style={{ marginBottom: 16 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('sap.client_secret')}</label>
+                            <input type="password" value={integrationConfig.client_secret || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, client_secret: e.target.value }))} style={{ ...sInput, fontSize: 12 }} />
+                          </div>
+                          <div style={{ marginBottom: 16 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('sap.saml_user')}</label>
+                            <input value={integrationConfig.saml_user || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, saml_user: e.target.value }))} placeholder="Ex: api_illizeo" style={{ ...sInput, fontSize: 12 }} />
+                          </div>
+                          <div style={{ marginBottom: 20 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('sap.token_url')}</label>
+                            <input value={integrationConfig.token_url || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, token_url: e.target.value }))} placeholder={`${integrationConfig.base_url || "https://api2.successfactors.eu"}/oauth/token`} style={{ ...sInput, fontSize: 12 }} />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ marginBottom: 16 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('sap.api_user')}</label>
+                            <input value={integrationConfig.username || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, username: e.target.value }))} placeholder="Ex: sfadmin" style={{ ...sInput, fontSize: 12 }} />
+                          </div>
+                          <div style={{ marginBottom: 20 }}>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('sap.password')}</label>
+                            <input type="password" value={integrationConfig.password || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, password: e.target.value }))} style={{ ...sInput, fontSize: 12 }} />
+                          </div>
+                        </>
+                      )}
+
+                      <button disabled={integrationSaving || !(sapOAuthReady || sapBasicReady)} onClick={async () => {
                         setIntegrationSaving(true);
                         try {
+                          const payload = sapAuthMode === "oauth2"
+                            ? { auth_mode: "oauth2", base_url: integrationConfig.base_url, company_id: integrationConfig.company_id, client_id: integrationConfig.client_id, client_secret: integrationConfig.client_secret, saml_user: integrationConfig.saml_user, token_url: integrationConfig.token_url }
+                            : { auth_mode: "basic", base_url: integrationConfig.base_url, company_id: integrationConfig.company_id, username: integrationConfig.username, password: integrationConfig.password };
                           const res = await apiFetch<{ success: boolean; message: string }>(`/integrations/${selectedIntegration.id}/sap/connect`, {
-                            method: "POST",
-                            body: JSON.stringify({ base_url: integrationConfig.base_url, company_id: integrationConfig.company_id, username: integrationConfig.username, password: integrationConfig.password }),
+                            method: "POST", body: JSON.stringify(payload),
                           });
                           if (res.success) {
-                            addToast_admin("SuccessFactors connecté");
+                            addToast_admin(t('sap.connected'));
                             refetchIntegrations(); setIntegrationPanelId(null);
                           } else {
-                            addToast_admin(res.message || "Erreur de connexion");
+                            addToast_admin(res.message || t('toast.error'));
                           }
                         } catch (err: any) {
-                          try { const p = JSON.parse(err.message); addToast_admin(p.message || "Identifiants invalides"); } catch { addToast_admin("Identifiants invalides ou serveur inaccessible"); }
+                          try { const p = JSON.parse(err.message); addToast_admin(p.message || t('sap.invalid_creds')); } catch { addToast_admin(t('sap.invalid_creds')); }
                         }
                         finally { setIntegrationSaving(false); }
-                      }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 14, padding: "12px 0", width: "100%", opacity: integrationSaving || !integrationConfig.base_url || !integrationConfig.company_id || !integrationConfig.username || !integrationConfig.password ? 0.5 : 1 }}>
+                      }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 14, padding: "12px 0", width: "100%", opacity: integrationSaving || !(sapOAuthReady || sapBasicReady) ? 0.5 : 1 }}>
                         {integrationSaving ? t('common.checking') : t('common.test_connect')}
                       </button>
 
                       {/* Setup guide */}
                       <div style={{ marginTop: 20, padding: "16px", background: C.bg, borderRadius: 10, fontSize: 11, color: C.textLight }}>
                         <div style={{ fontWeight: 700, fontSize: 12, color: C.text, marginBottom: 4 }}>{t('integ.procedure')} SuccessFactors</div>
-                        <div style={{ padding: "6px 10px", background: C.amberLight, borderRadius: 6, marginBottom: 12, fontSize: 10, color: C.amber }}>
-                          Illizeo utilise l'API <b>OData v2</b> (SFAPI est dépréciée depuis août 2018).
-                        </div>
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>1. Créer un utilisateur technique</div>
-                          <div>Admin Center → <b>Manage Users</b></div>
-                          <div>Créez un utilisateur dédié (ex: <b>api_illizeo</b>)</div>
-                          <div>Cochez <b>"Can use API"</b> dans les propriétés du user</div>
-                        </div>
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>2. Créer un groupe de permissions</div>
-                          <div>Admin Center → <b>Manage Permission Groups</b></div>
-                          <div>Créez un groupe "Illizeo Integration"</div>
-                          <div>Ajoutez l'utilisateur <b>api_illizeo</b> au groupe</div>
-                        </div>
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>3. Configurer le rôle de permissions</div>
-                          <div>Admin Center → <b>Manage Permission Roles</b></div>
-                          <div>Créez un rôle "Illizeo Connector" et assignez-le au groupe</div>
-                          <div style={{ marginTop: 4, fontWeight: 500, color: C.text }}>Permissions requises :</div>
-                          <div style={{ padding: "8px 10px", background: C.white, borderRadius: 6, marginTop: 4, fontFamily: "monospace", fontSize: 10, lineHeight: 1.6 }}>
-                            <b>Admin Privileges</b> → Manage Integration Tools<br/>
-                            <b>User</b> → Read (Employee Data)<br/>
-                            <b>Employee Central</b> → Read (EmpJob, EmpEmployment)<br/>
-                            <b>Metadata</b> → Read (FOCompany, FODepartment, FOLocation, FOJobCode)<br/>
-                            <b>OData API</b> → General OData API Access
-                          </div>
-                        </div>
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>4. Vérifier l'accès API OData</div>
-                          <div>Admin Center → <b>API Center</b></div>
-                          <div>Vérifiez que les endpoints OData v2 sont activés</div>
-                          <div>Testez avec : <code style={{ fontSize: 10, background: C.white, padding: "1px 4px", borderRadius: 3 }}>GET /odata/v2/User?$top=1&$format=json</code></div>
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, color: C.text, marginBottom: 4 }}>5. Informations à renseigner ci-dessus</div>
-                          <div><b>URL du serveur</b> — Sélectionnez votre datacenter (visible dans l'URL de votre instance SF)</div>
-                          <div><b>Company ID</b> — Admin Center → Company Settings (affiché en haut de page)</div>
-                          <div><b>Utilisateur</b> — Le login du user technique créé en étape 1</div>
-                          <div><b>Mot de passe</b> — Le mot de passe de ce user technique</div>
+                        <div style={{ padding: "6px 10px", background: C.amberLight, borderRadius: 6, marginBottom: 12, fontSize: 10, color: C.amber }} dangerouslySetInnerHTML={{ __html: t('sap.odata_warning') }} />
+                        <div style={{ padding: "8px 10px", background: C.white, borderRadius: 6, marginBottom: 12, fontFamily: "monospace", fontSize: 10, lineHeight: 1.6 }}>
+                          <b>Admin Privileges</b> → Manage Integration Tools<br/>
+                          <b>User</b> → Read (Employee Data)<br/>
+                          <b>Employee Central</b> → Read (EmpJob, EmpEmployment)<br/>
+                          <b>Metadata</b> → Read (FOCompany, FODepartment, FOLocation, FOJobCode)<br/>
+                          <b>OData API</b> → General OData API Access
                         </div>
                       </div>
                     </div>
-                  )
+                    );
+                  })()
                 ) : selectedMeta.teamsConnect ? (
                   selectedIntegration.connecte ? (
                     <div>
                       <div style={{ padding: "20px", background: C.greenLight, borderRadius: 12, textAlign: "center", marginBottom: 20 }}>
                         <CheckCircle size={28} color={C.green} style={{ marginBottom: 8 }} />
                         <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 4 }}>{t('common.connected')}</div>
-                        <div style={{ fontSize: 12, color: C.text }}>Webhook actif{integrationConfig.graph_connected ? " + Graph API" : ""}</div>
+                        <div style={{ fontSize: 12, color: C.text }}>{t('teams.webhook_active')}{integrationConfig.graph_connected ? " + Graph API" : ""}</div>
                       </div>
                       <div style={{ padding: "16px", background: C.bg, borderRadius: 10, marginBottom: 16 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 10 }}>Fonctionnalités actives</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 10 }}>{t('teams.active_features')}</div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
                           {[
-                            { Icon: PartyPopper, color: "#4CAF50", label: "Message de bienvenue", desc: "Envoyé quand un parcours onboarding démarre", active: true },
-                            { Icon: AlertTriangle, color: "#F9A825", label: "Alertes retard", desc: "Actions ou documents en retard", active: true },
-                            { Icon: FileText, color: "#1A73E8", label: "Notifications documents", desc: "Soumission, validation, refus", active: true },
-                            { Icon: Trophy, color: "#C2185B", label: "Parcours terminé", desc: "Félicitations au collaborateur", active: true },
-                            { Icon: CalendarDays, color: "#7B5EA7", label: "Réunions automatiques", desc: "Création de rdv Teams pour le parcours", active: !!integrationConfig.graph_connected },
-                            { Icon: Bell, color: "#E65100", label: "Rappels avant deadline", desc: "Notification avant l'échéance", active: true },
+                            { Icon: PartyPopper, color: "#4CAF50", label: t('teams.welcome'), desc: t('teams.welcome_desc'), active: true },
+                            { Icon: AlertTriangle, color: "#F9A825", label: t('teams.late_alerts'), desc: t('teams.late_alerts_desc'), active: true },
+                            { Icon: FileText, color: "#1A73E8", label: t('teams.documents'), desc: t('teams.documents_desc'), active: true },
+                            { Icon: Trophy, color: "#C2185B", label: t('teams.path_complete'), desc: t('teams.path_complete_desc'), active: true },
+                            { Icon: CalendarDays, color: "#7B5EA7", label: t('teams.auto_meetings'), desc: t('teams.auto_meetings_desc'), active: !!integrationConfig.graph_connected },
+                            { Icon: Bell, color: "#E65100", label: t('teams.reminders'), desc: t('teams.reminders_desc'), active: true },
                           ].map(f => (
                             <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: C.white, borderRadius: 8 }}>
                               <div style={{ width: 28, height: 28, borderRadius: 6, background: `${(f as any).color || C.pink}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><f.Icon size={14} color={(f as any).color || C.pink} /></div>
@@ -694,7 +1078,7 @@ export function createAdminIntegrations(ctx: any) {
                                 <div style={{ fontWeight: 500, color: C.text }}>{f.label}</div>
                                 <div style={{ fontSize: 10, color: C.textMuted }}>{f.desc}</div>
                               </div>
-                              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: f.active ? C.greenLight : C.bg, color: f.active ? C.green : C.textMuted }}>{f.active ? "Actif" : "Graph API requis"}</span>
+                              <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: f.active ? C.greenLight : C.bg, color: f.active ? C.green : C.textMuted }}>{f.active ? t('tpl.status_active') : t('teams.graph_required')}</span>
                             </div>
                           ))}
                         </div>
@@ -702,14 +1086,14 @@ export function createAdminIntegrations(ctx: any) {
                       <button onClick={async () => {
                         try {
                           await apiFetch(`/integrations/${selectedIntegration.id}/teams/test`, { method: "POST" });
-                          addToast_admin("Notification de test envoyée dans Teams");
-                        } catch { addToast_admin("Erreur d'envoi"); }
-                      }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13, width: "100%", marginBottom: 12 }}>Envoyer une notification de test</button>
+                          addToast_admin(t('teams.test_sent'));
+                        } catch { addToast_admin(t('toast.error')); }
+                      }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13, width: "100%", marginBottom: 12 }}>{t('teams.send_test')}</button>
                       <button onClick={async () => {
-                        setConfirmDialog({ message: "Déconnecter Microsoft Teams ?", onConfirm: async () => {
+                        setConfirmDialog({ message: t('teams.disconnect_confirm'), onConfirm: async () => {
                           try {
                             await apiFetch(`/integrations/${selectedIntegration.id}/teams/disconnect`, { method: "POST" });
-                            addToast_admin("Teams déconnecté"); refetchIntegrations(); setIntegrationPanelId(null);
+                            addToast_admin(t('teams.disconnected')); refetchIntegrations(); setIntegrationPanelId(null);
                           } catch { addToast_admin(t('toast.error')); }
                           setConfirmDialog(null);
                         }});
@@ -727,15 +1111,15 @@ export function createAdminIntegrations(ctx: any) {
 
                       {/* Features covered */}
                       <div style={{ padding: "16px", background: C.white, border: `1px solid ${C.border}`, borderRadius: 10, marginBottom: 16 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 10 }}>{lang === 'fr' ? 'Fonctionnalités couvertes' : 'Features included'}</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 10 }}>{t('teams.features_included')}</div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 11 }}>
                           {[
-                            { Icon: PartyPopper, color: "#4CAF50", label: "Message de bienvenue", desc: "Annonce automatique dans le canal quand un nouveau collaborateur arrive" },
-                            { Icon: AlertTriangle, color: "#F9A825", label: "Alertes retard", desc: "Notification quand une action ou un document est en retard" },
-                            { Icon: FileText, color: "#1A73E8", label: "Documents", desc: "Alerte quand un document est soumis, validé ou refusé" },
-                            { Icon: Trophy, color: "#C2185B", label: "Parcours terminé", desc: "Notification de félicitations quand un parcours est complété" },
-                            { Icon: CalendarDays, color: "#7B5EA7", label: "Réunions auto", desc: "Création de réunions Teams pour les rdv du parcours (Graph API)" },
-                            { Icon: Bell, color: "#E65100", label: "Rappels", desc: "Rappels automatiques avant les deadlines d'actions" },
+                            { Icon: PartyPopper, color: "#4CAF50", label: t('teams.welcome'), desc: t('teams.welcome_desc') },
+                            { Icon: AlertTriangle, color: "#F9A825", label: t('teams.late_alerts'), desc: t('teams.late_alerts_desc') },
+                            { Icon: FileText, color: "#1A73E8", label: t('teams.documents'), desc: t('teams.documents_desc') },
+                            { Icon: Trophy, color: "#C2185B", label: t('teams.path_complete'), desc: t('teams.path_complete_desc') },
+                            { Icon: CalendarDays, color: "#7B5EA7", label: t('teams.auto_meetings'), desc: t('teams.auto_meetings_desc') },
+                            { Icon: Bell, color: "#E65100", label: t('teams.reminders'), desc: t('teams.reminders_desc') },
                           ].map(f => (
                             <div key={f.label} style={{ padding: "10px", background: C.bg, borderRadius: 8 }}>
                               <div style={{ width: 28, height: 28, borderRadius: 6, background: `${(f as any).color || C.pink}15`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 6 }}><f.Icon size={14} color={(f as any).color || C.pink} /></div>
@@ -748,16 +1132,16 @@ export function createAdminIntegrations(ctx: any) {
 
                       {/* Step 1: Webhook */}
                       <div style={{ padding: "16px", background: C.bg, borderRadius: 10, marginBottom: 16 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>Étape 1 — Workflow Webhook (notifications)</div>
-                        <div style={{ fontSize: 11, color: C.textLight, marginBottom: 12 }}>Recevez les alertes d'onboarding dans un canal Teams via Power Automate</div>
-                        <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>URL du Workflow Webhook *</label>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>{t('teams.step1_title')}</div>
+                        <div style={{ fontSize: 11, color: C.textLight, marginBottom: 12 }}>{t('teams.step1_desc')}</div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('teams.webhook_url')}</label>
                         <input value={integrationConfig.webhook_url || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, webhook_url: e.target.value }))} placeholder="https://prod-xx.westeurope.logic.azure.com/..." style={{ ...sInput, fontSize: 12 }} />
                       </div>
 
                       {/* Step 2: Graph API (optional) */}
                       <div style={{ padding: "16px", background: C.bg, borderRadius: 10, marginBottom: 20 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>Étape 2 — Graph API (optionnel)</div>
-                        <div style={{ fontSize: 11, color: C.textLight, marginBottom: 12 }}>Permet de créer des réunions Teams automatiquement</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 4 }}>{t('teams.step2_title')}</div>
+                        <div style={{ fontSize: 11, color: C.textLight, marginBottom: 12 }}>{t('teams.step2_desc')}</div>
                         <div style={{ marginBottom: 8 }}>
                           <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>Tenant ID (Azure AD)</label>
                           <input value={integrationConfig.tenant_id || ""} onChange={e => setIntegrationConfig(prev => ({ ...prev, tenant_id: e.target.value }))} style={{ ...sInput, fontSize: 12 }} />
@@ -786,10 +1170,10 @@ export function createAdminIntegrations(ctx: any) {
                             const graphRes = await apiFetch<{ success: boolean; message: string }>(`/integrations/${selectedIntegration.id}/teams/connect-graph`, {
                               method: "POST", body: JSON.stringify({ tenant_id: integrationConfig.tenant_id, client_id: integrationConfig.client_id, client_secret: integrationConfig.client_secret }),
                             });
-                            if (!graphRes.success) addToast_admin("Webhook OK mais Graph API échoué: " + graphRes.message);
+                            if (!graphRes.success) addToast_admin("Webhook OK — Graph API: " + graphRes.message);
                           }
 
-                          addToast_admin("Microsoft Teams connecté"); refetchIntegrations(); setIntegrationPanelId(null);
+                          addToast_admin(t('teams.connected')); refetchIntegrations(); setIntegrationPanelId(null);
                         } catch (err: any) {
                           try { const p = JSON.parse(err.message); addToast_admin(p.message || "Erreur"); } catch { addToast_admin("Erreur de connexion"); }
                         }
@@ -799,27 +1183,23 @@ export function createAdminIntegrations(ctx: any) {
                       </button>
 
                       <div style={{ marginTop: 20, padding: "14px 16px", background: C.bg, borderRadius: 10, fontSize: 11, color: C.textLight }}>
-                        <div style={{ fontWeight: 700, fontSize: 12, color: C.text, marginBottom: 8 }}>Comment créer un Webhook Teams (via Workflows)</div>
-                        <div style={{ padding: "6px 10px", background: C.amberLight, borderRadius: 6, marginBottom: 10, fontSize: 10, color: C.amber }}>
-                          Les connecteurs Incoming Webhook classiques sont dépréciés. Utilisez <b>Power Automate Workflows</b>.
+                        <div style={{ fontWeight: 700, fontSize: 12, color: C.text, marginBottom: 8 }}>{t('teams.how_to_title')}</div>
+                        <div style={{ padding: "6px 10px", background: C.amberLight, borderRadius: 6, marginBottom: 10, fontSize: 10, color: C.amber }} dangerouslySetInnerHTML={{ __html: t('teams.how_to_warning') }} />
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ fontWeight: 600, color: C.text }}>{t('teams.step_open')}</div>
+                          <div dangerouslySetInnerHTML={{ __html: t('teams.step_open_desc') }} />
                         </div>
                         <div style={{ marginBottom: 8 }}>
-                          <div style={{ fontWeight: 600, color: C.text }}>1. Ouvrir le canal Teams</div>
-                          <div>Clic droit sur le canal → <b>Workflows</b> (ou <b>⋯</b> → <b>Workflows</b>)</div>
+                          <div style={{ fontWeight: 600, color: C.text }}>{t('teams.step_create')}</div>
+                          <div dangerouslySetInnerHTML={{ __html: t('teams.step_create_desc') }} />
                         </div>
                         <div style={{ marginBottom: 8 }}>
-                          <div style={{ fontWeight: 600, color: C.text }}>2. Créer un workflow webhook</div>
-                          <div>Cherchez <b>"Post to a channel when a webhook request is received"</b></div>
-                          <div>Sélectionnez-le et cliquez <b>Suivant</b></div>
-                        </div>
-                        <div style={{ marginBottom: 8 }}>
-                          <div style={{ fontWeight: 600, color: C.text }}>3. Configurer le workflow</div>
-                          <div>Sélectionnez l'<b>équipe</b> et le <b>canal</b> cible → Cliquez <b>Créer le flux</b></div>
+                          <div style={{ fontWeight: 600, color: C.text }}>{t('teams.step_configure')}</div>
+                          <div dangerouslySetInnerHTML={{ __html: t('teams.step_configure_desc') }} />
                         </div>
                         <div>
-                          <div style={{ fontWeight: 600, color: C.text }}>4. Copier l'URL du workflow</div>
-                          <div>L'URL est affichée après la création (commence par <code style={{ fontSize: 10, background: C.white, padding: "1px 3px", borderRadius: 2 }}>https://prod-xx.westeurope.logic.azure.com</code>)</div>
-                          <div>Collez-la dans le champ "URL du Webhook" ci-dessus</div>
+                          <div style={{ fontWeight: 600, color: C.text }}>{t('teams.step_copy')}</div>
+                          <div dangerouslySetInnerHTML={{ __html: t('teams.step_copy_desc') }} />
                         </div>
                       </div>
                     </div>
@@ -848,6 +1228,331 @@ export function createAdminIntegrations(ctx: any) {
                     ))}
                   </>
                 )}
+
+                {/* ─── FIELD MAPPING SECTION ─── */}
+                {selectedIntegration.connecte && (() => {
+                  const ILLIZEO_FIELDS = [
+                    { key: "prenom", label: "Prénom", required: true, group: "identity" },
+                    { key: "nom", label: "Nom", required: true, group: "identity" },
+                    { key: "email", label: "Email", required: true, group: "identity" },
+                    { key: "date_debut", label: "Date de début", required: true, group: "identity" },
+                    { key: "poste", label: "Poste / Fonction", required: false, group: "job" },
+                    { key: "departement", label: "Département", required: false, group: "job" },
+                    { key: "site", label: "Site / Bureau", required: false, group: "job" },
+                    { key: "manager_email", label: "Email du manager", required: false, group: "job" },
+                    { key: "type_contrat", label: "Type de contrat", required: false, group: "contract" },
+                    { key: "date_fin_essai", label: "Date fin période d'essai", required: false, group: "contract" },
+                    { key: "date_fin_contrat", label: "Date fin de contrat", required: false, group: "contract" },
+                    { key: "salaire", label: "Salaire (pour info RH)", required: false, group: "contract" },
+                    { key: "telephone", label: "Téléphone", required: false, group: "personal" },
+                    { key: "adresse", label: "Adresse", required: false, group: "personal" },
+                    { key: "nationalite", label: "Nationalité", required: false, group: "personal" },
+                    { key: "numero_avs", label: "Numéro AVS / SS", required: false, group: "personal" },
+                  ];
+
+                  const SOURCE_FIELDS: Record<string, string[]> = {
+                    sap: ["PerPersonal.firstName", "PerPersonal.lastName", "PerEmail.emailAddress", "EmpJob.startDate", "EmpJob.jobTitle", "EmpJob.department", "EmpJob.location", "EmpJob.managerId", "EmpEmployment.employmentType", "EmpJob.probationEndDate", "EmpEmployment.endDate", "EmpCompensation.payGrade", "PerPhone.phoneNumber", "PerAddressDEFLT.address1", "PerPersonal.nationality", "PerNationalId.nationalId"],
+                    personio: ["first_name", "last_name", "email", "hire_date", "position", "department", "office", "supervisor.email", "employment_type", "probation_end", "contract_end_date", "salary", "phone", "address", "nationality", "social_security"],
+                    bamboohr: ["firstName", "lastName", "workEmail", "hireDate", "jobTitle", "department", "location", "supervisorEmail", "employmentStatus", "customProbationEnd", "terminationDate", "payRate", "mobilePhone", "homeAddress", "nationality", "ssn"],
+                    workday: ["Worker.Name.First", "Worker.Name.Last", "Worker.Email", "Worker.HireDate", "Position.Title", "Organization.Name", "Location.Name", "Manager.Email", "Worker.ContractType", "Worker.ProbationEnd", "Worker.ContractEnd", "Compensation.Amount", "Worker.Phone", "Worker.Address", "Worker.Nationality", "Worker.NationalID"],
+                    lucca: ["firstName", "lastName", "mail", "dtContractStart", "jobTitle", "department.name", "legalEntity.name", "manager.mail", "contract", "dtContractEnd", "dtContractEnd", "salary", "phonePro", "address", "nationality", "registrationNumber"],
+                    taleez: ["candidate.firstName", "candidate.lastName", "candidate.email", "hiring.startDate", "job.title", "job.department", "job.location", "hiring.managerEmail", "hiring.contractType", "hiring.probationEnd", "hiring.contractEnd", "hiring.salary", "candidate.phone", "candidate.address", "candidate.nationality", "candidate.socialSecurityNumber"],
+                    default: ["first_name", "last_name", "email", "start_date", "job_title", "department", "location", "manager_email", "contract_type", "probation_end", "contract_end", "salary", "phone", "address", "nationality", "social_security_number"],
+                  };
+
+                  const provider = selectedIntegration.provider;
+                  const sourceFields = SOURCE_FIELDS[provider] || SOURCE_FIELDS.default;
+                  const mappedCount = integrationMappings.filter((m: any) => m.source).length;
+                  const totalCount = ILLIZEO_FIELDS.length;
+
+                  const GROUP_LABELS: Record<string, string> = {
+                    identity: lang === "fr" ? "Identité" : "Identity",
+                    job: lang === "fr" ? "Poste" : "Job",
+                    contract: lang === "fr" ? "Contrat" : "Contract",
+                    personal: lang === "fr" ? "Personnel" : "Personal",
+                  };
+
+                  const TRANSFORM_OPTIONS = [
+                    { value: "none", label: t("mapping.none") },
+                    { value: "uppercase", label: lang === "fr" ? "Majuscules" : "Uppercase" },
+                    { value: "lowercase", label: lang === "fr" ? "Minuscules" : "Lowercase" },
+                    { value: "date_format", label: lang === "fr" ? "Format date" : "Date format" },
+                    { value: "custom", label: "Custom" },
+                  ];
+
+                  const getMapping = (targetKey: string) => integrationMappings.find((m: any) => m.target === targetKey) || { target: targetKey, source: "", transform: "none" };
+
+                  const updateMapping = (targetKey: string, field: string, value: string) => {
+                    const exists = integrationMappings.find((m: any) => m.target === targetKey);
+                    if (exists) {
+                      setIntegrationMappings(integrationMappings.map((m: any) => m.target === targetKey ? { ...m, [field]: value } : m));
+                    } else {
+                      setIntegrationMappings([...integrationMappings, { target: targetKey, source: field === "source" ? value : "", transform: field === "transform" ? value : "none" }]);
+                    }
+                  };
+
+                  const autoDetect = () => {
+                    const newMappings = ILLIZEO_FIELDS.map((f, i) => ({
+                      target: f.key,
+                      source: sourceFields[i] || "",
+                      transform: "none",
+                    }));
+                    setIntegrationMappings(newMappings);
+                  };
+
+                  const tabs: { key: "fields" | "values" | "parcours"; label: string }[] = [
+                    { key: "fields", label: t("mapping.fields") },
+                    { key: "values", label: t("mapping.values") },
+                    { key: "parcours", label: t("mapping.parcours") },
+                  ];
+
+                  return (
+                    <div style={{ marginTop: 24, borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
+                      {/* Section header */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <Sparkles size={18} color={C.pink} />
+                          <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{t("mapping.title")}</h3>
+                        </div>
+                        <span style={{ fontSize: 11, color: C.textMuted }}>{mappedCount}/{totalCount} {t("mapping.mapped").toLowerCase()}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: C.textLight, marginBottom: 14 }}>{t("mapping.desc")}</div>
+
+                      {/* Sub-tabs */}
+                      <div style={{ display: "flex", gap: 4, marginBottom: 16, background: C.bg, borderRadius: 8, padding: 3 }}>
+                        {tabs.map(tab => (
+                          <button key={tab.key} onClick={() => setIntegrationMappingTab(tab.key)} style={{
+                            flex: 1, padding: "7px 0", fontSize: 12, fontWeight: 600, border: "none", borderRadius: 6, cursor: "pointer",
+                            background: integrationMappingTab === tab.key ? C.white : "transparent",
+                            color: integrationMappingTab === tab.key ? C.pink : C.textMuted,
+                            boxShadow: integrationMappingTab === tab.key ? "0 1px 3px rgba(0,0,0,.08)" : "none",
+                            transition: "all .15s",
+                          }}>{tab.label}</button>
+                        ))}
+                      </div>
+
+                      {/* ─── TAB: FIELDS ─── */}
+                      {integrationMappingTab === "fields" && (
+                        <div>
+                          {/* Auto-detect + progress */}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ width: 120, height: 6, borderRadius: 3, background: C.bg, overflow: "hidden" }}>
+                                <div style={{ width: `${(mappedCount / totalCount) * 100}%`, height: "100%", borderRadius: 3, background: mappedCount === totalCount ? C.green : C.pink, transition: "width .3s" }} />
+                              </div>
+                              <span style={{ fontSize: 11, color: mappedCount === totalCount ? C.green : C.textMuted, fontWeight: 500 }}>{mappedCount}/{totalCount}</span>
+                            </div>
+                            <button onClick={autoDetect} style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 4 }}>
+                              <Sparkles size={12} /> {t("mapping.auto_detect")}
+                            </button>
+                          </div>
+
+                          {/* Grouped field rows */}
+                          {(["identity", "job", "contract", "personal"] as const).map(group => {
+                            const groupFields = ILLIZEO_FIELDS.filter(f => f.group === group);
+                            return (
+                              <div key={group} style={{ marginBottom: 16 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: C.textMuted, marginBottom: 8 }}>{GROUP_LABELS[group]}</div>
+                                {groupFields.map(field => {
+                                  const mapping = getMapping(field.key);
+                                  const isMapped = !!mapping.source;
+                                  return (
+                                    <div key={field.key} style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto auto", gap: 8, alignItems: "center", marginBottom: 6, padding: "6px 10px", background: C.bg, borderRadius: 8, border: `1px solid ${isMapped ? C.greenLight : C.border}` }}>
+                                      {/* Illizeo field label */}
+                                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500 }}>
+                                        <span>{field.label}</span>
+                                        {field.required && <span style={{ fontSize: 9, fontWeight: 700, padding: "1px 5px", borderRadius: 3, background: C.redLight, color: C.red }}>{t("mapping.required")}</span>}
+                                      </div>
+                                      {/* Source field dropdown */}
+                                      <select value={mapping.source} onChange={e => updateMapping(field.key, "source", e.target.value)} style={{ ...sInput, fontSize: 11, padding: "4px 6px", margin: 0 }}>
+                                        <option value="">-- {t("mapping.source")} --</option>
+                                        {sourceFields.map(sf => <option key={sf} value={sf}>{sf}</option>)}
+                                      </select>
+                                      {/* Transform dropdown */}
+                                      <select value={mapping.transform || "none"} onChange={e => updateMapping(field.key, "transform", e.target.value)} style={{ ...sInput, fontSize: 10, padding: "4px 6px", margin: 0, width: 100 }}>
+                                        {TRANSFORM_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                      </select>
+                                      {/* Status badge */}
+                                      <span style={{ fontSize: 9, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: isMapped ? C.greenLight : C.amberLight, color: isMapped ? C.green : C.amber, whiteSpace: "nowrap" }}>
+                                        {isMapped ? t("mapping.mapped") : t("mapping.unmapped")}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+
+                          {/* Save mapping button */}
+                          <button onClick={() => addToast_admin(t("mapping.saved"))} style={{ ...sBtn("pink"), fontSize: 12, padding: "10px 0", width: "100%", marginTop: 8 }}>
+                            <CheckCircle size={14} style={{ marginRight: 6 }} /> {t("mapping.save_mapping")}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* ─── TAB: VALUES ─── */}
+                      {integrationMappingTab === "values" && (
+                        <div>
+                          <div style={{ fontSize: 12, color: C.textLight, marginBottom: 12 }}>
+                            {lang === "fr" ? "Transformez les valeurs du système source en valeurs Illizeo." : "Transform source system values into Illizeo values."}
+                          </div>
+
+                          {/* Value mapping rules */}
+                          {(integrationMappings.filter((m: any) => m.type === "value").length === 0 ? [
+                            { type: "value", sourceField: "department", sourceValue: "MKTG", targetValue: "Marketing" },
+                            { type: "value", sourceField: "employment_type", sourceValue: "FT", targetValue: "CDI" },
+                            { type: "value", sourceField: "employment_type", sourceValue: "PT", targetValue: "CDD" },
+                          ] : integrationMappings.filter((m: any) => m.type === "value")).map((rule: any, idx: number) => (
+                            <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, padding: "8px 10px", background: C.bg, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                              {/* Source field */}
+                              <select value={rule.sourceField || ""} onChange={e => {
+                                const valueMappings = integrationMappings.filter((m: any) => m.type === "value");
+                                const others = integrationMappings.filter((m: any) => m.type !== "value");
+                                const updated = [...valueMappings];
+                                updated[idx] = { ...rule, sourceField: e.target.value, type: "value" };
+                                setIntegrationMappings([...others, ...updated]);
+                              }} style={{ ...sInput, fontSize: 11, padding: "4px 6px", margin: 0, flex: 1 }}>
+                                <option value="">-- {t("mapping.source")} --</option>
+                                {sourceFields.map(sf => <option key={sf} value={sf}>{sf}</option>)}
+                              </select>
+                              {/* Source value */}
+                              <input value={rule.sourceValue || ""} placeholder={t("mapping.source_value")} onChange={e => {
+                                const valueMappings = integrationMappings.filter((m: any) => m.type === "value");
+                                const others = integrationMappings.filter((m: any) => m.type !== "value");
+                                const updated = [...valueMappings];
+                                updated[idx] = { ...rule, sourceValue: e.target.value, type: "value" };
+                                setIntegrationMappings([...others, ...updated]);
+                              }} style={{ ...sInput, fontSize: 11, padding: "4px 6px", margin: 0, flex: 1 }} />
+                              {/* Arrow */}
+                              <ArrowRight size={14} color={C.textMuted} style={{ flexShrink: 0 }} />
+                              {/* Target value */}
+                              <input value={rule.targetValue || ""} placeholder={t("mapping.target_value")} onChange={e => {
+                                const valueMappings = integrationMappings.filter((m: any) => m.type === "value");
+                                const others = integrationMappings.filter((m: any) => m.type !== "value");
+                                const updated = [...valueMappings];
+                                updated[idx] = { ...rule, targetValue: e.target.value, type: "value" };
+                                setIntegrationMappings([...others, ...updated]);
+                              }} style={{ ...sInput, fontSize: 11, padding: "4px 6px", margin: 0, flex: 1 }} />
+                              {/* Delete */}
+                              <button onClick={() => {
+                                const valueMappings = integrationMappings.filter((m: any) => m.type === "value");
+                                const others = integrationMappings.filter((m: any) => m.type !== "value");
+                                valueMappings.splice(idx, 1);
+                                setIntegrationMappings([...others, ...valueMappings]);
+                              }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                                <Trash2 size={14} color={C.red} />
+                              </button>
+                            </div>
+                          ))}
+
+                          {/* Add rule button */}
+                          <button onClick={() => {
+                            setIntegrationMappings([...integrationMappings, { type: "value", sourceField: "", sourceValue: "", targetValue: "" }]);
+                          }} style={{ ...sBtn("outline"), fontSize: 11, padding: "7px 14px", display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+                            <Plus size={12} /> {t("mapping.add_rule")}
+                          </button>
+
+                          {/* Save */}
+                          <button onClick={() => addToast_admin(t("mapping.saved"))} style={{ ...sBtn("pink"), fontSize: 12, padding: "10px 0", width: "100%", marginTop: 16 }}>
+                            <CheckCircle size={14} style={{ marginRight: 6 }} /> {t("mapping.save_mapping")}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* ─── TAB: PARCOURS ─── */}
+                      {integrationMappingTab === "parcours" && (
+                        <div>
+                          <div style={{ fontSize: 12, color: C.textLight, marginBottom: 12 }}>
+                            {lang === "fr" ? "Définissez quel parcours d'onboarding assigner automatiquement selon les données du collaborateur." : "Define which onboarding path to automatically assign based on employee data."}
+                          </div>
+
+                          {/* Parcours rules */}
+                          {(integrationMappings.filter((m: any) => m.type === "parcours").length === 0 ? [
+                            { type: "parcours", field: "departement", operator: "=", value: "Tech", parcours: "Onboarding Développeur" },
+                            { type: "parcours", field: "type_contrat", operator: "=", value: "Stage", parcours: "Onboarding Stagiaire" },
+                          ] : integrationMappings.filter((m: any) => m.type === "parcours")).map((rule: any, idx: number) => (
+                            <div key={idx} style={{ padding: "12px 14px", background: C.bg, borderRadius: 10, border: `1px solid ${C.border}`, marginBottom: 8 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: C.pink }}>IF</span>
+                                {/* Field */}
+                                <select value={rule.field || ""} onChange={e => {
+                                  const parcoursMappings = integrationMappings.filter((m: any) => m.type === "parcours");
+                                  const others = integrationMappings.filter((m: any) => m.type !== "parcours");
+                                  const updated = [...parcoursMappings];
+                                  updated[idx] = { ...rule, field: e.target.value, type: "parcours" };
+                                  setIntegrationMappings([...others, ...updated]);
+                                }} style={{ ...sInput, fontSize: 11, padding: "4px 6px", margin: 0, width: "auto", minWidth: 120 }}>
+                                  <option value="">-- {lang === "fr" ? "Champ" : "Field"} --</option>
+                                  {ILLIZEO_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                                </select>
+                                {/* Operator */}
+                                <select value={rule.operator || "="} onChange={e => {
+                                  const parcoursMappings = integrationMappings.filter((m: any) => m.type === "parcours");
+                                  const others = integrationMappings.filter((m: any) => m.type !== "parcours");
+                                  const updated = [...parcoursMappings];
+                                  updated[idx] = { ...rule, operator: e.target.value, type: "parcours" };
+                                  setIntegrationMappings([...others, ...updated]);
+                                }} style={{ ...sInput, fontSize: 11, padding: "4px 6px", margin: 0, width: 80 }}>
+                                  <option value="=">=</option>
+                                  <option value="contains">{lang === "fr" ? "contient" : "contains"}</option>
+                                  <option value="starts_with">{lang === "fr" ? "commence par" : "starts with"}</option>
+                                </select>
+                                {/* Value */}
+                                <input value={rule.value || ""} placeholder={lang === "fr" ? "Valeur" : "Value"} onChange={e => {
+                                  const parcoursMappings = integrationMappings.filter((m: any) => m.type === "parcours");
+                                  const others = integrationMappings.filter((m: any) => m.type !== "parcours");
+                                  const updated = [...parcoursMappings];
+                                  updated[idx] = { ...rule, value: e.target.value, type: "parcours" };
+                                  setIntegrationMappings([...others, ...updated]);
+                                }} style={{ ...sInput, fontSize: 11, padding: "4px 6px", margin: 0, width: 100 }} />
+                                <span style={{ fontSize: 11, fontWeight: 700, color: C.green }}>{t("mapping.then_assign")}</span>
+                                {/* Parcours dropdown */}
+                                <select value={rule.parcours || ""} onChange={e => {
+                                  const parcoursMappings = integrationMappings.filter((m: any) => m.type === "parcours");
+                                  const others = integrationMappings.filter((m: any) => m.type !== "parcours");
+                                  const updated = [...parcoursMappings];
+                                  updated[idx] = { ...rule, parcours: e.target.value, type: "parcours" };
+                                  setIntegrationMappings([...others, ...updated]);
+                                }} style={{ ...sInput, fontSize: 11, padding: "4px 6px", margin: 0, width: "auto", minWidth: 140 }}>
+                                  <option value="">-- Parcours --</option>
+                                  {(PARCOURS_TEMPLATES || []).map((p: any) => <option key={p.id} value={p.nom}>{p.nom}</option>)}
+                                </select>
+                                {/* Delete */}
+                                <button onClick={() => {
+                                  const parcoursMappings = integrationMappings.filter((m: any) => m.type === "parcours");
+                                  const others = integrationMappings.filter((m: any) => m.type !== "parcours");
+                                  parcoursMappings.splice(idx, 1);
+                                  setIntegrationMappings([...others, ...parcoursMappings]);
+                                }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, marginLeft: "auto" }}>
+                                  <Trash2 size={14} color={C.red} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Default rule */}
+                          <div style={{ padding: "10px 14px", background: C.amberLight, borderRadius: 8, marginBottom: 8, display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                            <span style={{ fontWeight: 700, color: C.amber }}>{lang === "fr" ? "Sinon" : "Otherwise"}</span>
+                            <ArrowRight size={12} color={C.amber} />
+                            <span style={{ fontWeight: 500, color: C.amber }}>{lang === "fr" ? "Onboarding Standard" : "Standard Onboarding"}</span>
+                          </div>
+
+                          {/* Add rule button */}
+                          <button onClick={() => {
+                            setIntegrationMappings([...integrationMappings, { type: "parcours", field: "", operator: "=", value: "", parcours: "" }]);
+                          }} style={{ ...sBtn("outline"), fontSize: 11, padding: "7px 14px", display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+                            <Plus size={12} /> {t("mapping.add_rule")}
+                          </button>
+
+                          {/* Save */}
+                          <button onClick={() => addToast_admin(t("mapping.saved"))} style={{ ...sBtn("pink"), fontSize: 12, padding: "10px 0", width: "100%", marginTop: 16 }}>
+                            <CheckCircle size={14} style={{ marginRight: 6 }} /> {t("mapping.save_mapping")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Status toggle — only for non-OAuth and non-native */}
                 {!selectedMeta.oauth && selectedMeta.fields.length > 0 && (

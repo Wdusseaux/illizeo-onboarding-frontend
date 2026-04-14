@@ -205,6 +205,9 @@ export const _MOCK_WORKFLOW_RULES: WorkflowRule[] = [
   { id: 23, nom: "Notification nouveau message", declencheur: "Nouveau message reçu", action: "Envoyer notification email", destinataire: "Destinataire du message", actif: true },
   { id: 24, nom: "Notification mobilité interne", declencheur: "Parcours crossboarding créé", action: "Envoyer email mobilité", destinataire: "Collaborateur", actif: true },
   { id: 25, nom: "Notification retour de congé", declencheur: "Parcours reboarding créé", action: "Envoyer email bienvenue retour", destinataire: "Collaborateur", actif: true },
+  { id: 26, nom: "Envoi formulaire fin de période d'essai", declencheur: "Période d'essai terminée", action: "Envoyer formulaire évaluation", destinataire: "Manager direct", actif: true },
+  { id: 27, nom: "Envoi entretien de sortie", declencheur: "Parcours offboarding créé", action: "Envoyer questionnaire exit interview", destinataire: "Collaborateur", actif: true },
+  { id: 28, nom: "Envoi rapport d'étonnement J+30", declencheur: "J+30 après arrivée", action: "Envoyer questionnaire rapport d'étonnement", destinataire: "Collaborateur", actif: true },
 ];
 
 export const _MOCK_EMAIL_TEMPLATES: EmailTemplate[] = [
@@ -241,6 +244,10 @@ export const _MOCK_EMAIL_TEMPLATES: EmailTemplate[] = [
   { id: 26, nom: "Résumé hebdomadaire", sujet: "Votre semaine d'intégration — {{prenom}}", declencheur: "Hebdomadaire (lundi)", variables: ["{{prenom}}", "{{nb_docs_manquants}}", "{{parcours_nom}}", "{{lien}}"], actif: true },
   // Rappel RH
   { id: 27, nom: "Rappel RH — Actions en retard", sujet: "Rapport : {{nb_retards}} action(s) en retard", declencheur: "Hebdomadaire (lundi)", variables: ["{{nb_retards}}", "{{lien}}"], actif: true },
+  // Évaluations
+  { id: 28, nom: "Évaluation fin de période d'essai", sujet: "Évaluation de fin de période d'essai — {{collab_nom}}", declencheur: "Parcours complété à 100%", variables: ["{{manager}}", "{{collab_nom}}", "{{date_fin_essai}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{manager}},</h2><p>La période d'essai de <strong>{{collab_nom}}</strong> arrive à son terme le <strong>{{date_fin_essai}}</strong>.</p><p>Merci de compléter le formulaire d'évaluation afin de confirmer ou non la poursuite du contrat.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#C2185B;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Compléter l'évaluation</a></p>" },
+  { id: 29, nom: "Entretien de sortie (Exit Interview)", sujet: "Votre avis compte — Entretien de sortie", declencheur: "Création du parcours", variables: ["{{prenom}}", "{{date_depart}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Votre départ est prévu le <strong>{{date_depart}}</strong>. Nous aimerions recueillir votre retour d'expérience afin d'améliorer continuellement notre environnement de travail.</p><p>Ce questionnaire est confidentiel et prend environ 5 minutes.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#C2185B;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Répondre au questionnaire</a></p>" },
+  { id: 30, nom: "Rapport d'étonnement (1 mois)", sujet: "Votre regard compte — Rapport d'étonnement", declencheur: "J+30", variables: ["{{prenom}}", "{{parcours_nom}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Cela fait maintenant 1 mois que vous avez rejoint l'équipe. Nous aimerions recueillir votre regard neuf sur notre entreprise.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#C2185B;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Partager mon retour</a></p>" },
 ];
 export const TPL_CATEGORIES: Record<string, { label: string; color: string; bg: string }> = {
   onboarding: { label: "Onboarding", color: "#4CAF50", bg: "#E8F5E9" },
