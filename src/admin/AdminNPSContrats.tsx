@@ -127,7 +127,7 @@ export function createAdminNPSContrats(ctx: any) {
     apiKeyInput, setApiKeyInput, suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, collabMenuId, setCollabMenuId,
     adMappings, setAdMappings, adGroups, setAdGroups, syncLoading, setSyncLoading, obTeams, setObTeams,
     teamPanelMode, setTeamPanelMode, teamPanelData, setTeamPanelData, wfPanelMode, setWfPanelMode, wfPanelData, setWfPanelData,
-    tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData, contractTypes, setContractTypes, jurisdictions, setJurisdictions,
+    tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData, contractTypes, setContractTypes, jurisdictions, setJurisdictions, contratsPageTab, setContratsPageTab,
     lang, setLangState, darkMode, setDarkMode, activeLanguages, setActiveLanguages, contentTranslations, setContentTranslations,
     fieldConfig, setFieldConfig, translateFieldId, setTranslateFieldId, translateEN, setTranslateEN, adminUsers, setAdminUsers,
     userPanelMode, setUserPanelMode, userPanelData, setUserPanelData, userPanelLoading, setUserPanelLoading, userSearch, setUserSearch,
@@ -181,7 +181,6 @@ export function createAdminNPSContrats(ctx: any) {
       admin_cooptation: "cooptation",
       admin_gamification: "gamification",
       admin_equipements: "onboarding",
-      admin_signatures: "onboarding",
       admin_nps: "nps",
       admin_2fa: "sso",
       admin_provisioning: "provisioning",
@@ -221,9 +220,8 @@ export function createAdminNPSContrats(ctx: any) {
       { section: t('admin.content'), items: [
         { id: "admin_entreprise" as AdminPage, label: t('admin.company_page'), icon: Building2 },
         { id: "admin_equipements" as AdminPage, label: t('admin.equipment'), icon: Laptop },
-        { id: "admin_signatures" as AdminPage, label: t('admin.signatures'), icon: PenLine },
         { id: "admin_nps" as AdminPage, label: t('admin.nps'), icon: Star },
-        { id: "admin_contrats" as AdminPage, label: t('admin.contracts'), icon: FileSignature },
+        { id: "admin_contrats" as AdminPage, label: t('admin.contracts_signatures'), icon: FileSignature },
         { id: "admin_cooptation" as AdminPage, label: t('admin.cooptation'), icon: Handshake },
         { id: "admin_gamification" as AdminPage, label: t('admin.gamification'), icon: Trophy },
         { id: "admin_integrations" as AdminPage, label: t('admin.integrations'), icon: Link },
@@ -446,12 +444,152 @@ export function createAdminNPSContrats(ctx: any) {
 
     // ─── CONTRATS ──────────────────────────────────────────────
 
+    // ─── SIGNATURES TAB CONTENT ──────────────────────────────
+    const renderSignaturesTab = () => {
+      const reloadSign = () => { getSignatureDocuments().then(setSignDocs).catch(() => {}); };
+      return (<>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <p style={{ fontSize: 12, color: C.textLight, margin: 0 }}>{t('sign.desc')}</p>
+          <button onClick={() => { resetTr(); setSignPanel({ mode: "create", data: { titre: "", description: "", type: "lecture", obligatoire: true, actif: true } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('doc.new_template')}</button>
+        </div>
+
+        {/* How it works */}
+        <div style={{ padding: "16px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20, fontSize: 12, color: C.blue, lineHeight: 1.7 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>{t('sign.read_desc')}</div>
+            <div>{t('sign.sign_desc')}</div>
+          </div>
+        </div>
+
+        {/* Documents grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {signDocs.map((doc: any) => (
+            <div key={doc.id} className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden", opacity: doc.actif ? 1 : 0.5 }}>
+              <div style={{ padding: "16px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {doc.type === "lecture" ? <BookOpen size={16} color={C.blue} /> : <PenLine size={16} color={C.pink} />}
+                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{doc.titre}</h3>
+                  </div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: doc.type === "lecture" ? C.blueLight : C.pinkBg, color: doc.type === "lecture" ? C.blue : C.pink }}>{doc.type === "lecture" ? t('sign.type_read') : t('sign.type_sign')}</span>
+                    {doc.obligatoire && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.redLight, color: C.red }}>{t('dash.obligatory')}</span>}
+                  </div>
+                </div>
+                {doc.description && <p style={{ fontSize: 12, color: C.textLight, margin: "0 0 8px", lineHeight: 1.5 }}>{doc.description}</p>}
+                {doc.fichier_nom && <div style={{ fontSize: 11, color: C.textMuted, display: "flex", alignItems: "center", gap: 4 }}><Paperclip size={11} /> {doc.fichier_nom}</div>}
+              </div>
+              <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg }}>
+                <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
+                  <span style={{ color: C.text }}><strong>{doc.total_signes || 0}</strong>/{doc.total_envois || 0} {t('sign.signed')}</span>
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={async () => { try { await sendSignatureDocToAll(doc.id); reloadSign(); addToast_admin("Document envoyé à tous"); } catch { addToast_admin(t('toast.error')); } }} title={t('sign.send_all')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 10px", fontSize: 10, display: "flex", alignItems: "center", gap: 4 }}><Send size={10} /> {t('sign.send_all')}</button>
+                  <button onClick={() => { setContentTranslations((doc as any).translations || {}); setSignPanel({ mode: "edit", data: { ...doc } }); }} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
+                  <button onClick={() => showConfirm(`Supprimer "${doc.titre}" ?`, async () => { try { await apiDeleteSignDoc(doc.id); reloadSign(); addToast_admin(t('toast.deleted')); } catch {} })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={12} color={C.red} /></button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {signDocs.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('sign.no_docs')}</div>}
+        </div>
+
+        {/* Create/Edit Panel */}
+        {signPanel.mode !== "closed" && (<>
+          <div onClick={() => setSignPanel({ mode: "closed", data: {} })} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
+          <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 480, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{signPanel.mode === "create" ? t('sign.new_doc') : t('common.edit')}</h2>
+              <button onClick={() => setSignPanel({ mode: "closed", data: {} })} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
+            </div>
+            <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+              <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('sign.title_label')}</label>
+                <TranslatableField value={signPanel.data.titre || ""} onChange={(v: string) => setSignPanel((p: any) => ({ ...p, data: { ...p.data, titre: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.titre} onTranslationsChange={(tr: any) => setTr("titre", tr)} style={sInput} placeholder="Ex: Règlement intérieur" /></div>
+              <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('sign.desc_label')}</label>
+                <TranslatableField multiline rows={3} value={signPanel.data.description || ""} onChange={(v: string) => setSignPanel((p: any) => ({ ...p, data: { ...p.data, description: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={(tr: any) => setTr("description", tr)} style={{ ...sInput, minHeight: 60, resize: "vertical" }} /></div>
+              <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('sign.type_label')}</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[{ id: "lecture", label: t('sign.type_read_label'), icon: BookOpen, desc: t('sign.type_read_desc') }, { id: "signature", label: t('sign.type_sign_label'), icon: PenLine, desc: t('sign.type_sign_desc') }].map(tp => (
+                    <button key={tp.id} onClick={() => setSignPanel((p: any) => ({ ...p, data: { ...p.data, type: tp.id } }))} style={{ flex: 1, padding: "12px", borderRadius: 10, border: `2px solid ${signPanel.data.type === tp.id ? C.pink : C.border}`, background: signPanel.data.type === tp.id ? C.pinkBg : C.white, cursor: "pointer", textAlign: "left", fontFamily: font }}>
+                      <tp.icon size={18} color={signPanel.data.type === tp.id ? C.pink : C.textMuted} style={{ marginBottom: 6 }} />
+                      <div style={{ fontSize: 13, fontWeight: 600, color: signPanel.data.type === tp.id ? C.pink : C.text }}>{tp.label}</div>
+                      <div style={{ fontSize: 10, color: C.textMuted }}>{tp.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* File upload */}
+              <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('sign.file_label')}</label>
+                {signPanel.data.fichier_nom ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: C.greenLight, fontSize: 12 }}>
+                    <FileText size={14} color={C.green} />
+                    <span style={{ flex: 1, fontWeight: 500 }}>{signPanel.data.fichier_nom}</span>
+                  </div>
+                ) : (
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 8, border: `1px dashed ${C.border}`, cursor: "pointer", fontSize: 12, color: C.textLight }}>
+                    <Upload size={14} /> {t('sign.click_upload')}
+                    <input type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={async (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
+                      if (signPanel.data.id) {
+                        try { const res = await uploadSignatureFile(signPanel.data.id, file); setSignPanel((p: any) => ({ ...p, data: { ...p.data, fichier_nom: res.filename } })); addToast_admin(t('sign.file_uploaded')); } catch { addToast_admin(t('sign.upload_error')); }
+                      } else { setSignPanel((p: any) => ({ ...p, data: { ...p.data, _pendingFile: file, fichier_nom: file.name } })); }
+                    }} />
+                  </label>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 16 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer" }}>
+                  <input type="checkbox" checked={signPanel.data.obligatoire !== false} onChange={() => setSignPanel((p: any) => ({ ...p, data: { ...p.data, obligatoire: !p.data.obligatoire } }))} style={{ accentColor: C.pink }} /> {t('sign.mandatory')}
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer" }}>
+                  <input type="checkbox" checked={signPanel.data.actif !== false} onChange={() => setSignPanel((p: any) => ({ ...p, data: { ...p.data, actif: !p.data.actif } }))} style={{ accentColor: C.green }} /> {t('sign.active')}
+                </label>
+              </div>
+            </div>
+            <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setSignPanel({ mode: "closed", data: {} })} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
+              <button onClick={async () => {
+                if (!signPanel.data.titre?.trim()) { addToast_admin(t('sign.title_required')); return; }
+                try {
+                  const payload = { titre: signPanel.data.titre, description: signPanel.data.description || null, type: signPanel.data.type || "lecture", obligatoire: signPanel.data.obligatoire !== false, actif: signPanel.data.actif !== false, translations: buildTranslationsPayload() };
+                  let created: any;
+                  if (signPanel.mode === "edit" && signPanel.data.id) await apiUpdateSignDoc(signPanel.data.id, payload);
+                  else created = await apiCreateSignDoc(payload);
+                  if (signPanel.data._pendingFile && (created?.id || signPanel.data.id)) {
+                    try { await uploadSignatureFile(created?.id || signPanel.data.id, signPanel.data._pendingFile); } catch {}
+                  }
+                  reloadSign(); setSignPanel({ mode: "closed", data: {} }); addToast_admin(signPanel.mode === "create" ? "Document créé" : "Document modifié");
+                } catch { addToast_admin(t('toast.error')); }
+              }} className="iz-btn-pink" style={sBtn("pink")}>{signPanel.mode === "create" ? t('common.create') : t('common.save')}</button>
+            </div>
+          </div>
+        </>)}
+      </>);
+    };
+
+    // ─── CONTRATS & SIGNATURES (merged page) ──────────────────
     const renderContrats = () => (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.contracts')}</h1>
-          <button onClick={() => { setContratPanelData({ nom: "", type: "CDI", juridiction: "Suisse", actif: true }); resetTr(); setContratPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('contrat.new')}</button>
+          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.contracts_signatures')}</h1>
+          {contratsPageTab === "contrats" ? (
+            <button onClick={() => { setContratPanelData({ nom: "", type: "CDI", juridiction: "Suisse", actif: true }); resetTr(); setContratPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('contrat.new')}</button>
+          ) : null}
         </div>
+
+        {/* Tabs */}
+        <div style={{ display: "flex", gap: 0, marginBottom: 20, borderBottom: `2px solid ${C.border}` }}>
+          {([
+            { id: "contrats" as const, label: t('admin.tab_contracts'), icon: FileSignature },
+            { id: "signatures" as const, label: t('admin.tab_signatures'), icon: PenLine },
+          ]).map(tab => (
+            <button key={tab.id} onClick={() => setContratsPageTab(tab.id)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 20px", fontSize: 13, fontWeight: contratsPageTab === tab.id ? 600 : 400, color: contratsPageTab === tab.id ? C.pink : C.textMuted, background: "none", border: "none", borderBottom: `2px solid ${contratsPageTab === tab.id ? C.pink : "transparent"}`, marginBottom: -2, cursor: "pointer", transition: "all .15s", fontFamily: font }}>
+              <tab.icon size={15} /> {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {contratsPageTab === "contrats" && (<>
         {/* Config: contract types & jurisdictions */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
           {[
@@ -609,9 +747,12 @@ export function createAdminNPSContrats(ctx: any) {
             </div>
           </>
         )}
+        </>)}
+
+        {contratsPageTab === "signatures" && renderSignaturesTab()}
       </div>
     );
-  
+
     // ─── INTÉGRATIONS ──────────────────────────────────────────
     const INTEGRATION_META: Record<string, { desc: string; Icon: React.FC<any>; color: string; oauth?: boolean; apiKey?: boolean; sapConnect?: boolean; teamsConnect?: boolean; fields: { key: string; label: string; type: "text" | "password" | "select"; options?: string[] }[] }> = {
       docusign: { desc: t('integ.desc_docusign'), Icon: FileSignature, color: "#FFD700", oauth: true, fields: [

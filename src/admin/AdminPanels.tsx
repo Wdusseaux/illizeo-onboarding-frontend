@@ -445,8 +445,19 @@ export function createAdminPanels(ctx: any) {
 
                   {/* Signature */}
                   {actionPanelData.type === "signature" && (<>
-                    <div style={{ marginBottom: 12 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Document à signer</label>
-                      <input value={actionPanelData.options.documentNom || ""} onChange={e => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, documentNom: e.target.value } }))} placeholder="Nom du document" style={{ ...sInput, fontSize: 12 }} /></div>
+                    <div style={{ marginBottom: 12 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Document à signer *</label>
+                      <select value={actionPanelData.options.signature_document_id || ""} onChange={e => {
+                        const docId = e.target.value ? Number(e.target.value) : null;
+                        const doc = signDocs.find((d: any) => d.id === docId);
+                        setActionPanelData(prev => ({ ...prev, options: { ...prev.options, signature_document_id: docId, documentNom: doc?.titre || "" } }));
+                      }} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                        <option value="">— Sélectionner un document —</option>
+                        {signDocs.filter((d: any) => d.actif).map((d: any) => (
+                          <option key={d.id} value={d.id}>{d.titre} ({d.type === "lecture" ? "Lecture" : "Signature"})</option>
+                        ))}
+                      </select>
+                      {signDocs.length === 0 && <div style={{ fontSize: 11, color: C.amber, marginTop: 4 }}>Aucun document créé. Allez dans Contrats &amp; Documents → Documents à signer.</div>}
+                    </div>
                     <div style={{ marginBottom: 12 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Fournisseur de signature</label>
                       {(() => {
                       const sigIntegrations = (integrations || []).filter((i: any) => i.categorie === "signature");

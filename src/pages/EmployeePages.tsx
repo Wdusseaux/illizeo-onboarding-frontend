@@ -77,7 +77,7 @@ import {
   getEquipmentPackages, createEquipmentPackage as apiCreatePkg, updateEquipmentPackage as apiUpdatePkg, deleteEquipmentPackage as apiDeletePkg, provisionPackage as apiProvisionPkg,
   type EquipmentPackage,
   getSignatureDocuments, createSignatureDocument as apiCreateSignDoc, updateSignatureDocument as apiUpdateSignDoc, deleteSignatureDocument as apiDeleteSignDoc,
-  uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures,
+  uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures, getMyAcknowledgement,
   type SignatureDoc, type DocAcknowledgement,
   checkDossier, validateDossier, exportDossier, resetDossier, type DossierCheck,
 } from "../api/endpoints";
@@ -148,7 +148,7 @@ export function createEmployeeRenders(ctx: any) {
     uploadedPieces, setUploadedPieces, modalPieces, setModalPieces, modalFormFields, setModalFormFields, modalQuestions, setModalQuestions,
     modalSubtasks, setModalSubtasks, phases, setPhases, selectedPhaseId, setSelectedPhaseId, messageCanal, setMessageCanal,
     messageBody, setMessageBody, showWelcomeModal, setShowWelcomeModal, showDocPanel, setShowDocPanel, showDocCategory, setShowDocCategory,
-    showActionDetail, setShowActionDetail, actionTab, setActionTab, showProfile, setShowProfile, showTeamModal, setShowTeamModal,
+    showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading, actionTab, setActionTab, showProfile, setShowProfile, showTeamModal, setShowTeamModal,
     profileTab, setProfileTab, formData, setFormData, passwordVisible, setPasswordVisible, acceptCGU, setAcceptCGU,
     employeeDocs, setEmployeeDocs, completedActions, setCompletedActions, sharedTimeline, setSharedTimeline, toasts, setToasts,
     auth, _needsPlan, isDemo, apiEnabled, COLLABORATEURS, refetchCollaborateurs, PARCOURS_TEMPLATES, refetchParcours,
@@ -201,6 +201,7 @@ export function createEmployeeRenders(ctx: any) {
       icon: null,
       assignment_id: a.assignment_id || null,
       assignment_status: a.assignment_status || "a_faire",
+      options: a.options || undefined,
     };
   }) : ACTIONS;
 
@@ -346,7 +347,11 @@ export function createEmployeeRenders(ctx: any) {
           </span>
         )}
       </div>
-      {action.urgent && !isDone && <button className="iz-btn-pink" onClick={e => { e.stopPropagation(); setShowDocPanel("admin"); }} style={{ ...sBtn("dark"), padding: "8px 20px", fontSize: 13 }}>{t('emp.complete_btn')}</button>}
+      {action.urgent && !isDone && (() => {
+        const tplMatch = ACTION_TEMPLATES.find((tp: any) => tp.titre === action.title);
+        const isSignatureAction = tplMatch?.type === "signature" || tplMatch?.type === "lecture";
+        return <button className="iz-btn-pink" onClick={e => { e.stopPropagation(); if (isSignatureAction) { setShowActionDetail(action.id); } else { setShowDocPanel("admin"); } }} style={{ ...sBtn("dark"), padding: "8px 20px", fontSize: 13 }}>{isSignatureAction ? t('emp.sign_btn') || "Signer" : t('emp.complete_btn')}</button>;
+      })()}
       {showCheckbox && (
         <div onClick={e => { e.stopPropagation(); if (isDone) { handleReactivateAction(action.id, (action as any).assignment_id); } else { handleCompleteAction(action.id, (action as any).assignment_id); } }} style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${isDone ? C.green : C.border}`, background: isDone ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all .2s", cursor: "pointer" }}>
           {isDone && <Check size={14} color={C.white} />}
@@ -1178,8 +1183,12 @@ export function createEmployeeRenders(ctx: any) {
     if (!action) return null;
     const isDone = completedActions.has(action.id);
     const assignmentId = (action as any).assignment_id;
-    // Find matching template for richer data
-    const tpl = ACTION_TEMPLATES.find(t => t.titre === action.title);
+    // Find matching template for richer data — fallback to action's own data for employees
+    const tpl = ACTION_TEMPLATES.find(t => t.titre === action.title) || ((action as any).actionType ? {
+      titre: action.title, type: (action as any).actionType, phase: (action as any).date || "",
+      delaiRelatif: (action as any).date, obligatoire: false, description: (action as any).subtitle,
+      options: (action as any).options, piecesRequises: undefined, dureeEstimee: undefined, lienExterne: undefined, parcours: (action as any).badge || "",
+    } as any : null);
     const meta = tpl ? ACTION_TYPE_META[tpl.type] : null;
     return (
       <>
@@ -1277,6 +1286,48 @@ export function createEmployeeRenders(ctx: any) {
           {tpl && tpl.type === "formulaire" && !isDone && (
             <div style={{ marginBottom: 16 }}>
               <button className="iz-btn-outline" style={{ ...sBtn("outline"), width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><ClipboardList size={16} /> Remplir le formulaire</button>
+            </div>
+          )}
+          {/* ── Signature action: show document + sign button ── */}
+          {tpl && tpl.type === "signature" && !isDone && !tpl.options?.signature_document_id && (
+            <div style={{ padding: "14px 16px", background: C.amberLight, borderRadius: 10, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+              <AlertTriangle size={16} color={C.amber} />
+              <span style={{ fontSize: 13, color: C.amber }}>Aucun document lié à cette action.</span>
+            </div>
+          )}
+          {tpl && tpl.type === "signature" && !isDone && tpl.options?.signature_document_id && (
+            <div style={{ marginBottom: 16 }}>
+              {sigActionAck?.document && (
+                <div style={{ padding: "14px 16px", background: C.bg, borderRadius: 10, marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    {sigActionAck.document.type === "lecture" ? <BookOpen size={16} color={C.blue} /> : <PenTool size={16} color={C.pink} />}
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>{sigActionAck.document.titre}</span>
+                  </div>
+                  {sigActionAck.document.description && <p style={{ fontSize: 12, color: C.textLight, margin: "0 0 8px", lineHeight: 1.5 }}>{sigActionAck.document.description}</p>}
+                  {sigActionAck.document.fichier_nom && <div style={{ fontSize: 11, color: C.textMuted, display: "flex", alignItems: "center", gap: 4 }}><Paperclip size={11} /> {sigActionAck.document.fichier_nom}</div>}
+                </div>
+              )}
+              {sigActionAck && (sigActionAck.statut === 'signe' || sigActionAck.statut === 'lu') ? (
+                <div style={{ padding: "12px 16px", background: C.greenLight, borderRadius: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                  <CheckCircle size={16} color={C.green} />
+                  <span style={{ fontSize: 13, fontWeight: 500, color: C.green }}>{sigActionAck.document?.type === "lecture" ? "Document lu et confirmé" : "Document signé"}</span>
+                </div>
+              ) : sigActionAck ? (
+                <button disabled={sigActionLoading} onClick={async () => {
+                  setSigActionLoading(true);
+                  try {
+                    await acknowledgeDoc(sigActionAck.id);
+                    setSigActionAck({ ...sigActionAck, statut: sigActionAck.document?.type === "lecture" ? "lu" : "signe" });
+                    handleCompleteAction(action.id, assignmentId);
+                    addToast(sigActionAck.document?.type === "lecture" ? "Lecture confirmée" : "Document signé avec succès", "success");
+                  } catch { addToast("Erreur lors de la signature", "error"); }
+                  setSigActionLoading(false);
+                }} className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <PenTool size={16} /> {sigActionLoading ? "En cours..." : sigActionAck.document?.type === "lecture" ? "Confirmer la lecture" : "Signer le document"}
+                </button>
+              ) : (
+                <div style={{ padding: "12px 16px", background: C.bg, borderRadius: 10, textAlign: "center", fontSize: 13, color: C.textMuted }}>Chargement du document...</div>
+              )}
             </div>
           )}
           {isDone && (

@@ -59,7 +59,7 @@ import {
   getEquipmentPackages, createEquipmentPackage as apiCreatePkg, updateEquipmentPackage as apiUpdatePkg, deleteEquipmentPackage as apiDeletePkg, provisionPackage as apiProvisionPkg,
   type EquipmentPackage,
   getSignatureDocuments, createSignatureDocument as apiCreateSignDoc, updateSignatureDocument as apiUpdateSignDoc, deleteSignatureDocument as apiDeleteSignDoc,
-  uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures,
+  uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures, getMyAcknowledgement,
   type SignatureDoc, type DocAcknowledgement,
   checkDossier, validateDossier, exportDossier, resetDossier, type DossierCheck,
   completeMyAction as apiCompleteMyAction, reactivateMyAction as apiReactivateMyAction,
@@ -385,6 +385,7 @@ export default function OnboardingModule() {
   // Contrat panel
   const [contratPanelMode, setContratPanelMode] = useState<"closed" | "create" | "edit">("closed");
   const [contratPanelData, setContratPanelData] = useState<any>({ nom: "", type: "CDI", juridiction: "Suisse", actif: true });
+  const [contratsPageTab, setContratsPageTab] = useState<"contrats" | "signatures">("contrats");
   // Language
   const [lang, setLangState] = useState<Lang>(getLang());
   const switchLang = (l: Lang) => { setLang(l); setLangState(l); updateCompanySettings({ interface_language: l }).catch(() => {}); };
@@ -580,6 +581,8 @@ export default function OnboardingModule() {
   const [showDocPanel, setShowDocPanel] = useState<string | null>(null);
   const [showDocCategory, setShowDocCategory] = useState<string | null>(null);
   const [showActionDetail, setShowActionDetail] = useState<number | null>(null);
+  const [sigActionAck, setSigActionAck] = useState<any>(null);
+  const [sigActionLoading, setSigActionLoading] = useState(false);
   const [actionTab, setActionTab] = useState<DashboardTab>("toutes");
   const [showProfile, setShowProfile] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -891,6 +894,7 @@ export default function OnboardingModule() {
     tplPanelData, setTplPanelData,
     contratPanelMode, setContratPanelMode,
     contratPanelData, setContratPanelData,
+    contratsPageTab, setContratsPageTab,
     lang, setLangState,
     darkMode, setDarkMode,
     activeLanguages, setActiveLanguages,
@@ -997,7 +1001,7 @@ export default function OnboardingModule() {
     showWelcomeModal, setShowWelcomeModal,
     showDocPanel, setShowDocPanel,
     showDocCategory, setShowDocCategory,
-    showActionDetail, setShowActionDetail,
+    showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading,
     actionTab, setActionTab,
     showProfile, setShowProfile,
     showTeamModal, setShowTeamModal,
@@ -1121,7 +1125,7 @@ export default function OnboardingModule() {
       getEquipmentStats().then(setEquipStats).catch(() => {});
       getEquipmentPackages().then(setEquipPackages).catch(() => {});
     }
-    if (auth.isAuthenticated && auth.isAdmin && adminPage === "admin_signatures") {
+    if (auth.isAuthenticated && auth.isAdmin && adminPage === "admin_contrats") {
       getSignatureDocuments().then(setSignDocs).catch(() => {});
     }
   }, [auth.isAuthenticated, adminPage]);
@@ -1131,6 +1135,22 @@ export default function OnboardingModule() {
       getMyPendingSignatures().then(setMyPendingSigs).catch(() => {});
     }
   }, [auth.isAuthenticated]);
+  // Load signature acknowledgement when opening a signature-type action detail
+  useEffect(() => {
+    if (!showActionDetail) { setSigActionAck(null); return; }
+    // Try admin templates first, then employee's own actions
+    const empActions = (myCollabProfile as any)?.parcours_actions || [];
+    const empAction = empActions.find((a: any) => a.id === showActionDetail);
+    const mockAction = ACTIONS.find((a: any) => a.id === showActionDetail);
+    const tpl = ACTION_TEMPLATES.find((t: any) => t.titre === (empAction?.titre || mockAction?.title));
+    const actionOptions = tpl?.options || empAction?.options;
+    const actionType = tpl?.type || empAction?.type;
+    const sigDocId = actionOptions?.signature_document_id;
+    if (actionType === "signature" && sigDocId) {
+      setSigActionAck(null);
+      getMyAcknowledgement(sigDocId).then(setSigActionAck).catch(() => {});
+    }
+  }, [showActionDetail]);
   // Close notification dropdown on outside click
   useEffect(() => {
     if (!showNotifDropdown) return;
@@ -1778,9 +1798,6 @@ export default function OnboardingModule() {
         {adminPage === "admin_password_policy" && adminInline.renderAdminPasswordPolicy()}
         {/* ═══ EQUIPMENT MANAGEMENT ═══════════════════════════════ */}
         {adminPage === "admin_equipements" && adminInline.renderAdminEquipements()}
-
-        {/* ═══ SIGNATURE DOCUMENTS ═════════════════════════════════ */}
-        {adminPage === "admin_signatures" && adminInline.renderAdminSignatures()}
 
         {adminPage === "admin_donnees" && adminInline.renderAdminDonnees()}
         {adminPage === "admin_provisioning" && adminInline.renderAdminProvisioning()}

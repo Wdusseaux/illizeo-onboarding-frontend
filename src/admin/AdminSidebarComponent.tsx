@@ -182,7 +182,6 @@ export function createAdminSidebarComponent(ctx: any) {
       admin_cooptation: "cooptation",
       admin_gamification: "gamification",
       admin_equipements: "onboarding",
-      admin_signatures: "onboarding",
       admin_nps: "nps",
       admin_2fa: "sso",
       admin_provisioning: "provisioning",
@@ -225,9 +224,8 @@ export function createAdminSidebarComponent(ctx: any) {
       { section: t('admin.content'), items: [
         { id: "admin_entreprise" as AdminPage, label: t('admin.company_page'), icon: Building2 },
         { id: "admin_equipements" as AdminPage, label: t('admin.equipment'), icon: Laptop },
-        { id: "admin_signatures" as AdminPage, label: t('admin.signatures'), icon: PenLine },
         { id: "admin_nps" as AdminPage, label: t('admin.nps'), icon: Star },
-        { id: "admin_contrats" as AdminPage, label: t('admin.contracts'), icon: FileSignature },
+        { id: "admin_contrats" as AdminPage, label: t('admin.contracts_signatures'), icon: FileSignature },
         { id: "admin_cooptation" as AdminPage, label: t('admin.cooptation'), icon: Handshake },
         { id: "admin_gamification" as AdminPage, label: t('admin.gamification'), icon: Trophy },
         { id: "admin_integrations" as AdminPage, label: t('admin.integrations'), icon: Link },

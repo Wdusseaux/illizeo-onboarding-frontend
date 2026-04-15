@@ -181,7 +181,6 @@ export function createAdminCooptation(ctx: any) {
       admin_cooptation: "cooptation",
       admin_gamification: "gamification",
       admin_equipements: "onboarding",
-      admin_signatures: "onboarding",
       admin_nps: "nps",
       admin_2fa: "sso",
       admin_provisioning: "provisioning",
@@ -221,9 +220,8 @@ export function createAdminCooptation(ctx: any) {
       { section: t('admin.content'), items: [
         { id: "admin_entreprise" as AdminPage, label: t('admin.company_page'), icon: Building2 },
         { id: "admin_equipements" as AdminPage, label: t('admin.equipment'), icon: Laptop },
-        { id: "admin_signatures" as AdminPage, label: t('admin.signatures'), icon: PenLine },
         { id: "admin_nps" as AdminPage, label: t('admin.nps'), icon: Star },
-        { id: "admin_contrats" as AdminPage, label: t('admin.contracts'), icon: FileSignature },
+        { id: "admin_contrats" as AdminPage, label: t('admin.contracts_signatures'), icon: FileSignature },
         { id: "admin_cooptation" as AdminPage, label: t('admin.cooptation'), icon: Handshake },
         { id: "admin_gamification" as AdminPage, label: t('admin.gamification'), icon: Trophy },
         { id: "admin_integrations" as AdminPage, label: t('admin.integrations'), icon: Link },
@@ -248,6 +246,18 @@ export function createAdminCooptation(ctx: any) {
       valide: { label: t('coopt.validated'), color: C.green, bg: C.greenLight, icon: CheckCircle2 },
       recompense_versee: { label: t('coopt.rewarded'), color: "#7B5EA7", bg: C.purple + "15", icon: Gift },
       refuse: { label: t('coopt.refused'), color: C.red, bg: C.redLight, icon: Ban },
+    };
+
+    const CAMP_PRIORITE_META: Record<string, { label: string; color: string; bg: string }> = {
+      basse: { label: "Basse", color: C.textMuted, bg: C.bg },
+      normale: { label: "Normale", color: C.blue, bg: C.blueLight },
+      haute: { label: "Haute", color: C.amber, bg: C.amberLight },
+      urgente: { label: "Urgente", color: C.red, bg: C.redLight },
+    };
+    const CAMP_STATUT_META: Record<string, { label: string; color: string; bg: string }> = {
+      active: { label: "Active", color: C.green, bg: C.greenLight },
+      pourvue: { label: "Pourvue", color: C.blue, bg: C.blueLight },
+      fermee: { label: "Fermée", color: C.textMuted, bg: C.bg },
     };
 
     const renderCooptation = () => {

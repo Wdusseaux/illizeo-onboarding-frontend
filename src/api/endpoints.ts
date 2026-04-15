@@ -191,6 +191,7 @@ export function transformAction(a: ApiAction) {
     dureeEstimee: a.duree_estimee || undefined,
     parcours: a.parcours?.nom || '',
     piecesRequises: a.pieces_requises || undefined,
+    options: a.options || undefined,
   };
 }
 
@@ -1079,6 +1080,7 @@ export async function getDocAcknowledgements(docId: number) { return apiFetch<Do
 export async function acknowledgeDoc(ackId: number) { return apiFetch<DocAcknowledgement>(`/acknowledgements/${ackId}/sign`, { method: 'POST' }); }
 export async function refuseDoc(ackId: number, commentaire?: string) { return apiFetch<DocAcknowledgement>(`/acknowledgements/${ackId}/refuse`, { method: 'POST', body: JSON.stringify({ commentaire }) }); }
 export async function getMyPendingSignatures() { return apiFetch<DocAcknowledgement[]>('/my-pending-signatures'); }
+export async function getMyAcknowledgement(docId: number) { return apiFetch<DocAcknowledgement>(`/signature-documents/${docId}/my-acknowledgement`); }
 
 // ─── Dossier Validation & SIRH Export ───────────────────────
 export interface DossierCheck {
@@ -1303,6 +1305,7 @@ export async function getMyCollaborateur() {
     assignment_id: a.assignment_id || null,
     assignment_status: a.assignment_status || 'a_faire',
     completed_at: a.completed_at || null,
+    options: a.options || undefined,
   }));
   (collab as any).parcours_nom = raw.parcours?.nom || null;
   (collab as any).parcours_categorie = raw.parcours?.categorie?.slug || raw.parcours?.categorie || null;
