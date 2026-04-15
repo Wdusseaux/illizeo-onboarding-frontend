@@ -130,7 +130,7 @@ export function createAdminIntegrations(ctx: any) {
     adMappings, setAdMappings, adGroups, setAdGroups, syncLoading, setSyncLoading, obTeams, setObTeams,
     teamPanelMode, setTeamPanelMode, teamPanelData, setTeamPanelData, wfPanelMode, setWfPanelMode, wfPanelData, setWfPanelData,
     tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData,
-    lang, setLangState, darkMode, setDarkMode, activeLanguages, setActiveLanguages, contentTranslations, setContentTranslations,
+    lang, setLangState, darkMode, setDarkMode, demoMode, setDemoMode, activeLanguages, setActiveLanguages, contentTranslations, setContentTranslations,
     fieldConfig, setFieldConfig, translateFieldId, setTranslateFieldId, translateEN, setTranslateEN, adminUsers, setAdminUsers,
     userPanelMode, setUserPanelMode, userPanelData, setUserPanelData, userPanelLoading, setUserPanelLoading, userSearch, setUserSearch,
     userRoleFilter, setUserRoleFilter, gedTab, setGedTab, gedSearch, setGedSearch, gedCatFilter, setGedCatFilter,
@@ -362,16 +362,16 @@ export function createAdminIntegrations(ctx: any) {
 
         {/* ─── API & WEBHOOKS SECTION ──────────────────────── */}
         {(() => {
-          const mockKeys = apiKeys.length > 0 ? apiKeys : [
+          const mockKeys = apiKeys.length > 0 ? apiKeys : (demoMode ? [
             { id: 1, name: "Production App", key: "ilz_live_sk_7f3a9b2c...d4e8", prefix: "ilz_live_sk_7f3a", scopes: ["collaborateurs:read", "parcours:read", "documents:read", "actions:read"], created_at: "2026-03-15", last_used: "2026-04-13T14:32:00", active: true },
             { id: 2, name: "Staging/Test", key: "ilz_test_sk_2b8c4d6e...a1f3", prefix: "ilz_test_sk_2b8c", scopes: ["collaborateurs:read", "collaborateurs:write", "parcours:read", "parcours:write"], created_at: "2026-04-01", last_used: null, active: true },
             { id: 3, name: "Legacy Integration", key: "ilz_live_sk_9e1f...deprecated", prefix: "ilz_live_sk_9e1f", scopes: ["collaborateurs:read"], created_at: "2025-11-20", last_used: "2026-01-15T09:00:00", active: false },
-          ];
-          const mockWebhooks = apiWebhooks.length > 0 ? apiWebhooks : [
+          ] : []);
+          const mockWebhooks = apiWebhooks.length > 0 ? apiWebhooks : (demoMode ? [
             { id: 1, url: "https://erp.example.com/api/illizeo/webhook", events: ["collaborateur.created", "collaborateur.updated", "document.validated"], secret: "whsec_a8f3...b2c1", active: true, last_triggered: "2026-04-13T10:15:00", success_rate: 98.5 },
             { id: 2, url: "https://slack-bot.internal/onboarding-events", events: ["parcours.completed", "action.overdue"], secret: "whsec_d4e7...f6a9", active: true, last_triggered: "2026-04-12T16:45:00", success_rate: 100 },
-          ];
-          const mockLogs = apiLogs.length > 0 ? apiLogs : [
+          ] : []);
+          const mockLogs = apiLogs.length > 0 ? apiLogs : (demoMode ? [
             { id: 1, method: "GET", endpoint: "/api/v1/collaborateurs", status: 200, response_time_ms: 45, api_key_name: "Production App", timestamp: "2026-04-13T14:32:00" },
             { id: 2, method: "POST", endpoint: "/api/v1/collaborateurs", status: 201, response_time_ms: 120, api_key_name: "Production App", timestamp: "2026-04-13T14:30:12" },
             { id: 3, method: "GET", endpoint: "/api/v1/parcours", status: 200, response_time_ms: 38, api_key_name: "Production App", timestamp: "2026-04-13T14:28:55" },
@@ -382,17 +382,7 @@ export function createAdminIntegrations(ctx: any) {
             { id: 8, method: "GET", endpoint: "/api/v1/actions", status: 200, response_time_ms: 41, api_key_name: "Production App", timestamp: "2026-04-13T14:05:22" },
             { id: 9, method: "POST", endpoint: "/api/v1/nps-surveys/3/send", status: 200, response_time_ms: 210, api_key_name: "Production App", timestamp: "2026-04-13T13:55:00" },
             { id: 10, method: "GET", endpoint: "/api/v1/equipments", status: 200, response_time_ms: 33, api_key_name: "Staging/Test", timestamp: "2026-04-13T13:50:00" },
-            { id: 11, method: "GET", endpoint: "/api/v1/collaborateurs", status: 401, response_time_ms: 8, api_key_name: "Legacy Integration", timestamp: "2026-04-13T13:45:00" },
-            { id: 12, method: "POST", endpoint: "/api/v1/parcours", status: 201, response_time_ms: 156, api_key_name: "Production App", timestamp: "2026-04-13T13:40:00" },
-            { id: 13, method: "GET", endpoint: "/api/v1/nps-surveys", status: 200, response_time_ms: 29, api_key_name: "Staging/Test", timestamp: "2026-04-13T13:35:00" },
-            { id: 14, method: "PUT", endpoint: "/api/v1/collaborateurs/15", status: 400, response_time_ms: 15, api_key_name: "Production App", timestamp: "2026-04-13T13:30:00" },
-            { id: 15, method: "GET", endpoint: "/api/v1/parcours", status: 500, response_time_ms: 2100, api_key_name: "Production App", timestamp: "2026-04-13T13:25:00" },
-            { id: 16, method: "GET", endpoint: "/api/v1/documents", status: 200, response_time_ms: 47, api_key_name: "Staging/Test", timestamp: "2026-04-13T13:20:00" },
-            { id: 17, method: "POST", endpoint: "/api/v1/collaborateurs", status: 403, response_time_ms: 10, api_key_name: "Legacy Integration", timestamp: "2026-04-13T13:15:00" },
-            { id: 18, method: "GET", endpoint: "/api/v1/actions", status: 200, response_time_ms: 36, api_key_name: "Production App", timestamp: "2026-04-13T13:10:00" },
-            { id: 19, method: "DELETE", endpoint: "/api/v1/collaborateurs/101", status: 200, response_time_ms: 65, api_key_name: "Production App", timestamp: "2026-04-13T13:05:00" },
-            { id: 20, method: "GET", endpoint: "/api/v1/collaborateurs", status: 200, response_time_ms: 42, api_key_name: "Staging/Test", timestamp: "2026-04-13T13:00:00" },
-          ];
+          ] : []);
 
           const SCOPE_COLORS: Record<string, string> = { "collaborateurs:read": "#4CAF50", "collaborateurs:write": "#E53935", "parcours:read": "#1A73E8", "parcours:write": "#7B5EA7", "documents:read": "#F9A825", "documents:write": "#E65100", "actions:read": "#00BCD4" };
           const METHOD_COLORS: Record<string, string> = { GET: "#4CAF50", POST: "#1A73E8", PUT: "#F9A825", DELETE: "#E53935", PATCH: "#7B5EA7" };

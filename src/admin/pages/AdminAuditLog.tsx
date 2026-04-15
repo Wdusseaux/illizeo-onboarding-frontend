@@ -11,7 +11,7 @@ export function createAdminAuditLog(ctx: any) {
     auditFilter, setAuditFilter, auditSearch, setAuditSearch,
     auditExpandedEntry, setAuditExpandedEntry,
     auditVisibleCount, setAuditVisibleCount,
-    addToast_admin,
+    addToast_admin, demoMode,
   } = ctx;
 
   return function renderAdminAuditLog() {
@@ -37,9 +37,10 @@ export function createAdminAuditLog(ctx: any) {
     };
     type AuditType = keyof typeof AUDIT_TYPES;
 
-    const MOCK_USERS = ["Sophie Martin", "Julien Dupont", "Marie Bernard", "Thomas Petit", "Camille Robert", "Admin RH"];
+    const MOCK_USERS = demoMode ? ["Sophie Martin", "Julien Dupont", "Marie Bernard", "Thomas Petit", "Camille Robert", "Admin RH"] : [];
     const now = Date.now();
     const MOCK_ENTRIES = (() => {
+      if (!demoMode) return [];
       const types: AuditType[] = Object.keys(AUDIT_TYPES) as AuditType[];
       const entries: { id: number; type: AuditType; description: string; user: string; timestamp: number; details: Record<string, any> }[] = [];
       const descriptions: Record<AuditType, string[]> = {
