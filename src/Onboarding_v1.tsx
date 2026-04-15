@@ -554,6 +554,8 @@ export default function OnboardingModule() {
     { id: 2, titre: "Découverte du groupe", url: "https://illizeo.com/video/groupe" },
   ]);
   const [gradientColor, setGradientColor] = useState("#2D1B3D");
+  const [loginGradientStart, setLoginGradientStart] = useState(() => localStorage.getItem("illizeo_login_gradient_start") || "#1a1a2e");
+  const [loginGradientEnd, setLoginGradientEnd] = useState(() => localStorage.getItem("illizeo_login_gradient_end") || "#C2185B");
   const [bannerUploaded, setBannerUploaded] = useState(false);
   const [employeeBannerColor, setEmployeeBannerColor] = useState(() => localStorage.getItem("illizeo_banner_color") || "#2D1B3D");
   const [employeeBannerCustom, setEmployeeBannerCustom] = useState(false);
@@ -978,7 +980,7 @@ export default function OnboardingModule() {
     selectedContratId, setSelectedContratId,
     entrepriseBlocs, setEntrepriseBlocs,
     entrepriseVideos, setEntrepriseVideos,
-    gradientColor, setGradientColor,
+    gradientColor, setGradientColor, loginGradientStart, setLoginGradientStart, loginGradientEnd, setLoginGradientEnd,
     bannerUploaded, setBannerUploaded,
     employeeBannerColor, setEmployeeBannerColor,
     employeeBannerCustom, setEmployeeBannerCustom,
@@ -1084,6 +1086,8 @@ export default function OnboardingModule() {
         if (s.contract_types) try { setContractTypes(JSON.parse(s.contract_types)); } catch {}
         if (s.jurisdictions) try { setJurisdictions(JSON.parse(s.jurisdictions)); } catch {}
         if (s.demo_mode !== undefined) { const dm = s.demo_mode === "true" || s.demo_mode === true; setDemoMode(dm); localStorage.setItem("illizeo_demo_mode", String(dm)); }
+        if (s.login_gradient_start) { setLoginGradientStart(s.login_gradient_start); localStorage.setItem("illizeo_login_gradient_start", s.login_gradient_start); }
+        if (s.login_gradient_end) { setLoginGradientEnd(s.login_gradient_end); localStorage.setItem("illizeo_login_gradient_end", s.login_gradient_end); }
         // Setup wizard: show for new tenants (no setup_completed flag)
         if (auth.isAdmin && !s.setup_completed) {
           setShowSetupWizard(true);

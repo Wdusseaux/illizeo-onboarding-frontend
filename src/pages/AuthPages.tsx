@@ -132,7 +132,7 @@ export function createAuthPages(ctx: any) {
     tplPanelOpen, setTplPanelOpen, tplPanelDoc, setTplPanelDoc, selectedDocsForValidation, setSelectedDocsForValidation, realDocs, setRealDocs,
     emailConfig, setEmailConfig, tplCatFilter, setTplCatFilter, tplPreview, setTplPreview, themeColor, setThemeColor,
     region, setRegion, dateFormat, setDateFormat, timeFormat, setTimeFormat, timezone, setTimezone,
-    customLogo, setCustomLogo, customLogoFull, setCustomLogoFull, loginBgImage, setLoginBgImage, customFavicon, setCustomFavicon,
+    customLogo, setCustomLogo, customLogoFull, setCustomLogoFull, loginBgImage, setLoginBgImage, customFavicon, setCustomFavicon, loginGradientStart, loginGradientEnd,
     cooptations, setCooptations, cooptStats, setCooptStats, cooptSettings, setCooptSettings, cooptFilter, setCooptFilter,
     cooptCampaignFilter, setCooptCampaignFilter, cooptPanelMode, setCooptPanelMode, cooptPanelData, setCooptPanelData, cooptSettingsOpen, setCooptSettingsOpen,
     cooptTab, setCooptTab, campaigns, setCampaigns, leaderboard, setLeaderboard, campaignPanelMode, setCampaignPanelMode,
@@ -206,7 +206,7 @@ export function createAuthPages(ctx: any) {
   const renderResetPassword = () => {
     loadPwdPolicy();
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)` }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 400, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
@@ -262,7 +262,7 @@ export function createAuthPages(ctx: any) {
 
   const renderTwoFactorVerify = () => {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)` }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 400, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
@@ -414,7 +414,7 @@ export function createAuthPages(ctx: any) {
 
   const renderTenantSelection = () => {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)` }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 440, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
@@ -478,7 +478,7 @@ export function createAuthPages(ctx: any) {
 
   const renderRegister = () => {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)` }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 480, background: C.white, borderRadius: 16, padding: "36px 40px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>

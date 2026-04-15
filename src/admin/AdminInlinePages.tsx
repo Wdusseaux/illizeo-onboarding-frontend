@@ -157,7 +157,7 @@ export function createAdminInlinePages(ctx: any) {
     msgSearchQuery, setMsgSearchQuery, confirmDialog, setConfirmDialog, selectedAction, setSelectedAction, actionTypeFilters, setActionTypeFilters,
     actionParcoursFilter, setActionParcoursFilter, selectedActionType, setSelectedActionType, suspendedParcours, setSuspendedParcours, docPieces, setDocPieces,
     parcoursStatut, setParcoursStatut, groupeColor, setGroupeColor, groupeMembres, setGroupeMembres, contrats, setContrats,
-    selectedContratId, setSelectedContratId, entrepriseBlocs, setEntrepriseBlocs, entrepriseVideos, setEntrepriseVideos, gradientColor, setGradientColor,
+    selectedContratId, setSelectedContratId, entrepriseBlocs, setEntrepriseBlocs, entrepriseVideos, setEntrepriseVideos, gradientColor, setGradientColor, loginGradientStart, setLoginGradientStart, loginGradientEnd, setLoginGradientEnd,
     bannerUploaded, setBannerUploaded, employeeBannerColor, setEmployeeBannerColor, employeeBannerCustom, setEmployeeBannerCustom, bannerImage, setBannerImage,
     avatarImage, setAvatarImage, avatarZoom, setAvatarZoom, avatarPos, setAvatarPos, showAvatarEditor, setShowAvatarEditor,
     bannerZoom, setBannerZoom, bannerPos, setBannerPos, bannerDragging, setBannerDragging, bannerEditMode, setBannerEditMode,
@@ -1322,7 +1322,7 @@ export function createAdminInlinePages(ctx: any) {
               <h2 style={sSectionTitle}><Clapperboard size={18} color={C.pink} /> {t('settings.login_bg')}</h2>
               <p style={sSectionDesc}>{t('settings.login_bg_desc')}</p>
               <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-                <div style={{ width: 240, height: 140, borderRadius: 12, border: `2px solid ${C.border}`, overflow: "hidden", background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 }}>
+                <div style={{ width: 240, height: 140, borderRadius: 12, border: `2px solid ${C.border}`, overflow: "hidden", background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart} 0%, ${loginGradientEnd} 100%)`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 }}>
                   <div style={{ width: 80, background: "rgba(255,255,255,.9)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
                     <div style={{ fontSize: 7, fontWeight: 700, color: C.dark }}>Connexion</div>
                     <div style={{ width: "100%", height: 4, borderRadius: 2, background: C.bg, margin: "3px 0" }} />
@@ -1330,7 +1330,7 @@ export function createAdminInlinePages(ctx: any) {
                     <div style={{ width: "100%", height: 8, borderRadius: 3, background: C.pink }} />
                   </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <label style={{ cursor: "pointer" }}>
                     <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
                       const file = e.target.files?.[0];
@@ -1343,7 +1343,26 @@ export function createAdminInlinePages(ctx: any) {
                     <span className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 18px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}><Upload size={13} /> {t('settings.choose_image')}</span>
                   </label>
                   {loginBgImage && <button onClick={() => { saveSetting("login_bg_image", "", setLoginBgImage); addToast_admin(t('settings.reset')); }} style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, color: C.red, borderColor: C.red }}>{t('settings.reset')}</button>}
-                  <div style={{ fontSize: 10, color: C.textMuted, lineHeight: 1.5, maxWidth: 200 }}>{t('settings.login_bg_hint')}</div>
+
+                  {/* Gradient color pickers */}
+                  {!loginBgImage && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: C.text }}>Couleurs du dégradé</div>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <input type="color" value={loginGradientStart} onChange={e => { setLoginGradientStart(e.target.value); localStorage.setItem("illizeo_login_gradient_start", e.target.value); }} style={{ width: 32, height: 32, border: `2px solid ${C.border}`, borderRadius: 6, cursor: "pointer", padding: 0 }} />
+                          <span style={{ fontSize: 10, color: C.textMuted }}>Début</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <input type="color" value={loginGradientEnd} onChange={e => { setLoginGradientEnd(e.target.value); localStorage.setItem("illizeo_login_gradient_end", e.target.value); }} style={{ width: 32, height: 32, border: `2px solid ${C.border}`, borderRadius: 6, cursor: "pointer", padding: 0 }} />
+                          <span style={{ fontSize: 10, color: C.textMuted }}>Fin</span>
+                        </div>
+                        <button onClick={() => { saveSetting("login_gradient_start", loginGradientStart, setLoginGradientStart); saveSetting("login_gradient_end", loginGradientEnd, setLoginGradientEnd); addToast_admin("Dégradé sauvegardé"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 12px", fontSize: 10 }}>Sauvegarder</button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ fontSize: 10, color: C.textMuted, lineHeight: 1.5, maxWidth: 240 }}>{t('settings.login_bg_hint')}</div>
                 </div>
               </div>
             </div>
