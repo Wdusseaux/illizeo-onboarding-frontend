@@ -1837,7 +1837,7 @@ export default function OnboardingModule() {
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{LANG_META.fr.nativeName} (FR)</label>
-                  <input value={fc.label} disabled style={{ ...sInput, fontSize: 13, background: C.bg, color: C.textMuted }} />
+                  <input value={fc.label} onChange={e => setFieldConfig(prev => prev.map(f => f.id === fc.id ? { ...f, label: e.target.value } : f))} style={{ ...sInput, fontSize: 13 }} />
                 </div>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{LANG_META.en.nativeName} (EN)</label>
@@ -1846,8 +1846,8 @@ export default function OnboardingModule() {
                 <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   <button onClick={() => setTranslateFieldId(null)} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button onClick={async () => {
-                    await apiUpdateFieldConfig(fc.id, { label_en: translateEN });
-                    setFieldConfig(prev => prev.map(f => f.id === fc.id ? { ...f, label_en: translateEN } : f));
+                    await apiUpdateFieldConfig(fc.id, { label: fc.label, label_en: translateEN });
+                    setFieldConfig(prev => prev.map(f => f.id === fc.id ? { ...f, label: fc.label, label_en: translateEN } : f));
                     addToast_admin(`${t('fields.translation_saved')} : ${fc.label} → ${translateEN}`);
                     setTranslateFieldId(null);
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13 }}>{t('common.save')}</button>
