@@ -9,7 +9,7 @@ export function createAdminCalendar(ctx: any) {
   const {
     calendarMonth, setCalendarMonth, calendarView, setCalendarView,
     calendarListFilter, setCalendarListFilter,
-    COLLABORATEURS,
+    COLLABORATEURS, demoMode,
   } = ctx;
 
   return function renderAdminCalendar() {
@@ -34,11 +34,13 @@ export function createAdminCalendar(ctx: any) {
     });
 
     const today = new Date();
-    events.push(
-      { date: new Date(today.getFullYear(), today.getMonth(), 15), type: 'meeting', title: 'Point RH mensuel', subtitle: 'Salle A - 10h00', color: '#1A73E8' },
-      { date: new Date(today.getFullYear(), today.getMonth(), 18), type: 'training', title: 'Formation sécurité', subtitle: 'En ligne - 14h00', color: '#7B5EA7' },
-      { date: new Date(today.getFullYear(), today.getMonth(), 22), type: 'meeting', title: 'Revue onboarding Q2', subtitle: 'Salle B - 11h00', color: '#1A73E8' },
-    );
+    if (demoMode) {
+      events.push(
+        { date: new Date(today.getFullYear(), today.getMonth(), 15), type: 'meeting', title: 'Point RH mensuel', subtitle: 'Salle A - 10h00', color: '#1A73E8' },
+        { date: new Date(today.getFullYear(), today.getMonth(), 18), type: 'training', title: 'Formation sécurité', subtitle: 'En ligne - 14h00', color: '#7B5EA7' },
+        { date: new Date(today.getFullYear(), today.getMonth(), 22), type: 'meeting', title: 'Revue onboarding Q2', subtitle: 'Salle B - 11h00', color: '#1A73E8' },
+      );
+    }
 
     // -- Helpers --
     const isSameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
