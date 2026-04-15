@@ -148,7 +148,7 @@ export function createEmployeeRenders(ctx: any) {
     uploadedPieces, setUploadedPieces, modalPieces, setModalPieces, modalFormFields, setModalFormFields, modalQuestions, setModalQuestions,
     modalSubtasks, setModalSubtasks, phases, setPhases, selectedPhaseId, setSelectedPhaseId, messageCanal, setMessageCanal,
     messageBody, setMessageBody, showWelcomeModal, setShowWelcomeModal, showDocPanel, setShowDocPanel, showDocCategory, setShowDocCategory,
-    showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading, actionTab, setActionTab, showProfile, setShowProfile, showTeamModal, setShowTeamModal,
+    showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading, sigContratData, setSigContratData, actionTab, setActionTab, showProfile, setShowProfile, showTeamModal, setShowTeamModal,
     profileTab, setProfileTab, formData, setFormData, passwordVisible, setPasswordVisible, acceptCGU, setAcceptCGU,
     employeeDocs, setEmployeeDocs, completedActions, setCompletedActions, sharedTimeline, setSharedTimeline, toasts, setToasts,
     auth, _needsPlan, isDemo, apiEnabled, COLLABORATEURS, refetchCollaborateurs, PARCOURS_TEMPLATES, refetchParcours,
@@ -1289,13 +1289,50 @@ export function createEmployeeRenders(ctx: any) {
             </div>
           )}
           {/* ── Signature action: show document + sign button ── */}
-          {tpl && tpl.type === "signature" && !isDone && !tpl.options?.signature_document_id && (
+          {tpl && tpl.type === "signature" && !isDone && !tpl.options?.signature_document_id && !tpl.options?.contrat_id && (
             <div style={{ padding: "14px 16px", background: C.amberLight, borderRadius: 10, marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
               <AlertTriangle size={16} color={C.amber} />
               <span style={{ fontSize: 13, color: C.amber }}>Aucun document lié à cette action.</span>
             </div>
           )}
-          {tpl && tpl.type === "signature" && !isDone && tpl.options?.signature_document_id && (
+          {/* ── Personalized contrat ── */}
+          {tpl && tpl.type === "signature" && !isDone && tpl.options?.contrat_id && (
+            <div style={{ marginBottom: 16 }}>
+              {sigContratData ? (
+                <div style={{ padding: "16px", background: C.bg, borderRadius: 10, marginBottom: 12 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <FileSignature size={18} color={C.pink} />
+                    <span style={{ fontSize: 15, fontWeight: 600 }}>{sigContratData.contrat?.nom}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.textLight, marginBottom: 12 }}>Document personnalisé pour {sigContratData.collaborateur?.prenom} {sigContratData.collaborateur?.nom}</div>
+                  {/* Variables preview */}
+                  <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "6px 12px", fontSize: 12, padding: "12px", background: C.white, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                    {Object.entries(sigContratData.variables || {}).filter(([_, v]) => v).slice(0, 8).map(([key, val]) => (
+                      <><span style={{ color: C.textMuted, fontWeight: 500 }}>{key.replace(/_/g, ' ')}</span><span style={{ color: C.text }}>{String(val)}</span></>
+                    ))}
+                  </div>
+                  {sigContratData.contrat?.fichier && (
+                    <div style={{ marginTop: 8, fontSize: 11, color: C.textMuted, display: "flex", alignItems: "center", gap: 4 }}><Paperclip size={11} /> {sigContratData.contrat.fichier}</div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ padding: "12px 16px", background: C.bg, borderRadius: 10, textAlign: "center", fontSize: 13, color: C.textMuted }}>Chargement du contrat...</div>
+              )}
+              {sigContratData && (
+                <button disabled={sigActionLoading} onClick={async () => {
+                  setSigActionLoading(true);
+                  try {
+                    handleCompleteAction(action.id, assignmentId);
+                    addToast("Contrat signé avec succès", "success");
+                  } catch { addToast("Erreur lors de la signature", "error"); }
+                  setSigActionLoading(false);
+                }} className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <PenTool size={16} /> {sigActionLoading ? "En cours..." : "Signer le contrat"}
+                </button>
+              )}
+            </div>
+          )}
+          {tpl && tpl.type === "signature" && !isDone && tpl.options?.signature_document_id && !tpl.options?.contrat_id && (
             <div style={{ marginBottom: 16 }}>
               {sigActionAck?.document && (
                 <div style={{ padding: "14px 16px", background: C.bg, borderRadius: 10, marginBottom: 12 }}>

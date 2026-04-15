@@ -445,18 +445,45 @@ export function createAdminPanels(ctx: any) {
 
                   {/* Signature */}
                   {actionPanelData.type === "signature" && (<>
-                    <div style={{ marginBottom: 12 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Document à signer *</label>
-                      <select value={actionPanelData.options.signature_document_id || ""} onChange={e => {
-                        const docId = e.target.value ? Number(e.target.value) : null;
-                        const doc = signDocs.find((d: any) => d.id === docId);
-                        setActionPanelData(prev => ({ ...prev, options: { ...prev.options, signature_document_id: docId, documentNom: doc?.titre || "" } }));
-                      }} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
-                        <option value="">— Sélectionner un document —</option>
-                        {signDocs.filter((d: any) => d.actif).map((d: any) => (
-                          <option key={d.id} value={d.id}>{d.titre} ({d.type === "lecture" ? "Lecture" : "Signature"})</option>
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Source du document *</label>
+                      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                        {[{ id: "contrat", label: "Contrat personnalisé", desc: "Variables remplacées par collaborateur" }, { id: "document", label: "Document identique", desc: "Même document pour tous" }].map(src => (
+                          <button key={src.id} onClick={() => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, signature_source: src.id, signature_document_id: null, contrat_id: null, documentNom: "" } }))}
+                            style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: `2px solid ${(actionPanelData.options.signature_source || (actionPanelData.options.contrat_id ? "contrat" : "document")) === src.id ? C.pink : C.border}`, background: (actionPanelData.options.signature_source || (actionPanelData.options.contrat_id ? "contrat" : "document")) === src.id ? C.pinkBg : C.white, cursor: "pointer", textAlign: "left", fontFamily: font }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: (actionPanelData.options.signature_source || (actionPanelData.options.contrat_id ? "contrat" : "document")) === src.id ? C.pink : C.text }}>{src.label}</div>
+                            <div style={{ fontSize: 10, color: C.textMuted }}>{src.desc}</div>
+                          </button>
                         ))}
-                      </select>
-                      {signDocs.length === 0 && <div style={{ fontSize: 11, color: C.amber, marginTop: 4 }}>Aucun document créé. Allez dans Contrats &amp; Documents → Documents à signer.</div>}
+                      </div>
+
+                      {/* Contrat selector */}
+                      {(actionPanelData.options.signature_source || (actionPanelData.options.contrat_id ? "contrat" : "document")) === "contrat" && (
+                        <select value={actionPanelData.options.contrat_id || ""} onChange={e => {
+                          const cId = e.target.value ? Number(e.target.value) : null;
+                          const c = contrats.find((c: any) => c.id === cId);
+                          setActionPanelData(prev => ({ ...prev, options: { ...prev.options, contrat_id: cId, signature_document_id: null, documentNom: c?.nom || "", signature_source: "contrat" } }));
+                        }} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                          <option value="">— Sélectionner un contrat —</option>
+                          {contrats.filter((c: any) => c.actif).map((c: any) => (
+                            <option key={c.id} value={c.id}>{c.nom} ({c.type} — {c.juridiction})</option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* Document à signer selector */}
+                      {(actionPanelData.options.signature_source || "document") === "document" && !actionPanelData.options.contrat_id && (
+                        <select value={actionPanelData.options.signature_document_id || ""} onChange={e => {
+                          const docId = e.target.value ? Number(e.target.value) : null;
+                          const doc = signDocs.find((d: any) => d.id === docId);
+                          setActionPanelData(prev => ({ ...prev, options: { ...prev.options, signature_document_id: docId, contrat_id: null, documentNom: doc?.titre || "", signature_source: "document" } }));
+                        }} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                          <option value="">— Sélectionner un document —</option>
+                          {signDocs.filter((d: any) => d.actif).map((d: any) => (
+                            <option key={d.id} value={d.id}>{d.titre} ({d.type === "lecture" ? "Lecture" : "Signature"})</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     <div style={{ marginBottom: 12 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Fournisseur de signature</label>
                       {(() => {
@@ -704,11 +731,10 @@ export function createAdminPanels(ctx: any) {
                   <button onClick={() => setActionPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button disabled={actionPanelLoading || !actionPanelData.titre.trim()} onClick={async () => {
                     setActionPanelLoading(true);
-                    const actionTypeId = Object.keys(ACTION_TYPE_META).indexOf(actionPanelData.type) + 1 || 1;
                     const firstPhaseId = actionPanelData.phaseIds?.[0] || null;
                     const payload: Record<string, any> = {
                       titre: actionPanelData.titre.trim(),
-                      action_type_id: actionTypeId,
+                      action_type_slug: actionPanelData.type,
                       phase_id: firstPhaseId,
                       delai_relatif: actionPanelData.delaiRelatif,
                       obligatoire: actionPanelData.obligatoire,

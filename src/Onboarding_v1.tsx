@@ -59,7 +59,7 @@ import {
   getEquipmentPackages, createEquipmentPackage as apiCreatePkg, updateEquipmentPackage as apiUpdatePkg, deleteEquipmentPackage as apiDeletePkg, provisionPackage as apiProvisionPkg,
   type EquipmentPackage,
   getSignatureDocuments, createSignatureDocument as apiCreateSignDoc, updateSignatureDocument as apiUpdateSignDoc, deleteSignatureDocument as apiDeleteSignDoc,
-  uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures, getMyAcknowledgement,
+  uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures, getMyAcknowledgement, getContratGenerated,
   type SignatureDoc, type DocAcknowledgement,
   checkDossier, validateDossier, exportDossier, resetDossier, type DossierCheck,
   completeMyAction as apiCompleteMyAction, reactivateMyAction as apiReactivateMyAction,
@@ -583,6 +583,7 @@ export default function OnboardingModule() {
   const [showActionDetail, setShowActionDetail] = useState<number | null>(null);
   const [sigActionAck, setSigActionAck] = useState<any>(null);
   const [sigActionLoading, setSigActionLoading] = useState(false);
+  const [sigContratData, setSigContratData] = useState<any>(null);
   const [actionTab, setActionTab] = useState<DashboardTab>("toutes");
   const [showProfile, setShowProfile] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -1001,7 +1002,7 @@ export default function OnboardingModule() {
     showWelcomeModal, setShowWelcomeModal,
     showDocPanel, setShowDocPanel,
     showDocCategory, setShowDocCategory,
-    showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading,
+    showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading, sigContratData, setSigContratData,
     actionTab, setActionTab,
     showProfile, setShowProfile,
     showTeamModal, setShowTeamModal,
@@ -1137,7 +1138,7 @@ export default function OnboardingModule() {
   }, [auth.isAuthenticated]);
   // Load signature acknowledgement when opening a signature-type action detail
   useEffect(() => {
-    if (!showActionDetail) { setSigActionAck(null); return; }
+    if (!showActionDetail) { setSigActionAck(null); setSigContratData(null); return; }
     // Try admin templates first, then employee's own actions
     const empActions = (myCollabProfile as any)?.parcours_actions || [];
     const empAction = empActions.find((a: any) => a.id === showActionDetail);
@@ -1145,10 +1146,18 @@ export default function OnboardingModule() {
     const tpl = ACTION_TEMPLATES.find((t: any) => t.titre === (empAction?.titre || mockAction?.title));
     const actionOptions = tpl?.options || empAction?.options;
     const actionType = tpl?.type || empAction?.type;
-    const sigDocId = actionOptions?.signature_document_id;
-    if (actionType === "signature" && sigDocId) {
-      setSigActionAck(null);
-      getMyAcknowledgement(sigDocId).then(setSigActionAck).catch(() => {});
+    if (actionType === "signature") {
+      const contratId = actionOptions?.contrat_id;
+      const sigDocId = actionOptions?.signature_document_id;
+      if (contratId) {
+        // Personalized contrat
+        setSigContratData(null); setSigActionAck(null);
+        getContratGenerated(contratId).then(setSigContratData).catch(() => {});
+      } else if (sigDocId) {
+        // Generic document to sign
+        setSigActionAck(null); setSigContratData(null);
+        getMyAcknowledgement(sigDocId).then(setSigActionAck).catch(() => {});
+      }
     }
   }, [showActionDetail]);
   // Close notification dropdown on outside click

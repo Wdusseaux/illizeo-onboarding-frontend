@@ -368,6 +368,20 @@ export async function deleteContrat(id: number) {
   return apiFetch<void>(`/contrats/${id}`, { method: 'DELETE' });
 }
 
+export async function uploadContratFile(id: number, file: File) {
+  const formData = new FormData(); formData.append('fichier', file);
+  const baseUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+  const tenantId = localStorage.getItem('illizeo_tenant_id') || 'illizeo';
+  const token = localStorage.getItem('illizeo_token') || '';
+  const res = await fetch(`${baseUrl}/contrats/${id}/upload`, { method: 'POST', headers: { 'X-Tenant': tenantId, ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: formData });
+  if (!res.ok) throw new Error('Upload failed'); return res.json();
+}
+
+export async function getContratGenerated(contratId: number, collaborateurId?: number) {
+  const qs = collaborateurId ? `?collaborateur_id=${collaborateurId}` : '';
+  return apiFetch<any>(`/contrats/${contratId}/generate${qs}`);
+}
+
 // ─── Document Categories ────────────────────────────────────
 interface ApiDocCategory {
   id: number; slug: string; titre: string;

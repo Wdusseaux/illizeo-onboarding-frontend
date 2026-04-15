@@ -34,7 +34,7 @@ import {
   assignActions as apiAssignActions,
   createWorkflow as apiCreateWorkflow, updateWorkflow as apiUpdateWorkflow, deleteWorkflow as apiDeleteWorkflow,
   createEmailTemplate as apiCreateEmailTpl, updateEmailTemplate as apiUpdateEmailTpl, deleteEmailTemplate as apiDeleteEmailTpl,
-  createContrat as apiCreateContrat, updateContrat as apiUpdateContrat, deleteContrat as apiDeleteContrat,
+  createContrat as apiCreateContrat, updateContrat as apiUpdateContrat, deleteContrat as apiDeleteContrat, uploadContratFile,
   getUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser,
   getFieldConfig, updateFieldConfig as apiUpdateFieldConfig, createFieldConfig as apiCreateFieldConfig, deleteFieldConfig as apiDeleteFieldConfig,
   getOnboardingTeams, createOnboardingTeam as apiCreateTeam, updateOnboardingTeam as apiUpdateTeam, deleteOnboardingTeam as apiDeleteTeam,
@@ -737,8 +737,19 @@ export function createAdminNPSContrats(ctx: any) {
                   <button onClick={async () => {
                     try {
                       const payload: Record<string, any> = { nom: contratPanelData.nom, type: contratPanelData.type, juridiction: contratPanelData.juridiction, actif: contratPanelData.actif, fichier: contratPanelData.fichier, translations: buildTranslationsPayload() };
-                      if (contratPanelMode === "create") { await apiCreateContrat(payload); addToast_admin(t('contrat.created')); }
-                      else { await apiUpdateContrat(contratPanelData.id, payload); addToast_admin(t('contrat.updated')); }
+                      let contratId = contratPanelData.id;
+                      if (contratPanelMode === "create") {
+                        const created = await apiCreateContrat(payload);
+                        contratId = (created as any).id;
+                        addToast_admin(t('contrat.created'));
+                      } else {
+                        await apiUpdateContrat(contratPanelData.id, payload);
+                        addToast_admin(t('contrat.updated'));
+                      }
+                      // Upload pending file if any
+                      if (contratPanelData._file && contratId) {
+                        try { await uploadContratFile(contratId, contratPanelData._file); } catch {}
+                      }
                       setContratPanelMode("closed");
                     } catch { addToast_admin(t('toast.error')); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13 }}>{contratPanelMode === "create" ? t('common.create') : t('common.save')}</button>
