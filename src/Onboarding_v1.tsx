@@ -170,9 +170,20 @@ export default function OnboardingModule() {
     }
     // 3. Just registered (needs plan selection) — skip tenant selection
     if (_needsPlan && localStorage.getItem("illizeo_tenant_id")) return true;
+    // 4. Already have a tenant in localStorage
+    if (localStorage.getItem("illizeo_tenant_id")) return true;
     // Otherwise show tenant selection
     return false;
   });
+  // Re-check tenant param on URL changes (for SPA navigation)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tenantParam = params.get("tenant");
+    if (tenantParam && !tenantResolved) {
+      localStorage.setItem("illizeo_tenant_id", tenantParam);
+      setTenantResolved(true);
+    }
+  }, []);
   const [tenantInput, setTenantInput] = useState("");
   const [regData, setRegData] = useState({ company_name: "", admin_prenom: "", admin_nom: "", admin_email: "", password: "", password_confirmation: "" });
   const [regLoading, setRegLoading] = useState(false);

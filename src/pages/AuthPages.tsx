@@ -412,9 +412,12 @@ export function createAuthPages(ctx: any) {
     );
   };
 
+  // Default Illizeo gradient — used for tenant selection page (not customizable by clients)
+  const ILLIZEO_DEFAULT_GRADIENT = "linear-gradient(135deg, #1a1a2e 0%, #2D1B3D 50%, #C2185B 100%)";
+
   const renderTenantSelection = () => {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: ILLIZEO_DEFAULT_GRADIENT }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 440, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
