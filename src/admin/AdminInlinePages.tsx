@@ -855,6 +855,7 @@ export function createAdminInlinePages(ctx: any) {
                 <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${C.border}` }}>
                   {([
                     { id: "facturation" as const, label: "Informations de facturation" },
+                    { id: "consommation" as const, label: "Consommation" },
                     { id: "factures" as const, label: "Facturation" },
                     { id: "paiement" as const, label: "Méthode de paiement" },
                     { id: "protection" as const, label: "Informations sur la protection des données" },
@@ -865,6 +866,96 @@ export function createAdminInlinePages(ctx: any) {
                   ))}
                 </div>
                 <div style={{ padding: "24px" }}>
+                  {subTab === "consommation" && (() => {
+                    // Build monthly consumption from COLLABORATEURS data
+                    const collabs = COLLABORATEURS || [];
+                    const now = new Date();
+                    const months: { label: string; year: number; month: number }[] = [];
+                    for (let i = 5; i >= 0; i--) {
+                      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                      months.push({ label: d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "long", year: "numeric" }), year: d.getFullYear(), month: d.getMonth() });
+                    }
+                    const CAT_META: Record<string, { label: string; color: string; bg: string }> = {
+                      onboarding: { label: "Onboarding", color: "#4CAF50", bg: "#E8F5E9" },
+                      offboarding: { label: "Offboarding", color: "#E53935", bg: "#FFEBEE" },
+                      crossboarding: { label: "Crossboarding", color: "#1A73E8", bg: "#E3F2FD" },
+                      reboarding: { label: "Reboarding", color: "#7B5EA7", bg: "#F3E5F5" },
+                    };
+                    // Count collabs per month based on date_debut
+                    const monthlyData = months.map(m => {
+                      const counts: Record<string, number> = { onboarding: 0, offboarding: 0, crossboarding: 0, reboarding: 0 };
+                      let total = 0;
+                      collabs.forEach((c: any) => {
+                        if (!c.dateDebut) return;
+                        const d = new Date(c.dateDebut);
+                        if (d.getFullYear() === m.year && d.getMonth() === m.month) {
+                          const cat = c.parcours_categorie || (PARCOURS_TEMPLATES.find((p: any) => p.id === c.parcours_id) as any)?.categorie?.slug || "onboarding";
+                          if (counts[cat] !== undefined) counts[cat]++;
+                          total++;
+                        }
+                      });
+                      return { ...m, counts, total };
+                    });
+                    const grandTotal = monthlyData.reduce((s, m) => s + m.total, 0);
+                    const currentMonth = monthlyData[monthlyData.length - 1];
+                    return (
+                      <div>
+                        <p style={{ fontSize: 13, color: C.textLight, marginBottom: 16 }}>Suivi mensuel de la consommation par type de parcours</p>
+
+                        {/* Current month summary */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+                          {Object.entries(CAT_META).map(([key, meta]) => (
+                            <div key={key} style={{ padding: "14px 16px", borderRadius: 10, background: meta.bg, border: `1px solid ${meta.color}20` }}>
+                              <div style={{ fontSize: 24, fontWeight: 700, color: meta.color }}>{currentMonth.counts[key]}</div>
+                              <div style={{ fontSize: 11, color: meta.color, fontWeight: 600 }}>{meta.label}</div>
+                              <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>ce mois</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Monthly table */}
+                        <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                            <thead>
+                              <tr style={{ background: C.bg }}>
+                                <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>Mois</th>
+                                {Object.values(CAT_META).map(meta => (
+                                  <th key={meta.label} style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, fontSize: 11, color: meta.color, textTransform: "uppercase" }}>{meta.label}</th>
+                                ))}
+                                <th style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, fontSize: 11, color: C.text, textTransform: "uppercase" }}>Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {monthlyData.map((m, i) => (
+                                <tr key={i} style={{ borderTop: `1px solid ${C.border}`, background: i === monthlyData.length - 1 ? C.pinkBg + "40" : "transparent" }}>
+                                  <td style={{ padding: "10px 14px", fontWeight: i === monthlyData.length - 1 ? 600 : 400, textTransform: "capitalize" }}>{m.label}</td>
+                                  {Object.keys(CAT_META).map(key => (
+                                    <td key={key} style={{ padding: "10px 14px", textAlign: "center", fontWeight: m.counts[key] > 0 ? 600 : 400, color: m.counts[key] > 0 ? CAT_META[key].color : C.textMuted }}>
+                                      {m.counts[key]}
+                                    </td>
+                                  ))}
+                                  <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, color: C.text }}>{m.total}</td>
+                                </tr>
+                              ))}
+                              <tr style={{ borderTop: `2px solid ${C.border}`, background: C.bg }}>
+                                <td style={{ padding: "10px 14px", fontWeight: 700 }}>Total (6 mois)</td>
+                                {Object.keys(CAT_META).map(key => (
+                                  <td key={key} style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, color: CAT_META[key].color }}>
+                                    {monthlyData.reduce((s, m) => s + m.counts[key], 0)}
+                                  </td>
+                                ))}
+                                <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, color: C.text }}>{grandTotal}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div style={{ marginTop: 16, padding: "12px 16px", background: C.blueLight, borderRadius: 8, fontSize: 12, color: C.blue }}>
+                          La facturation est basée sur le nombre de collaborateurs actifs par mois. Chaque parcours démarré compte comme une unité de consommation.
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {subTab === "facturation" && (
                     <div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>

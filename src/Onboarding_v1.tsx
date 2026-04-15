@@ -128,7 +128,7 @@ export default function OnboardingModule() {
   const [tenantActiveModules, setTenantActiveModules] = useState<string[]>([]);
   const [tenantSubscriptions, setTenantSubscriptions] = useState<any[]>([]);
   const [selectedPlanIds, setSelectedPlanIds] = useState<number[]>([]);
-  const [subTab, setSubTab] = useState<"facturation" | "factures" | "paiement" | "protection">("facturation");
+  const [subTab, setSubTab] = useState<"facturation" | "factures" | "paiement" | "protection" | "consommation">("facturation");
   const [subView, setSubView] = useState<"overview" | "change" | "apps">(_needsPlan ? "change" : "overview");
   const [subEmployeeCount, setSubEmployeeCount] = useState(25);
   const [billingInfo, setBillingInfo] = useState({ company: "", email: "", prenom: "", nom: "", telephone: "", pays: "Suisse", rue: "", ville: "", code_postal: "", vat: "" });
