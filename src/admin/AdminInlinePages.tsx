@@ -55,7 +55,7 @@ import {
   exportAllData, exportCollaborateursCSV, exportAuditLog, rgpdDeleteCollaborateur, rgpdDeleteAccount,
   get2FAStatus, setup2FA, confirm2FA, disable2FA, regenerate2FARecoveryCodes,
   registerTenant, checkTenantAvailability,
-  getCompanySettings, updateCompanySettings,
+  getCompanySettings, updateCompanySettings, purgeDemoCollaborateurs,
   getBadges, getMyBadges, getBadgeTemplates, createBadgeTemplate as apiCreateBadgeTpl, updateBadgeTemplate as apiUpdateBadgeTpl, deleteBadgeTemplate as apiDeleteBadgeTpl, awardBadge, revokeBadge,
   type Badge, type BadgeTemplate,
   getPlans, type PlanData,
@@ -132,7 +132,7 @@ export function createAdminInlinePages(ctx: any) {
     adMappings, setAdMappings, adGroups, setAdGroups, syncLoading, setSyncLoading, obTeams, setObTeams,
     teamPanelMode, setTeamPanelMode, teamPanelData, setTeamPanelData, wfPanelMode, setWfPanelMode, wfPanelData, setWfPanelData,
     tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData,
-    lang, setLangState, darkMode, setDarkMode, activeLanguages, setActiveLanguages, contentTranslations, setContentTranslations,
+    lang, setLangState, darkMode, setDarkMode, demoMode, setDemoMode, activeLanguages, setActiveLanguages, contentTranslations, setContentTranslations,
     fieldConfig, setFieldConfig, translateFieldId, setTranslateFieldId, translateEN, setTranslateEN, adminUsers, setAdminUsers,
     adminRoles, setAdminRoles, rolePanelMode, setRolePanelMode, rolePanelData, setRolePanelData,
     roleTab, setRoleTab, selectedRoleId, setSelectedRoleId, permMatrixFilter, setPermMatrixFilter,
@@ -1941,6 +1941,42 @@ export function createAdminInlinePages(ctx: any) {
             <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 24px" }}>{t('data.subtitle')}</p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Demo mode toggle */}
+              <div className="iz-card" style={{ ...sCard, padding: "20px 24px", display: "flex", alignItems: "center", gap: 16, border: demoMode ? `2px solid ${C.amber}` : `1px solid ${C.border}` }}>
+                <div style={{ width: 44, height: 44, borderRadius: 10, background: demoMode ? C.amberLight : C.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Boxes size={20} color={demoMode ? C.amber : C.textMuted} /></div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 2 }}>Mode démonstration</div>
+                  <div style={{ fontSize: 12, color: C.textMuted }}>
+                    {demoMode
+                      ? "Activé — Des collaborateurs et données fictives sont affichés pour la démonstration."
+                      : "Désactivé — Seules les vraies données sont affichées."}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {demoMode && (
+                    <button onClick={() => showConfirm("Supprimer toutes les données de démo ? Les collaborateurs fictifs, messages et notifications seront supprimés. La configuration (parcours, actions, documents) sera conservée.", async () => {
+                      try {
+                        await purgeDemoCollaborateurs();
+                        await updateCompanySettings({ demo_mode: "false" });
+                        setDemoMode(false); localStorage.setItem("illizeo_demo_mode", "false");
+                        refetchCollaborateurs();
+                        addToast_admin("Données de démo supprimées");
+                      } catch { addToast_admin("Erreur"); }
+                    })} style={{ ...sBtn("outline"), whiteSpace: "nowrap", color: C.red, borderColor: C.red, fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}><Trash size={12} /> Purger les données démo</button>
+                  )}
+                  <div onClick={async () => {
+                    const newVal = !demoMode;
+                    setDemoMode(newVal); localStorage.setItem("illizeo_demo_mode", String(newVal));
+                    await updateCompanySettings({ demo_mode: String(newVal) }).catch(() => {});
+                    addToast_admin(newVal ? "Mode démo activé" : "Mode démo désactivé");
+                  }} style={{ width: 44, height: 24, borderRadius: 12, background: demoMode ? C.amber : C.border, cursor: "pointer", position: "relative", transition: "all .2s" }}>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: demoMode ? 22 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ height: 1, background: C.border, margin: "4px 0" }} />
+
               {/* Export all */}
               <div className="iz-card" style={{ ...sCard, padding: "20px 24px", display: "flex", alignItems: "center", gap: 16 }}>
                 <div style={{ width: 44, height: 44, borderRadius: 10, background: C.blueLight, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Download size={20} color={C.blue} /></div>

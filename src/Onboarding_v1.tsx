@@ -267,6 +267,7 @@ export default function OnboardingModule() {
   const apiEnabled = { enabled: auth.isAuthenticated };
   // Only show mock data for the editor tenant (illizeo). Other tenants get empty arrays.
   const isDemo = (localStorage.getItem("illizeo_tenant_id") || "illizeo") === "illizeo";
+  const [demoMode, setDemoMode] = useState<boolean>(localStorage.getItem("illizeo_demo_mode") === "true");
   const { data: COLLABORATEURS, refetch: refetchCollaborateurs } = useApiData(getCollaborateurs, isDemo ? _MOCK_COLLABORATEURS : [], apiEnabled);
   const { data: PARCOURS_TEMPLATES, refetch: refetchParcours } = useApiData(getParcours, isDemo ? _MOCK_PARCOURS_TEMPLATES : [], apiEnabled);
   const { data: ACTION_TEMPLATES, refetch: refetchActions } = useApiData(getActions, isDemo ? _MOCK_ACTION_TEMPLATES as any : [], apiEnabled);
@@ -614,10 +615,10 @@ export default function OnboardingModule() {
 
   const [completedActions, setCompletedActions] = useState<Set<number>>(new Set());
 
-  const [sharedTimeline, setSharedTimeline] = useState<TimelineEntry[]>([
+  const [sharedTimeline, setSharedTimeline] = useState<TimelineEntry[]>(demoMode ? [
     { date: "15/02/2026", heure: "10:30", event: "Parcours onboarding créé", type: "system", detail: "Parcours « Onboarding Standard » assigné par Admin RH" },
     { date: "15/02/2026", heure: "10:31", event: "Email d'invitation envoyé", type: "email", detail: "Email envoyé à nadia.ferreira@gmail.com" },
-  ]);
+  ] : []);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
@@ -897,7 +898,7 @@ export default function OnboardingModule() {
     contratPanelData, setContratPanelData,
     contratsPageTab, setContratsPageTab,
     lang, setLangState,
-    darkMode, setDarkMode,
+    darkMode, setDarkMode, demoMode, setDemoMode,
     activeLanguages, setActiveLanguages,
     contentTranslations, setContentTranslations,
     fieldConfig, setFieldConfig,
@@ -1082,6 +1083,7 @@ export default function OnboardingModule() {
         // Contract types & jurisdictions from company settings
         if (s.contract_types) try { setContractTypes(JSON.parse(s.contract_types)); } catch {}
         if (s.jurisdictions) try { setJurisdictions(JSON.parse(s.jurisdictions)); } catch {}
+        if (s.demo_mode !== undefined) { const dm = s.demo_mode === "true" || s.demo_mode === true; setDemoMode(dm); localStorage.setItem("illizeo_demo_mode", String(dm)); }
         // Setup wizard: show for new tenants (no setup_completed flag)
         if (auth.isAdmin && !s.setup_completed) {
           setShowSetupWizard(true);
@@ -2248,15 +2250,15 @@ export default function OnboardingModule() {
                       {allPhaseItems.map((item, ai) => {
                         const empA = item.empAction;
                         return (
-                          <div key={ai} className="iz-card" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", marginBottom: 4, borderRadius: 8, border: `1px solid ${item.isDone ? C.green : C.border}`, background: item.isDone ? C.greenLight : C.white, cursor: empA && !item.isDone ? "pointer" : "default", opacity: item.isDone ? .7 : 1, transition: "all .2s" }} onClick={() => { if (empA && !item.isDone) handleCompleteAction(empA.id); }}>
+                          <div key={ai} className="iz-card" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", marginBottom: 4, borderRadius: 8, border: `1px solid ${item.isDone ? C.green : C.border}`, background: item.isDone ? C.greenLight : C.white, cursor: "pointer", opacity: item.isDone ? .7 : 1, transition: "all .2s" }} onClick={() => { if (empA) { if (item.isDone) { handleReactivateAction(empA.id, (empA as any).assignment_id); } else { setShowActionDetail(empA.id); } } }}>
                             <div style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${item.isDone ? C.green : C.border}`, background: item.isDone ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                               {item.isDone && <Check size={12} color={C.white} />}
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: 13, fontWeight: 500, textDecoration: item.isDone ? "line-through" : "none", color: item.isDone ? C.textLight : C.text }}>{item.tpl.titre}</div>
                             </div>
-                            {empA?.urgent && !item.isDone && <button onClick={e => { e.stopPropagation(); setShowDocPanel("admin"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "4px 12px", fontSize: 11 }}>{t('emp.complete_btn')}</button>}
-                            {item.isDone && <span style={{ fontSize: 11, color: C.green, fontWeight: 600 }}>{t('emp.task_done')}</span>}
+                            {item.isDone && empA && <button onClick={e => { e.stopPropagation(); handleReactivateAction(empA.id, (empA as any).assignment_id); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 12px", fontSize: 11 }}><RotateCcw size={11} style={{ marginRight: 4 }} /> Réactiver</button>}
+                            {!item.isDone && empA && <button onClick={e => { e.stopPropagation(); setShowActionDetail(empA.id); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 12px", fontSize: 11 }}>{t('emp.complete_btn')}</button>}
                             {!item.isDone && !empA && <span style={{ fontSize: 10, color: C.textMuted }}>{item.tpl.delaiRelatif}</span>}
                           </div>
                         );
@@ -2320,7 +2322,8 @@ export default function OnboardingModule() {
             </div>
           </div>
 
-          {/* Activité récente */}
+          {/* Activité récente — only show if there's data */}
+          {sharedTimeline.length > 0 && (
           <div className="iz-card iz-fade-up iz-stagger-4" style={{ ...sCard }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px" }}>{t('emp.recent_activity')}</h3>
             {sharedTimeline.slice(0, 6).map((ev, i) => (
@@ -2340,6 +2343,7 @@ export default function OnboardingModule() {
               </div>
             ))}
           </div>
+          )}
         </div>
         );
       })()}
