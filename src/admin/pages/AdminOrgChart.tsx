@@ -8,7 +8,7 @@ import type { Collaborateur } from '../../types';
 
 export function createAdminOrgChart(ctx: any) {
   const {
-    COLLABORATEURS,
+    COLLABORATEURS, demoMode,
     orgView, setOrgView, orgSearch, setOrgSearch,
     orgExpandedNodes, setOrgExpandedNodes,
     orgSortCol, setOrgSortCol, orgSortDir, setOrgSortDir,
@@ -100,7 +100,14 @@ export function createAdminOrgChart(ctx: any) {
         </div>
 
         {/* TREE VIEW */}
-        {orgView === "tree" && (
+        {orgView === "tree" && collabs.length === 0 && (
+          <div style={{ padding: "60px 20px", textAlign: "center", color: C.textMuted }}>
+            <Users size={48} color={C.border} style={{ marginBottom: 16 }} />
+            <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>Aucun collaborateur</div>
+            <div style={{ fontSize: 13 }}>Ajoutez des collaborateurs pour voir l'organigramme.</div>
+          </div>
+        )}
+        {orgView === "tree" && collabs.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
             {/* CEO Node */}
             <div onClick={() => toggleNode("ceo")} style={{ cursor: "pointer" }}>
