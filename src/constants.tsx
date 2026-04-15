@@ -164,8 +164,36 @@ export function applyDarkMode(dark: boolean): void {
 applyDarkMode(isDarkMode());
 
 // ─── LOCALE HELPERS ────────────────────────────────────────────
-export const REGION_LOCALE: Record<string, string> = { CH: "fr-CH", FR: "fr-FR", BE: "fr-BE", LU: "fr-LU", CA: "fr-CA", US: "en-US", GB: "en-GB", DE: "de-DE" };
-export const REGION_CURRENCY: Record<string, string> = { CH: "CHF", FR: "EUR", BE: "EUR", LU: "EUR", CA: "CAD", US: "USD", GB: "GBP", DE: "EUR" };
+export const REGION_LOCALE: Record<string, string> = {
+  AF:"fa-AF",AL:"sq-AL",DZ:"ar-DZ",AD:"ca-AD",AO:"pt-AO",AR:"es-AR",AM:"hy-AM",AU:"en-AU",AT:"de-AT",AZ:"az-AZ",
+  BH:"ar-BH",BD:"bn-BD",BE:"fr-BE",BJ:"fr-BJ",BO:"es-BO",BA:"bs-BA",BW:"en-BW",BR:"pt-BR",BN:"ms-BN",BG:"bg-BG",
+  BF:"fr-BF",KH:"km-KH",CM:"fr-CM",CA:"fr-CA",CL:"es-CL",CN:"zh-CN",CO:"es-CO",KR:"ko-KR",CR:"es-CR",CI:"fr-CI",
+  HR:"hr-HR",CU:"es-CU",CY:"el-CY",CZ:"cs-CZ",DK:"da-DK",DO:"es-DO",EC:"es-EC",EG:"ar-EG",AE:"ar-AE",EE:"et-EE",
+  ET:"am-ET",FI:"fi-FI",FR:"fr-FR",GA:"fr-GA",GE:"ka-GE",DE:"de-DE",GH:"en-GH",GR:"el-GR",GT:"es-GT",GN:"fr-GN",
+  HT:"fr-HT",HN:"es-HN",HK:"zh-HK",HU:"hu-HU",IS:"is-IS",IN:"hi-IN",ID:"id-ID",IR:"fa-IR",IQ:"ar-IQ",IE:"en-IE",
+  IL:"he-IL",IT:"it-IT",JM:"en-JM",JP:"ja-JP",JO:"ar-JO",KZ:"kk-KZ",KE:"sw-KE",KW:"ar-KW",LV:"lv-LV",LB:"ar-LB",
+  LT:"lt-LT",LU:"fr-LU",MG:"fr-MG",MY:"ms-MY",ML:"fr-ML",MT:"mt-MT",MA:"fr-MA",MU:"fr-MU",MX:"es-MX",MD:"ro-MD",
+  MC:"fr-MC",MN:"mn-MN",ME:"sr-ME",MZ:"pt-MZ",NP:"ne-NP",NL:"nl-NL",NZ:"en-NZ",NG:"en-NG",NO:"nb-NO",OM:"ar-OM",
+  PK:"ur-PK",PA:"es-PA",PY:"es-PY",PE:"es-PE",PH:"en-PH",PL:"pl-PL",PT:"pt-PT",QA:"ar-QA",RO:"ro-RO",RU:"ru-RU",
+  RW:"rw-RW",SA:"ar-SA",SN:"fr-SN",RS:"sr-RS",SG:"en-SG",SK:"sk-SK",SI:"sl-SI",ZA:"en-ZA",ES:"es-ES",LK:"si-LK",
+  SE:"sv-SE",CH:"fr-CH",TW:"zh-TW",TZ:"sw-TZ",TH:"th-TH",TG:"fr-TG",TN:"fr-TN",TR:"tr-TR",UA:"uk-UA",GB:"en-GB",
+  US:"en-US",UY:"es-UY",UZ:"uz-UZ",VE:"es-VE",VN:"vi-VN",ZM:"en-ZM",ZW:"en-ZW",
+};
+export const REGION_CURRENCY: Record<string, string> = {
+  AF:"AFN",AL:"ALL",DZ:"DZD",AD:"EUR",AO:"AOA",AR:"ARS",AM:"AMD",AU:"AUD",AT:"EUR",AZ:"AZN",
+  BH:"BHD",BD:"BDT",BE:"EUR",BJ:"XOF",BO:"BOB",BA:"BAM",BW:"BWP",BR:"BRL",BN:"BND",BG:"BGN",
+  BF:"XOF",KH:"KHR",CM:"XAF",CA:"CAD",CL:"CLP",CN:"CNY",CO:"COP",KR:"KRW",CR:"CRC",CI:"XOF",
+  HR:"EUR",CU:"CUP",CY:"EUR",CZ:"CZK",DK:"DKK",DO:"DOP",EC:"USD",EG:"EGP",AE:"AED",EE:"EUR",
+  ET:"ETB",FI:"EUR",FR:"EUR",GA:"XAF",GE:"GEL",DE:"EUR",GH:"GHS",GR:"EUR",GT:"GTQ",GN:"GNF",
+  HT:"HTG",HN:"HNL",HK:"HKD",HU:"HUF",IS:"ISK",IN:"INR",ID:"IDR",IR:"IRR",IQ:"IQD",IE:"EUR",
+  IL:"ILS",IT:"EUR",JM:"JMD",JP:"JPY",JO:"JOD",KZ:"KZT",KE:"KES",KW:"KWD",LV:"EUR",LB:"LBP",
+  LT:"EUR",LU:"EUR",MG:"MGA",MY:"MYR",ML:"XOF",MT:"EUR",MA:"MAD",MU:"MUR",MX:"MXN",MD:"MDL",
+  MC:"EUR",MN:"MNT",ME:"EUR",MZ:"MZN",NP:"NPR",NL:"EUR",NZ:"NZD",NG:"NGN",NO:"NOK",OM:"OMR",
+  PK:"PKR",PA:"PAB",PY:"PYG",PE:"PEN",PH:"PHP",PL:"PLN",PT:"EUR",QA:"QAR",RO:"RON",RU:"RUB",
+  RW:"RWF",SA:"SAR",SN:"XOF",RS:"RSD",SG:"SGD",SK:"EUR",SI:"EUR",ZA:"ZAR",ES:"EUR",LK:"LKR",
+  SE:"SEK",CH:"CHF",TW:"TWD",TZ:"TZS",TH:"THB",TG:"XOF",TN:"TND",TR:"TRY",UA:"UAH",GB:"GBP",
+  US:"USD",UY:"UYU",UZ:"UZS",VE:"VES",VN:"VND",ZM:"ZMW",ZW:"ZWL",
+};
 
 export function getLocaleSettings() {
   const r = localStorage.getItem("illizeo_region") || "CH";
