@@ -27,6 +27,6 @@ export function createAdminRenders(ctx: any) {
     ...adminNPSContrats,
     ...adminCooptation,
     ...adminIntegrations,
-    ...adminSidebarComponent,
+    renderSidebar_admin: adminSidebarComponent.renderSidebar_admin,
   };
 }

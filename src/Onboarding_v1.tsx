@@ -175,15 +175,7 @@ export default function OnboardingModule() {
     // Otherwise show tenant selection
     return false;
   });
-  // Re-check tenant param on URL changes (for SPA navigation)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tenantParam = params.get("tenant");
-    if (tenantParam && !tenantResolved) {
-      localStorage.setItem("illizeo_tenant_id", tenantParam);
-      setTenantResolved(true);
-    }
-  }, []);
+  // Note: tenant resolution is handled in useState initializer above
   const [tenantInput, setTenantInput] = useState("");
   const [regData, setRegData] = useState({ company_name: "", admin_prenom: "", admin_nom: "", admin_email: "", password: "", password_confirmation: "" });
   const [regLoading, setRegLoading] = useState(false);
@@ -1408,9 +1400,10 @@ export default function OnboardingModule() {
     renderDocuments, renderWorkflows, renderTemplates, renderEquipes,
     renderNotifications_admin, renderEntreprise_admin, renderMessagerie_admin,
     renderNPS, renderContrats, renderCooptation, renderIntegrations,
-    renderSidebar_admin, PARCOURS_CAT_META, hasModule, isPageAccessible,
+    renderSidebar_admin: _renderSidebar_admin, PARCOURS_CAT_META, hasModule, isPageAccessible,
     isEditorTenant, isInTrial, trialExpired, hasActiveSub, SIDEBAR,
   } = adminRenders as any;
+  const renderSidebar_admin = typeof _renderSidebar_admin === "function" ? _renderSidebar_admin : () => <div style={{ width: 220, minHeight: "100vh", background: "#fff", borderRight: "1px solid #e0e0e0" }} />;
 
   const adminInline = createAdminInlinePages(ctx);
   const adminPanels = createAdminPanels(ctx);
