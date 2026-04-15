@@ -2204,23 +2204,26 @@ export default function OnboardingModule() {
               : phases
             ).map((ph: any, phIdx: number) => {
               const PhIcon = PHASE_ICONS[ph.nom];
-              // Match actions to phases
+              // Match actions to phases — use employee data directly
               const phaseActionTpls = _myActionTpls.filter((t: any) => t.phase === ph.nom);
-              const phaseActions = _myActions.filter(a => {
-                const tpl = ACTION_TEMPLATES.find(t => t.titre === a.title);
-                return tpl && tpl.phase === ph.nom;
-              });
-              // Combine: employee ACTIONS that match + remaining templates
-              const allPhaseItems = phaseActionTpls.map(tpl => {
-                const empAction = _myActions.find(a => a.title === tpl.titre);
-                return { tpl, empAction, isDone: empAction ? completedActions.has(empAction.id) : false };
+              // Combine: employee ACTIONS that match
+              const allPhaseItems = phaseActionTpls.map((tpl: any) => {
+                const empAction = _myActions.find((a: any) => a.title === tpl.titre);
+                return { tpl, empAction, isDone: empAction ? completedActions.has(empAction.id) : (tpl.assignment_status === "termine") };
               });
               const allDone = allPhaseItems.length > 0 && allPhaseItems.every(a => a.isDone);
               const someDone = allPhaseItems.some(a => a.isDone);
-              const isCurrent = !allDone && (phIdx === 0 || phases.slice(0, phIdx).every((_, prevIdx) => {
-                const prevTpls = ACTION_TEMPLATES.filter(t => t.phase === phases[prevIdx].nom && t.parcours === _myParcoursName);
-                const prevActions = prevTpls.map(t => _myActions.find(a => a.title === t.titre)).filter(Boolean);
-                return prevActions.length > 0 && prevActions.every(a => a && completedActions.has(a.id));
+              // Use local data for phase progression
+              const allPhases = ((_myCollab as any)?.parcours_phases?.length > 0
+                ? (_myCollab as any).parcours_phases.map((p: any) => ({ id: p.id, nom: p.nom }))
+                : phases);
+              const isCurrent = !allDone && (phIdx === 0 || allPhases.slice(0, phIdx).every((_: any, prevIdx: number) => {
+                const prevPhaseName = allPhases[prevIdx]?.nom;
+                const prevTpls = _myActionTpls.filter((t: any) => t.phase === prevPhaseName);
+                return prevTpls.length > 0 && prevTpls.every((t: any) => {
+                  const ea = _myActions.find((a: any) => a.title === t.titre);
+                  return ea ? completedActions.has(ea.id) : (t.assignment_status === "termine");
+                });
               }));
               const isPast = allDone;
               const isFuture = !isCurrent && !isPast;
@@ -2265,7 +2268,8 @@ export default function OnboardingModule() {
             })}
           </div>
 
-          {/* Documents status */}
+          {/* Documents status — only show for onboarding parcours */}
+          {((_myCollab as any)?.parcours_categorie === "onboarding" || (!(_myCollab as any)?.parcours_categorie && Object.keys(employeeDocs).length > 0)) && (
           <div className="iz-card iz-fade-up iz-stagger-2" style={{ ...sCard, marginBottom: 20 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{t('emp.my_documents')}</h3>
@@ -2290,12 +2294,21 @@ export default function OnboardingModule() {
               ))}
             </div>
           </div>
+          )}
 
           {/* Équipe & contacts */}
           <div className="iz-card iz-fade-up iz-stagger-3" style={{ ...sCard, marginBottom: 20 }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px" }}>{t('emp.my_team')}</h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {TEAM_MEMBERS.slice(0, 6).map((m, i) => (
+              {((_myCollab as any)?.accompagnants?.length > 0
+                ? (_myCollab as any).accompagnants.map((a: any) => {
+                    const ROLE_LABELS: Record<string, string> = { hrbp: "HRBP", manager: "Manager", buddy: "Buddy / Parrain", it: "IT Support", admin_rh: "Admin RH" };
+                    const ROLE_COLORS: Record<string, string> = { hrbp: "#7B5EA7", manager: "#1A73E8", buddy: "#4CAF50", it: "#F9A825", admin_rh: "#C2185B" };
+                    const initials = (a.name || "").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+                    return { name: a.name, role: ROLE_LABELS[a.role] || a.role, initials, color: ROLE_COLORS[a.role] || "#888" };
+                  })
+                : TEAM_MEMBERS.slice(0, 6)
+              ).map((m: any, i: number) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: C.bg, borderRadius: 8 }}>
                   <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: C.white }}>{m.initials}</div>
                   <div>

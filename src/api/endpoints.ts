@@ -1323,6 +1323,7 @@ export async function getMyCollaborateur() {
   }));
   (collab as any).parcours_nom = raw.parcours?.nom || null;
   (collab as any).parcours_categorie = raw.parcours?.categorie?.slug || raw.parcours?.categorie || null;
+  (collab as any).accompagnants = raw.accompagnants || [];
   return collab;
 }
 
