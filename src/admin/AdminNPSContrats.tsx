@@ -34,7 +34,7 @@ import {
   assignActions as apiAssignActions,
   createWorkflow as apiCreateWorkflow, updateWorkflow as apiUpdateWorkflow, deleteWorkflow as apiDeleteWorkflow,
   createEmailTemplate as apiCreateEmailTpl, updateEmailTemplate as apiUpdateEmailTpl, deleteEmailTemplate as apiDeleteEmailTpl,
-  createContrat as apiCreateContrat, updateContrat as apiUpdateContrat, deleteContrat as apiDeleteContrat, uploadContratFile,
+  createContrat as apiCreateContrat, updateContrat as apiUpdateContrat, deleteContrat as apiDeleteContrat, uploadContratFile, getContratGenerated, downloadContratMerged,
   getUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser,
   getFieldConfig, updateFieldConfig as apiUpdateFieldConfig, createFieldConfig as apiCreateFieldConfig, deleteFieldConfig as apiDeleteFieldConfig,
   getOnboardingTeams, createOnboardingTeam as apiCreateTeam, updateOnboardingTeam as apiUpdateTeam, deleteOnboardingTeam as apiDeleteTeam,
@@ -568,6 +568,8 @@ export function createAdminNPSContrats(ctx: any) {
     };
 
     // ─── CONTRATS & SIGNATURES (merged page) ──────────────────
+    const { generateContrat, setGenerateContrat, generateCollabId, setGenerateCollabId, generateData, setGenerateData, generateLoading, setGenerateLoading } = ctx;
+
     const renderContrats = () => (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -648,7 +650,10 @@ export function createAdminNPSContrats(ctx: any) {
                   <td style={{ padding: "10px 14px" }}>{c.type}</td>
                   <td style={{ padding: "10px 14px" }}>{c.juridiction}</td>
                   <td style={{ padding: "10px 14px" }}><span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: c.actif ? C.greenLight : C.bg, color: c.actif ? C.green : C.textMuted }}>{c.actif ? t('nps.active') : t('nps.inactive')}</span></td>
-                  <td style={{ padding: "10px 14px" }}><button onClick={e => { e.stopPropagation(); setContratPanelData({ id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction, actif: c.actif, fichier: c.fichier || "" }); setContratPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "3px 10px", fontSize: 11 }}>{t('common.edit')}</button></td>
+                  <td style={{ padding: "10px 14px", display: "flex", gap: 6 }}>
+                    {c.fichier && <button onClick={e => { e.stopPropagation(); setGenerateContrat(c); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "3px 10px", fontSize: 11 }}>Générer</button>}
+                    <button onClick={e => { e.stopPropagation(); setContratPanelData({ id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction, actif: c.actif, fichier: c.fichier || "" }); setContratPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "3px 10px", fontSize: 11 }}>{t('common.edit')}</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -761,6 +766,91 @@ export function createAdminNPSContrats(ctx: any) {
         </>)}
 
         {contratsPageTab === "signatures" && renderSignaturesTab()}
+
+        {/* ── Generate contract modal ─────────────────────── */}
+        {generateContrat && (
+          <>
+            <div onClick={() => { setGenerateContrat(null); setGenerateData(null); setGenerateCollabId(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1100 }} />
+            <div className="iz-modal iz-scale-in" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: C.white, borderRadius: 16, width: 640, maxHeight: "80vh", overflow: "auto", zIndex: 1101 }}>
+              <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>Générer un contrat</h2>
+                  <p style={{ fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{generateContrat.nom} — {generateContrat.type}</p>
+                </div>
+                <button onClick={() => { setGenerateContrat(null); setGenerateData(null); setGenerateCollabId(null); }} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
+              </div>
+              <div style={{ padding: "20px 24px" }}>
+                {/* Step 1: Select collaborateur */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>1. Sélectionnez un collaborateur</label>
+                  <select value={generateCollabId || ""} onChange={e => { const id = Number(e.target.value); setGenerateCollabId(id); setGenerateData(null); }} style={{ ...sInput, fontSize: 13, width: "100%" }}>
+                    <option value="">— Choisir un collaborateur —</option>
+                    {COLLABORATEURS.map((c: any) => <option key={c.id} value={c.id}>{c.prenom} {c.nom} — {c.poste} ({c.site})</option>)}
+                  </select>
+                </div>
+
+                {generateCollabId && !generateData && (
+                  <button onClick={async () => {
+                    setGenerateLoading(true);
+                    try {
+                      const data = await getContratGenerated(generateContrat.id, generateCollabId);
+                      setGenerateData(data);
+                    } catch { addToast_admin("Erreur lors de la génération"); }
+                    finally { setGenerateLoading(false); }
+                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, marginBottom: 16 }}>
+                    {generateLoading ? "Chargement..." : "2. Prévisualiser les variables"}
+                  </button>
+                )}
+
+                {/* Step 2: Variable preview */}
+                {generateData && (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>2. Variables du contrat</label>
+                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", maxHeight: 300, overflow: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ background: C.bg }}>
+                              <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 10, color: C.textLight, textTransform: "uppercase" }}>Variable</th>
+                              <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 10, color: C.textLight, textTransform: "uppercase" }}>Valeur</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(generateData.variables).map(([key, val]: [string, any]) => (
+                              <tr key={key} style={{ borderTop: `1px solid ${C.border}` }}>
+                                <td style={{ padding: "6px 12px", fontFamily: "monospace", fontSize: 11, color: C.pink }}>${'{' + key + '}'}</td>
+                                <td style={{ padding: "6px 12px", color: val ? C.text : C.textMuted }}>{val || "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Step 3: Download */}
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>3. Télécharger le contrat généré</label>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button onClick={async () => {
+                          try { await downloadContratMerged(generateContrat.id, generateCollabId!, 'docx'); addToast_admin("Contrat DOCX téléchargé"); }
+                          catch { addToast_admin("Erreur lors du téléchargement"); }
+                        }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center" }}>
+                          <Download size={14} /> DOCX
+                        </button>
+                        <button onClick={async () => {
+                          try { await downloadContratMerged(generateContrat.id, generateCollabId!, 'pdf'); addToast_admin("Contrat PDF téléchargé"); }
+                          catch { addToast_admin("Erreur lors du téléchargement PDF"); }
+                        }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center" }}>
+                          <Download size={14} /> PDF
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
 

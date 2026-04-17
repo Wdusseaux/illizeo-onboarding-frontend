@@ -229,6 +229,7 @@ export function createAdminSidebarComponent(ctx: any) {
         { id: "admin_cooptation" as AdminPage, label: t('admin.cooptation'), icon: Handshake },
         { id: "admin_gamification" as AdminPage, label: t('admin.gamification'), icon: Trophy },
         { id: "admin_integrations" as AdminPage, label: t('admin.integrations'), icon: Link },
+        { id: "admin_provisioning" as AdminPage, label: t('prov.title'), icon: Download },
       ]},
       { section: t('admin.settings'), items: [
         { id: "admin_audit" as AdminPage, label: t('audit.title'), icon: ClipboardCheck },
@@ -238,7 +239,6 @@ export function createAdminSidebarComponent(ctx: any) {
         { id: "admin_apparence" as AdminPage, label: t('admin.appearance'), icon: Palette },
         { id: "admin_password_policy" as AdminPage, label: lang === "fr" ? "Sécurité" : "Security", icon: ShieldCheck },
         { id: "admin_donnees" as AdminPage, label: t('admin.data_rgpd'), icon: DatabaseBackup },
-        { id: "admin_provisioning" as AdminPage, label: t('prov.title'), icon: Download },
         ...(!isEditorTenant ? [{ id: "admin_abonnement" as AdminPage, label: t('admin.subscription'), icon: CircleDollarSign }] : []),
       ]},
     ];
@@ -273,12 +273,16 @@ export function createAdminSidebarComponent(ctx: any) {
               {section.items.map(item => {
                 const active = adminPage === item.id;
                 const Icon = item.icon;
-                const accessible = isPageAccessible(item.id);
+                const _locked = !isEditorTenant && !isInTrial && !hasActiveSub;
+                const isExempt = item.id === "admin_abonnement" || item.id === "admin_donnees";
+                const accessible = isExempt || (!_locked && isPageAccessible(item.id));
+                // Hide non-accessible module pages (don't hide when globally locked — those show as locked)
+                if (!accessible && !_locked) return null;
                 return (
                   <button key={item.id} onClick={() => {
-                    if (trialExpired && !hasActiveSub && !isEditorTenant && item.id !== "admin_abonnement") {
+                    if (_locked && !isExempt) {
                       setAdminPage("admin_abonnement" as any); setSubView("change");
-                      addToast_admin("Votre période d'essai est terminée. Veuillez souscrire un plan.");
+                      addToast_admin("Veuillez souscrire un plan pour accéder à cette fonctionnalité.");
                     } else if (accessible) { setAdminPage(item.id); setCollabProfileId(null); }
                     else { addToast_admin("Module non inclus dans votre plan. Mettez à niveau votre abonnement."); }
                   }} title={collapsed ? item.label + (accessible ? "" : " (non inclus)") : undefined} className="iz-sidebar-item" style={{
@@ -338,7 +342,7 @@ export function createAdminSidebarComponent(ctx: any) {
               <button onClick={() => setAdminPage("admin_2fa" as any)} className="iz-sidebar-item" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "none", background: adminPage === "admin_2fa" ? C.pinkBg : "transparent", cursor: "pointer", fontFamily: font, fontSize: 11, color: adminPage === "admin_2fa" ? C.pink : C.textMuted, width: "100%", transition: "all .15s" }}>
                 <ShieldCheck size={13} /> {lang === "fr" ? "Mon 2FA" : "My 2FA"}
               </button>
-              <button onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `${window.location.pathname}?tenant=${tid}` : window.location.pathname; }); }} className="iz-sidebar-item" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", fontFamily: font, fontSize: 11, color: C.textMuted, width: "100%", transition: "all .15s" }}>
+              <button onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `/${tid}` : "/"; }); }} className="iz-sidebar-item" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", fontFamily: font, fontSize: 11, color: C.textMuted, width: "100%", transition: "all .15s" }}>
                 <LogOut size={13} /> {t('auth.logout')}
               </button>
             </div>
@@ -361,7 +365,7 @@ export function createAdminSidebarComponent(ctx: any) {
 
 
   // ─── SUPER ADMIN PANEL ──────────────────────────────────
-  if (superAdminMode && auth.isAuthenticated) {
+  const renderSuperAdminPanel = () => {
     const loadSA = () => {
       superAdminDashboard().then(setSaDashData).catch(e => { console.error("SA dashboard error:", e); setSaDashData({ total_tenants: 0, active_subscriptions: 0, mrr_eur: 0, mrr_chf: 0, total_collaborateurs: 0 }); });
       superAdminListTenants().then(setSaTenants).catch(() => setSaTenants([]));
@@ -383,6 +387,7 @@ export function createAdminSidebarComponent(ctx: any) {
             { id: "plans" as const, label: t('sa.plans_modules'), icon: Package },
             { id: "subscriptions" as const, label: t('sa.subscriptions'), icon: FileSignature },
             { id: "stripe" as const, label: "Stripe", icon: CircleDollarSign },
+            { id: "ai" as const, label: "IA & Claude", icon: Sparkles },
           ]).map(item => (
             <button key={item.id} onClick={() => setSaTab(item.id)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: saTab === item.id ? "rgba(255,255,255,.1)" : "transparent", color: saTab === item.id ? C.white : "rgba(255,255,255,.5)", cursor: "pointer", fontFamily: font, fontSize: 13, fontWeight: saTab === item.id ? 600 : 400, borderLeft: saTab === item.id ? `3px solid ${C.pink}` : "3px solid transparent" }}>
               <item.icon size={16} /> {item.label}
@@ -466,10 +471,11 @@ export function createAdminSidebarComponent(ctx: any) {
                       <div style={{ background: C.bg, borderRadius: 10, padding: "14px 16px", marginBottom: 16 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Tarification</div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12 }}>
-                          <div><span style={{ color: C.textMuted }}>Mensuel :</span> <b>{plan.prix_chf_mensuel} CHF</b>/emp/mois</div>
-                          <div><span style={{ color: C.textMuted }}>Annuel :</span> <b>{(Number(plan.prix_chf_mensuel) * 0.9).toFixed(1)} CHF</b>/emp/mois <span style={{ fontSize: 9, color: C.green, fontWeight: 600 }}>-10%</span></div>
+                          <div><span style={{ color: C.textMuted }}>Mensuel :</span> <b>{plan.prix_chf_mensuel} CHF</b>{plan.addon_type === "ai" ? "/mois" : "/emp/mois"}</div>
+                          {plan.addon_type !== "ai" && <div><span style={{ color: C.textMuted }}>Annuel :</span> <b>{(Number(plan.prix_chf_mensuel) * 0.9).toFixed(1)} CHF</b>/emp/mois <span style={{ fontSize: 9, color: C.green, fontWeight: 600 }}>-10%</span></div>}
+                          {plan.addon_type === "ai" && <div><span style={{ color: C.textMuted, fontSize: 10 }}>Pas de réduction annuelle</span></div>}
                           <div><span style={{ color: C.textMuted }}>Min :</span> <b>{plan.min_mensuel_chf} CHF</b>/mois</div>
-                          <div><span style={{ color: C.textMuted }}>Min annuel :</span> <b>{Math.round(Number(plan.min_mensuel_chf) * 12 * 0.9)} CHF</b>/an</div>
+                          {plan.addon_type !== "ai" && <div><span style={{ color: C.textMuted }}>Min annuel :</span> <b>{Math.round(Number(plan.min_mensuel_chf) * 12 * 0.9)} CHF</b>/an</div>}
                         </div>
                         <div style={{ marginTop: 8, fontSize: 11, color: C.textMuted }}>Min. 25 collaborateurs facturés · Facturation en CHF uniquement</div>
                       </div>
@@ -568,9 +574,15 @@ export function createAdminSidebarComponent(ctx: any) {
                         <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Prix CHF/emp/mois</label><input type="number" step="0.5" value={saPlanData.prix_chf_mensuel} onChange={e => setSaPlanData((p: any) => ({ ...p, prix_chf_mensuel: Number(e.target.value), prix_eur_mensuel: Number(e.target.value) }))} style={sInput} /></div>
                         <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Min CHF/mois (25 emp.)</label><input type="number" value={saPlanData.min_mensuel_chf} onChange={e => setSaPlanData((p: any) => ({ ...p, min_mensuel_chf: Number(e.target.value), min_mensuel_eur: Number(e.target.value) }))} style={sInput} /></div>
                       </div>
-                      <div style={{ padding: "8px 12px", background: C.bg, borderRadius: 8, fontSize: 11, color: C.textMuted }}>
-                        Annuel : <b>{(Number(saPlanData.prix_chf_mensuel || 0) * 0.9).toFixed(1)} CHF</b>/emp/mois (-10%) · Min annuel : <b>{Math.round(Number(saPlanData.min_mensuel_chf || 0) * 12 * 0.9)} CHF</b>/an
-                      </div>
+                      {saPlanData.addon_type !== "ai" ? (
+                        <div style={{ padding: "8px 12px", background: C.bg, borderRadius: 8, fontSize: 11, color: C.textMuted }}>
+                          Annuel : <b>{(Number(saPlanData.prix_chf_mensuel || 0) * 0.9).toFixed(1)} CHF</b>/emp/mois (-10%) · Min annuel : <b>{Math.round(Number(saPlanData.min_mensuel_chf || 0) * 12 * 0.9)} CHF</b>/an
+                        </div>
+                      ) : (
+                        <div style={{ padding: "8px 12px", background: "#FFF3E0", borderRadius: 8, fontSize: 11, color: "#E65100" }}>
+                          Plan IA — prix fixe mensuel, pas de réduction annuelle
+                        </div>
+                      )}
 
                       <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 4 }}>Limites <span style={{ fontWeight: 400, fontSize: 11, color: C.textMuted }}>(vide = illimité)</span></div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 10 }}>
@@ -590,6 +602,29 @@ export function createAdminSidebarComponent(ctx: any) {
                         <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Stripe Price ID (EUR)</label><input value={saPlanData.stripe_price_id_eur || ""} onChange={e => setSaPlanData((p: any) => ({ ...p, stripe_price_id_eur: e.target.value }))} style={sInput} placeholder="price_..." /></div>
                         <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Stripe Price ID (CHF)</label><input value={saPlanData.stripe_price_id_chf || ""} onChange={e => setSaPlanData((p: any) => ({ ...p, stripe_price_id_chf: e.target.value }))} style={sInput} placeholder="price_..." /></div>
                       </div>
+
+                      {/* AI config — only for AI addon plans */}
+                      {(saPlanData.addon_type === "ai" || saPlanData.slug?.startsWith("ia_")) && (
+                        <>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: C.blue, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} /> Configuration IA</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                            <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Modèle Claude</label>
+                              <select value={saPlanData.ai_model || "claude-opus-4-6"} onChange={e => setSaPlanData((p: any) => ({ ...p, ai_model: e.target.value }))} style={sInput}>
+                                <option value="claude-opus-4-7">Opus 4.7 (top)</option>
+                                <option value="claude-opus-4-6">Opus 4.6</option>
+                                <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+                                <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
+                              </select>
+                            </div>
+                            <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Prix scan suppl. (CHF)</label><input type="number" step="0.01" value={saPlanData.ai_extra_scan_price_chf ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, ai_extra_scan_price_chf: e.target.value ? Number(e.target.value) : null }))} style={sInput} placeholder="0.10" /></div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                            <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Scans OCR/mois</label><input type="number" value={saPlanData.ai_ocr_scans ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, ai_ocr_scans: e.target.value ? Number(e.target.value) : null }))} style={sInput} /></div>
+                            <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Messages bot/mois</label><input type="number" value={saPlanData.ai_bot_messages ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, ai_bot_messages: e.target.value ? Number(e.target.value) : null }))} style={sInput} /></div>
+                            <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Contrats IA/mois</label><input type="number" value={saPlanData.ai_contrat_generations ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, ai_contrat_generations: e.target.value ? Number(e.target.value) : null }))} style={sInput} /></div>
+                          </div>
+                        </>
+                      )}
 
                       <div style={{ display: "flex", gap: 16, marginTop: 4 }}>
                         <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13 }}>
@@ -675,12 +710,119 @@ export function createAdminSidebarComponent(ctx: any) {
               </div>
             </div>
           )}
+
+          {saTab === "ai" && (() => {
+            const [aiConfig, setAiConfig] = [ctx.saAiConfig || { api_key: "", model: "claude-opus-4-6", key_set: false }, ctx.setSaAiConfig || (() => {})];
+            const [aiTenantUsage, setAiTenantUsage] = [ctx.saAiTenantUsage || [], ctx.setSaAiTenantUsage || (() => {})];
+
+            // Load AI config on first render
+            if (!ctx._aiLoaded) {
+              ctx._aiLoaded = true;
+              // Fetch current config
+              apiFetch('/super-admin/ai-config').then((d: any) => ctx.setSaAiConfig?.(d)).catch(() => {});
+              // Fetch usage per tenant
+              apiFetch('/super-admin/ai-usage').then((d: any) => ctx.setSaAiTenantUsage?.(d)).catch(() => {});
+            }
+
+            return (
+            <div>
+              <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}><Sparkles size={22} color={C.blue} /> IA & Claude</h1>
+
+              {/* API Config */}
+              <div className="iz-card" style={{ ...sCard, marginBottom: 24 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Configuration API Anthropic</h3>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: aiConfig.key_set ? C.green : C.red }} />
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>{aiConfig.key_set ? "Clé API configurée" : "Clé API non configurée"}</span>
+                  {aiConfig.key_set && <span style={{ fontSize: 11, color: C.textMuted }}>sk-ant-...{aiConfig.key_preview || ""}</span>}
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Clé API Anthropic</label>
+                  <input id="sa-anthropic-key" type="password" placeholder="sk-ant-api03-..." style={sInput} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Modèle par défaut</label>
+                  <select id="sa-anthropic-model" defaultValue={aiConfig.model || "claude-opus-4-6"} style={sInput}>
+                    <option value="claude-opus-4-7">Claude Opus 4.7 (le plus performant)</option>
+                    <option value="claude-opus-4-6">Claude Opus 4.6 (recommandé)</option>
+                    <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (rapide)</option>
+                    <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5 (économique)</option>
+                  </select>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14, fontSize: 12 }}>
+                  <div style={{ padding: "8px 12px", background: C.bg, borderRadius: 8 }}>
+                    <div style={{ color: C.textMuted, fontSize: 10 }}>Opus 4.6</div>
+                    <div style={{ fontWeight: 600 }}>$5 / $25 /MTok</div>
+                  </div>
+                  <div style={{ padding: "8px 12px", background: C.bg, borderRadius: 8 }}>
+                    <div style={{ color: C.textMuted, fontSize: 10 }}>Sonnet 4.6</div>
+                    <div style={{ fontWeight: 600 }}>$3 / $15 /MTok</div>
+                  </div>
+                  <div style={{ padding: "8px 12px", background: C.bg, borderRadius: 8 }}>
+                    <div style={{ color: C.textMuted, fontSize: 10 }}>Haiku 4.5</div>
+                    <div style={{ fontWeight: 600 }}>$1 / $5 /MTok</div>
+                  </div>
+                </div>
+                <button onClick={async () => {
+                  const key = (document.getElementById("sa-anthropic-key") as HTMLInputElement)?.value;
+                  const model = (document.getElementById("sa-anthropic-model") as HTMLSelectElement)?.value;
+                  const data: any = {};
+                  if (key) data.api_key = key;
+                  if (model) data.model = model;
+                  if (Object.keys(data).length === 0) { addToast_admin("Aucune modification"); return; }
+                  try {
+                    await apiFetch('/super-admin/ai-config', { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } });
+                    addToast_admin("Configuration IA enregistrée");
+                    apiFetch('/super-admin/ai-config').then((d: any) => ctx.setSaAiConfig?.(d)).catch(() => {});
+                  } catch { addToast_admin(t('toast.error')); }
+                }} className="iz-btn-pink" style={sBtn("pink")}>{t('common.save')}</button>
+              </div>
+
+              {/* Usage per tenant */}
+              <div className="iz-card" style={{ ...sCard }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Consommation IA par client</h3>
+                <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Mois en cours — tous les tenants avec un plan IA actif</p>
+                {aiTenantUsage.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 20, color: C.textMuted, fontSize: 13 }}>Aucune consommation IA ce mois</div>
+                ) : (
+                  <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: C.bg }}>
+                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Tenant</th>
+                          <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Plan IA</th>
+                          <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>OCR</th>
+                          <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Bot</th>
+                          <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Contrats</th>
+                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Coût API</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {aiTenantUsage.map((t: any, i: number) => (
+                          <tr key={t.tenant_id} style={{ borderTop: `1px solid ${C.border}`, background: i % 2 ? C.bg + "60" : "transparent" }}>
+                            <td style={{ padding: "8px 12px", fontWeight: 500 }}>{t.tenant_id}</td>
+                            <td style={{ padding: "8px 12px", textAlign: "center" }}><span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.blueLight, color: C.blue }}>{t.plan_name}</span></td>
+                            <td style={{ padding: "8px 12px", textAlign: "center" }}><span style={{ fontWeight: 600 }}>{t.ocr_scans}</span><span style={{ color: C.textMuted }}>/{t.ocr_limit}</span></td>
+                            <td style={{ padding: "8px 12px", textAlign: "center" }}><span style={{ fontWeight: 600 }}>{t.bot_messages}</span><span style={{ color: C.textMuted }}>/{t.bot_limit}</span></td>
+                            <td style={{ padding: "8px 12px", textAlign: "center" }}><span style={{ fontWeight: 600 }}>{t.contrat_generations}</span><span style={{ color: C.textMuted }}>/{t.contrat_limit}</span></td>
+                            <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: t.total_cost_usd > 5 ? C.red : C.text }}>${t.total_cost_usd?.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+            );
+          })()}
         </div>
       </div>
     );
-  }
+  };
 
   return {
     renderSidebar_admin,
+    renderSuperAdminPanel,
   };
 }

@@ -20,9 +20,9 @@ export const TEAM_MEMBERS: TeamMember[] = [
 ];
 
 export const DOC_CATEGORIES = [
-  { id: "complementaires", title: "Documents administratifs complémentaires", missing: 2, docs: ["IBAN/BIC Suisse *", "Certificats De Travail et Diplômes *"] },
+  { id: "complementaires", title: "Documents administratifs complémentaires", missing: 2, docs: ["IBAN/BIC *", "Certificats De Travail et Diplômes *"] },
   { id: "formulaires", title: "Formulaires à remplir et à renvoyer", missing: 9, docs: ["Formulaire permis résident Vaud", "Formulaire frontalier Genève", "Déclaration impôt Vaudois", "Fiche identification *"] },
-  { id: "suisse", title: "Documents administratifs – Suisse", missing: 4, docs: ["Pièce d'identité / Passeport *", "Carte AVS", "Permis de travail ou de résidence", "Photo d'identité *"] },
+  { id: "suisse", title: "Documents administratifs – Suisse", missing: 4, docs: ["Pièce d'identité / Passeport *", "Carte d'assuré social", "Permis de travail ou de résidence", "Photo d'identité *"] },
   { id: "supplementaires", title: "Documents administratifs supplémentaires", missing: 7, docs: ["Pièce justificative", "Pièce justificative", "Pièce justificative"] },
 ];
 
@@ -84,6 +84,7 @@ export const _MOCK_ACTION_TEMPLATES: ActionTemplate[] = [
   { id: 3, titre: "A la rencontre de nos leaders !", type: "formation", phase: "Premier jour", delaiRelatif: "J+0", obligatoire: false, description: "Vidéos capsules des leaders de l'entreprise", assignation: { mode: "tous", valeurs: [] }, lienExterne: "https://illizeo.com/onboard/leaders", dureeEstimee: "20 min", parcours: "Onboarding Standard" },
   { id: 4, titre: "Questionnaire d'intégration", type: "questionnaire", phase: "Première semaine", delaiRelatif: "J+7", obligatoire: true, description: "Feedback sur la première semaine d'intégration", assignation: { mode: "tous", valeurs: [] }, parcours: "Onboarding Standard" },
   { id: 5, titre: "Lire le règlement intérieur", type: "lecture", phase: "Avant le premier jour", delaiRelatif: "J-7", obligatoire: true, description: "Document PDF à lire obligatoirement avant l'arrivée", assignation: { mode: "tous", valeurs: [] }, parcours: "Onboarding Standard" },
+  { id: 19, titre: "Informations d'arrivée", type: "rdv", phase: "Avant le premier jour", delaiRelatif: "J-3", obligatoire: true, description: "Date, lieu et personne à demander le premier jour. À renseigner par le RH ou le manager pour chaque collaborateur.", assignation: { mode: "tous", valeurs: [] }, parcours: "Onboarding Standard" },
   { id: 6, titre: "Visite des locaux", type: "rdv", phase: "Premier jour", delaiRelatif: "J+0", obligatoire: true, description: "Visite guidée des bureaux et espaces communs", assignation: { mode: "site", valeurs: ["Genève"] }, dureeEstimee: "45 min", parcours: "Onboarding Standard" },
   { id: 7, titre: "Signer la charte informatique", type: "signature", phase: "Premier jour", delaiRelatif: "J+0", obligatoire: true, description: "Signature électronique de la charte d'utilisation des outils IT", assignation: { mode: "tous", valeurs: [] }, parcours: "Onboarding Standard" },
   { id: 8, titre: "Se présenter à l'équipe", type: "message", phase: "Première semaine", delaiRelatif: "J+1", obligatoire: false, description: "Petit message de présentation pour briser la glace", assignation: { mode: "groupe", valeurs: ["Nouveaux arrivants Genève"] }, parcours: "Onboarding Standard" },
@@ -157,7 +158,7 @@ export const TYPES_CONTRAT = ["CDI", "CDD", "Stage", "Alternance", "Freelance"];
 
 export const _MOCK_ADMIN_DOC_CATEGORIES: DocCategory[] = [
   { id: "complementaires", titre: "Documents administratifs complémentaires", pieces: [
-    { nom: "IBAN/BIC Suisse", obligatoire: true, type: "upload" },
+    { nom: "IBAN/BIC", obligatoire: true, type: "upload" },
     { nom: "Certificats De Travail et Diplômes", obligatoire: true, type: "upload" },
   ]},
   { id: "formulaires", titre: "Formulaires à remplir et à renvoyer", pieces: [
@@ -168,7 +169,7 @@ export const _MOCK_ADMIN_DOC_CATEGORIES: DocCategory[] = [
   ]},
   { id: "suisse", titre: "Documents administratifs – Suisse", pieces: [
     { nom: "Pièce d'identité / Passeport", obligatoire: true, type: "upload" },
-    { nom: "Carte AVS", obligatoire: false, type: "upload" },
+    { nom: "Carte d'assuré social", obligatoire: false, type: "upload" },
     { nom: "Permis de travail ou de résidence", obligatoire: false, type: "upload" },
     { nom: "Photo d'identité", obligatoire: true, type: "upload" },
   ]},

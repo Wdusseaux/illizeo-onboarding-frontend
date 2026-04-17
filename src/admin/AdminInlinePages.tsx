@@ -63,7 +63,7 @@ import {
   superAdminListPlans, superAdminCreatePlan, superAdminUpdatePlan, superAdminDeletePlan,
   superAdminUpdateModules, superAdminListSubscriptions, superAdminListInvoices,
   superAdminGetStripeConfig, superAdminUpdateStripeConfig,
-  getMySubscription, subscribeToPlan, cancelSubscription, getAvailablePlans, getActiveModules, getStorageUsage, getSignatureUsage,
+  getMySubscription, subscribeToPlan, cancelSubscription, getAvailablePlans, getActiveModules, getStorageUsage, getSignatureUsage, getMonthlyConsumption, type ConsumptionUser,
   getDocuments, uploadDocument, validateDocument as apiValidateDoc, refuseDocument as apiRefuseDoc,
   type UploadedDocument,
   getNpsSurveys, createNpsSurvey as apiCreateNps, updateNpsSurvey as apiUpdateNps, deleteNpsSurvey as apiDeleteNps,
@@ -605,6 +605,10 @@ export function createAdminInlinePages(ctx: any) {
   };
 
   const renderAdminAbonnement = () => {
+          const trialStart = localStorage.getItem("illizeo_trial_start");
+          const isInTrial = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) <= 14 * 24 * 60 * 60 * 1000;
+          const trialExpired = trialStart && !isInTrial;
+          const hasActiveSub = tenantSubscriptions.some((s: any) => s.status === "active" || s.status === "trialing");
           const reloadSub = () => {
             getMySubscription().then(res => { setTenantSubscriptions(res.subscriptions || []); setTenantActiveModules(res.active_modules || []); }).catch(() => {});
             if (plans.length === 0) getAvailablePlans().then(setPlans).catch(() => {});
@@ -652,7 +656,7 @@ export function createAdminInlinePages(ctx: any) {
 
             {/* ═══ VIEW: Change plan ═══ */}
             {subView === "change" && (() => {
-              const onboardingPlans = availablePlans.filter(p => p.slug !== "cooptation").sort((a, b) => a.ordre - b.ordre);
+              const onboardingPlans = availablePlans.filter((p: any) => !p.is_addon && p.addon_type !== "ai" && p.slug !== "cooptation").sort((a, b) => a.ordre - b.ordre);
               const cooptationPlan = availablePlans.find(p => p.slug === "cooptation");
               return (
               <div>
@@ -691,18 +695,32 @@ export function createAdminInlinePages(ctx: any) {
                         const planModules = (plan.modules || []).filter(m => m.actif).map(m => m.module);
                         return (
                         <div key={plan.id} style={{ border: isCurrent ? `2px solid ${C.green}` : isSelected ? `2px solid ${C.pink}` : `1px solid ${C.border}`, borderRadius: 12, padding: "20px", cursor: "pointer", transition: "all .15s", background: isSelected ? C.pinkBg : C.white }}
-                          onClick={() => { if (!isCurrent && plan.slug !== "enterprise") { setSelectedPlanIds(prev => prev.includes(plan.id) ? prev.filter(id => id !== plan.id) : [plan.id]); } }}>
+                          onClick={() => { if (!isCurrent) { setSelectedPlanIds(prev => prev.includes(plan.id) ? prev.filter(id => id !== plan.id) : [plan.id]); } }}>
                           {isCurrent && <div style={{ fontSize: 10, fontWeight: 700, color: C.green, marginBottom: 6 }}>PLAN ACTUEL</div>}
+                          {plan.populaire && !isCurrent && <div style={{ fontSize: 10, fontWeight: 700, color: C.pink, marginBottom: 6 }}>POPULAIRE</div>}
                           <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 4px" }}>{plan.nom}</h3>
                           <div style={{ fontSize: 11, color: C.textLight, marginBottom: 10 }}>{plan.description}</div>
                           <div style={{ marginBottom: 8 }}><span style={{ fontSize: 24, fontWeight: 800 }}>CHF {monthlyPrice}</span> <span style={{ fontSize: 11, color: C.textMuted }}>/ Mois / Employé</span></div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
                             {planModules.map(mod => <div key={mod} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.text }}><CheckCircle size={13} color={C.green} /> {MODULE_LABELS[mod]}</div>)}
                           </div>
-                          {plan.slug !== "enterprise" && !isCurrent && (
+                          {/* Plan limits */}
+                          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+                            {[
+                              { label: "Collaborateurs", value: plan.max_collaborateurs },
+                              { label: "Parcours", value: plan.max_parcours },
+                              { label: "Intégrations", value: plan.max_integrations },
+                              { label: "Workflows", value: plan.max_workflows },
+                            ].map(limit => (
+                              <div key={limit.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.textMuted }}>
+                                <span>{limit.label}</span>
+                                <span style={{ fontWeight: 600, color: limit.value ? C.text : C.green }}>{limit.value ?? "Illimité"}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {!isCurrent && (
                             <button onClick={e => { e.stopPropagation(); setSelectedPlanIds([plan.id]); }} className="iz-btn-pink" style={{ ...sBtn(isSelected ? "pink" : "outline"), width: "100%", marginTop: 14, fontSize: 12, padding: "8px 0" }}>{isSelected ? "Sélectionné" : "Sélectionner"}</button>
                           )}
-                          {plan.slug === "enterprise" && <button onClick={e => { e.stopPropagation(); window.open("mailto:contact@illizeo.com?subject=Enterprise", "_blank"); }} style={{ ...sBtn("dark"), width: "100%", marginTop: 14, fontSize: 12, padding: "8px 0" }}>Contactez-nous</button>}
                         </div>
                         );
                       })}
@@ -722,6 +740,46 @@ export function createAdminInlinePages(ctx: any) {
                         <div style={{ fontSize: 14, fontWeight: 700 }}>CHF {cooptationPlan.prix_chf_mensuel} <span style={{ fontSize: 11, fontWeight: 400, color: C.textMuted }}>/ emp / mois</span></div>
                       </div>
                     )}
+                    {/* AI add-on plans */}
+                    {(() => {
+                      const aiPlans = availablePlans.filter((p: any) => p.addon_type === "ai").sort((a: any, b: any) => a.ordre - b.ordre);
+                      if (aiPlans.length === 0) return null;
+                      const currentAiSub = activeSubs.find((s: any) => s.plan?.addon_type === "ai");
+                      return (
+                        <div style={{ marginTop: 24 }}>
+                          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={18} color={C.blue} /> Add-ons Intelligence Artificielle</h3>
+                          <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>OCR pièces d'identité, IllizeoBot, génération de contrats IA. Prix fixe mensuel, pas de réduction annuelle.</p>
+                          <div style={{ display: "grid", gridTemplateColumns: `repeat(${aiPlans.length}, 1fr)`, gap: 12 }}>
+                            {aiPlans.map((plan: any) => {
+                              const isCurrent = currentAiSub?.plan_id === plan.id;
+                              const isSelected = selectedPlanIds.includes(plan.id);
+                              return (
+                                <div key={plan.id} onClick={() => { if (!isCurrent) setSelectedPlanIds(prev => prev.includes(plan.id) ? prev.filter((id: number) => id !== plan.id) : [...prev.filter((id: number) => !aiPlans.some((ap: any) => ap.id === id)), plan.id]); }}
+                                  style={{ border: isCurrent ? `2px solid ${C.green}` : isSelected ? `2px solid ${C.blue}` : `1px solid ${C.border}`, borderRadius: 12, padding: "16px", cursor: "pointer", transition: "all .15s", background: isSelected ? C.blueLight + "30" : C.white }}>
+                                  {isCurrent && <div style={{ fontSize: 10, fontWeight: 700, color: C.green, marginBottom: 4 }}>PLAN ACTUEL</div>}
+                                  <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 2px" }}>{plan.nom}</h4>
+                                  <div style={{ fontSize: 11, color: C.textLight, marginBottom: 8 }}>{plan.description}</div>
+                                  <div style={{ marginBottom: 10 }}><span style={{ fontSize: 20, fontWeight: 800 }}>CHF {plan.prix_chf_mensuel}</span> <span style={{ fontSize: 11, color: C.textMuted }}>/ mois</span></div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Scans OCR</span><span style={{ fontWeight: 600 }}>{plan.ai_ocr_scans}/mois</span></div>
+                                    {plan.ai_bot_messages > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span>IllizeoBot</span><span style={{ fontWeight: 600 }}>{plan.ai_bot_messages} msgs</span></div>}
+                                    {plan.ai_bot_messages === 0 && <div style={{ display: "flex", justifyContent: "space-between", color: C.textMuted }}><span>IllizeoBot</span><span>—</span></div>}
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Contrats IA</span><span style={{ fontWeight: 600 }}>{plan.ai_contrat_generations}/mois</span></div>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Modèle</span><span style={{ fontWeight: 600, fontSize: 10 }}>{plan.ai_model === "claude-opus-4-6" ? "Opus (précision max)" : "Sonnet"}</span></div>
+                                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Scan suppl.</span><span style={{ fontWeight: 600 }}>CHF {plan.ai_extra_scan_price_chf}</span></div>
+                                  </div>
+                                  {!isCurrent && (
+                                    <button onClick={e => { e.stopPropagation(); setSelectedPlanIds(prev => [...prev.filter((id: number) => !aiPlans.some((ap: any) => ap.id === id)), plan.id]); }} className="iz-btn-pink" style={{ ...sBtn(isSelected ? "pink" : "outline"), width: "100%", marginTop: 10, fontSize: 11, padding: "6px 0", borderColor: isSelected ? C.blue : C.border, background: isSelected ? C.blue : "transparent", color: isSelected ? C.white : C.textMuted }}>
+                                      {isSelected ? "Sélectionné" : "Sélectionner"}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Right sidebar: summary */}
@@ -788,8 +846,11 @@ export function createAdminInlinePages(ctx: any) {
                         <div style={{ fontSize: 24, fontWeight: 800 }}>
                           {(() => {
                             const total = selectedPlanIds.reduce((sum, id) => {
-                              const p = availablePlans.find(pl => pl.id === id);
+                              const p = availablePlans.find(pl => pl.id === id) as any;
                               const price = Number(p?.prix_chf_mensuel || 0);
+                              const isAi = p?.addon_type === "ai";
+                              // AI plans: fixed price, no annual discount, not per-employee
+                              if (isAi) return sum + price;
                               return sum + (pricingBilling === "yearly" ? price * 0.9 : price) * subEmployeeCount;
                             }, 0);
                             return `${Math.round(total * 100) / 100} CHF`;
@@ -867,92 +928,164 @@ export function createAdminInlinePages(ctx: any) {
                 </div>
                 <div style={{ padding: "24px" }}>
                   {subTab === "consommation" && (() => {
-                    // Build monthly consumption from COLLABORATEURS data
-                    const collabs = COLLABORATEURS || [];
-                    const now = new Date();
-                    const months: { label: string; year: number; month: number }[] = [];
-                    for (let i = 5; i >= 0; i--) {
-                      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                      months.push({ label: d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "long", year: "numeric" }), year: d.getFullYear(), month: d.getMonth() });
-                    }
-                    const CAT_META: Record<string, { label: string; color: string; bg: string }> = {
-                      onboarding: { label: "Onboarding", color: "#4CAF50", bg: "#E8F5E9" },
-                      offboarding: { label: "Offboarding", color: "#E53935", bg: "#FFEBEE" },
-                      crossboarding: { label: "Crossboarding", color: "#1A73E8", bg: "#E3F2FD" },
-                      reboarding: { label: "Reboarding", color: "#7B5EA7", bg: "#F3E5F5" },
+                    const { consoData, setConsoData, consoMonth, setConsoMonth, consoLoading, setConsoLoading, consoFilter, setConsoFilter, consoSearch, setConsoSearch, loadConsumption } = ctx;
+
+                    const prevMonth = () => {
+                      setConsoMonth(prev => prev.month === 1 ? { year: prev.year - 1, month: 12 } : { ...prev, month: prev.month - 1 });
                     };
-                    // Count collabs per month based on date_debut
-                    const monthlyData = months.map(m => {
-                      const counts: Record<string, number> = { onboarding: 0, offboarding: 0, crossboarding: 0, reboarding: 0 };
-                      let total = 0;
-                      collabs.forEach((c: any) => {
-                        if (!c.dateDebut) return;
-                        const d = new Date(c.dateDebut);
-                        if (d.getFullYear() === m.year && d.getMonth() === m.month) {
-                          const cat = c.parcours_categorie || (PARCOURS_TEMPLATES.find((p: any) => p.id === c.parcours_id) as any)?.categorie?.slug || "onboarding";
-                          if (counts[cat] !== undefined) counts[cat]++;
-                          total++;
-                        }
-                      });
-                      return { ...m, counts, total };
-                    });
-                    const grandTotal = monthlyData.reduce((s, m) => s + m.total, 0);
-                    const currentMonth = monthlyData[monthlyData.length - 1];
+                    const nextMonth = () => {
+                      const now = new Date();
+                      const cur = consoMonth.year * 12 + consoMonth.month;
+                      const max = now.getFullYear() * 12 + (now.getMonth() + 1);
+                      if (cur < max) setConsoMonth(prev => prev.month === 12 ? { year: prev.year + 1, month: 1 } : { ...prev, month: prev.month + 1 });
+                    };
+
+                    const filteredUsers = (consoData?.users || [])
+                      .filter(u => consoFilter === "all" || u.role === consoFilter)
+                      .filter(u => !consoSearch || `${u.prenom} ${u.nom} ${u.email} ${u.site}`.toLowerCase().includes(consoSearch.toLowerCase()));
+
                     return (
                       <div>
-                        <p style={{ fontSize: 13, color: C.textLight, marginBottom: 16 }}>Suivi mensuel de la consommation par type de parcours</p>
+                        <p style={{ fontSize: 13, color: C.textLight, marginBottom: 16 }}>Facturation par employé actif consommé. Minimum 25 employés facturés par mois.</p>
 
-                        {/* Current month summary */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-                          {Object.entries(CAT_META).map(([key, meta]) => (
-                            <div key={key} style={{ padding: "14px 16px", borderRadius: 10, background: meta.bg, border: `1px solid ${meta.color}20` }}>
-                              <div style={{ fontSize: 24, fontWeight: 700, color: meta.color }}>{currentMonth.counts[key]}</div>
-                              <div style={{ fontSize: 11, color: meta.color, fontWeight: 600 }}>{meta.label}</div>
-                              <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>ce mois</div>
+                        {/* Month navigator */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                          <button onClick={prevMonth} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.white, cursor: "pointer", padding: "6px 12px", fontFamily: font }}><ChevronLeft size={14} /></button>
+                          <span style={{ fontSize: 15, fontWeight: 600, textTransform: "capitalize", minWidth: 160, textAlign: "center" }}>{consoData?.month_label || `${consoMonth.month}/${consoMonth.year}`}</span>
+                          <button onClick={nextMonth} style={{ border: `1px solid ${C.border}`, borderRadius: 8, background: C.white, cursor: "pointer", padding: "6px 12px", fontFamily: font }}><ChevronRight size={14} /></button>
+                        </div>
+
+                        {consoLoading ? (
+                          <div style={{ textAlign: "center", padding: 40, color: C.textMuted }}>Chargement...</div>
+                        ) : consoData ? (
+                          <>
+                            {/* Summary cards */}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+                              <div style={{ padding: "14px 16px", borderRadius: 10, background: C.blueLight, border: `1px solid ${C.blue}20` }}>
+                                <div style={{ fontSize: 24, fontWeight: 700, color: C.blue }}>{consoData.total_active}</div>
+                                <div style={{ fontSize: 11, color: C.blue, fontWeight: 600 }}>Utilisateurs actifs</div>
+                              </div>
+                              <div style={{ padding: "14px 16px", borderRadius: 10, background: "#FFF3E0", border: "1px solid #FF980020" }}>
+                                <div style={{ fontSize: 24, fontWeight: 700, color: "#E65100" }}>{consoData.admin_count}</div>
+                                <div style={{ fontSize: 11, color: "#E65100", fontWeight: 600 }}>Admins</div>
+                              </div>
+                              <div style={{ padding: "14px 16px", borderRadius: 10, background: "#E8F5E9", border: "1px solid #4CAF5020" }}>
+                                <div style={{ fontSize: 24, fontWeight: 700, color: "#2E7D32" }}>{consoData.employee_count}</div>
+                                <div style={{ fontSize: 11, color: "#2E7D32", fontWeight: 600 }}>Employés</div>
+                              </div>
                             </div>
-                          ))}
-                        </div>
 
-                        {/* Monthly table */}
-                        <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
-                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                            <thead>
-                              <tr style={{ background: C.bg }}>
-                                <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>Mois</th>
-                                {Object.values(CAT_META).map(meta => (
-                                  <th key={meta.label} style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, fontSize: 11, color: meta.color, textTransform: "uppercase" }}>{meta.label}</th>
+                            {/* Billed count */}
+                            <div style={{ padding: "12px 16px", background: C.bg, borderRadius: 8, marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontSize: 13, color: C.text }}>Employés facturés ce mois</span>
+                              <span style={{ fontSize: 16, fontWeight: 700, color: C.pink }}>{consoData.billed_count} <span style={{ fontSize: 11, fontWeight: 400, color: C.textMuted }}>(min. 25)</span></span>
+                            </div>
+
+                            {/* Filters */}
+                            <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+                              <div style={{ display: "flex", gap: 0, background: C.bg, borderRadius: 8, padding: 2 }}>
+                                {([["all", "Tous"], ["admin", "Admins"], ["employé", "Employés"]] as const).map(([val, label]) => (
+                                  <button key={val} onClick={() => setConsoFilter(val as any)} style={{ padding: "5px 12px", borderRadius: 6, fontSize: 11, fontWeight: consoFilter === val ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font, background: consoFilter === val ? C.pink : "transparent", color: consoFilter === val ? C.white : C.textMuted }}>{label}</button>
                                 ))}
-                                <th style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, fontSize: 11, color: C.text, textTransform: "uppercase" }}>Total</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {monthlyData.map((m, i) => (
-                                <tr key={i} style={{ borderTop: `1px solid ${C.border}`, background: i === monthlyData.length - 1 ? C.pinkBg + "40" : "transparent" }}>
-                                  <td style={{ padding: "10px 14px", fontWeight: i === monthlyData.length - 1 ? 600 : 400, textTransform: "capitalize" }}>{m.label}</td>
-                                  {Object.keys(CAT_META).map(key => (
-                                    <td key={key} style={{ padding: "10px 14px", textAlign: "center", fontWeight: m.counts[key] > 0 ? 600 : 400, color: m.counts[key] > 0 ? CAT_META[key].color : C.textMuted }}>
-                                      {m.counts[key]}
-                                    </td>
+                              </div>
+                              <div style={{ flex: 1 }} />
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, background: C.bg, borderRadius: 8, padding: "5px 10px" }}>
+                                <Search size={12} color={C.textMuted} />
+                                <input value={consoSearch} onChange={e => setConsoSearch(e.target.value)} placeholder="Rechercher..." style={{ border: "none", outline: "none", background: "transparent", fontSize: 12, fontFamily: font, color: C.text, width: 140 }} />
+                              </div>
+                            </div>
+
+                            {/* User table */}
+                            <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                                <thead>
+                                  <tr style={{ background: C.bg }}>
+                                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>Prénom</th>
+                                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>Nom</th>
+                                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>Site</th>
+                                    <th style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>Département</th>
+                                    <th style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>Rôle</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filteredUsers.map((u, i) => (
+                                    <tr key={u.id} style={{ borderTop: `1px solid ${C.border}`, background: i % 2 === 0 ? "transparent" : C.bg + "60" }}>
+                                      <td style={{ padding: "8px 14px" }}>{u.prenom}</td>
+                                      <td style={{ padding: "8px 14px", fontWeight: 500 }}>{u.nom}</td>
+                                      <td style={{ padding: "8px 14px", color: C.textMuted }}>{u.site}</td>
+                                      <td style={{ padding: "8px 14px", color: C.textMuted }}>{u.departement}</td>
+                                      <td style={{ padding: "8px 14px", textAlign: "center" }}>
+                                        <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: u.role === "admin" ? "#FFF3E0" : "#E8F5E9", color: u.role === "admin" ? "#E65100" : "#2E7D32" }}>{u.role === "admin" ? "Admin" : "Employé"}</span>
+                                      </td>
+                                    </tr>
                                   ))}
-                                  <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600, color: C.text }}>{m.total}</td>
-                                </tr>
-                              ))}
-                              <tr style={{ borderTop: `2px solid ${C.border}`, background: C.bg }}>
-                                <td style={{ padding: "10px 14px", fontWeight: 700 }}>Total (6 mois)</td>
-                                {Object.keys(CAT_META).map(key => (
-                                  <td key={key} style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, color: CAT_META[key].color }}>
-                                    {monthlyData.reduce((s, m) => s + m.counts[key], 0)}
-                                  </td>
-                                ))}
-                                <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, color: C.text }}>{grandTotal}</td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
+                                  {filteredUsers.length === 0 && (
+                                    <tr><td colSpan={5} style={{ padding: 20, textAlign: "center", color: C.textMuted, fontSize: 12 }}>Aucun utilisateur trouvé</td></tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            </div>
 
-                        <div style={{ marginTop: 16, padding: "12px 16px", background: C.blueLight, borderRadius: 8, fontSize: 12, color: C.blue }}>
-                          La facturation est basée sur le nombre de collaborateurs actifs par mois. Chaque parcours démarré compte comme une unité de consommation.
-                        </div>
+                            <div style={{ marginTop: 16, padding: "12px 16px", background: C.blueLight, borderRadius: 8, fontSize: 12, color: C.blue }}>
+                              Un employé actif dans le mois (même 1 seconde) est facturé pour le mois entier. Les admins comptent comme des employés actifs consommés.
+                            </div>
+
+                            {/* AI Consumption */}
+                            {(() => {
+                              const hasAiPlan = tenantSubscriptions.some((s: any) => (s.status === "active" || s.status === "trialing") && s.plan?.addon_type === "ai");
+                              const aiPlan = tenantSubscriptions.find((s: any) => (s.status === "active" || s.status === "trialing") && s.plan?.addon_type === "ai")?.plan;
+                              if (!hasAiPlan) return null;
+
+                              const { aiUsageData, setAiUsageData } = ctx;
+                              if (!aiUsageData && !ctx._aiUsageLoaded) {
+                                ctx._aiUsageLoaded = true;
+                                import('../api/endpoints').then(m => m.apiFetch?.('/ai/quota') || fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1'}/ai/quota`, { headers: { 'X-Tenant': localStorage.getItem('illizeo_tenant_id') || 'illizeo', Authorization: `Bearer ${localStorage.getItem('illizeo_token')}` } }).then(r => r.json()))
+                                  .then((d: any) => ctx.setAiUsageData?.(d)).catch(() => {});
+                              }
+
+                              if (!aiUsageData) return null;
+
+                              const items = [
+                                { label: "Scans OCR", used: aiUsageData.usage?.ocr_scans || 0, limit: aiUsageData.quota?.ocr_limit || 0, color: C.blue },
+                                { label: "Messages IllizeoBot", used: aiUsageData.usage?.bot_messages || 0, limit: aiUsageData.quota?.bot_limit || 0, color: "#7B5EA7" },
+                                { label: "Contrats IA", used: aiUsageData.usage?.contrat_generations || 0, limit: aiUsageData.quota?.contrat_limit || 0, color: C.pink },
+                              ];
+
+                              return (
+                                <div style={{ marginTop: 24 }}>
+                                  <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={16} color={C.blue} /> Consommation IA — {aiPlan?.nom}</h3>
+                                  <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Utilisation ce mois de votre add-on Intelligence Artificielle</p>
+                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
+                                    {items.filter(it => it.limit > 0).map(it => {
+                                      const pct = it.limit > 0 ? Math.round((it.used / it.limit) * 100) : 0;
+                                      return (
+                                        <div key={it.label} style={{ padding: "14px 16px", borderRadius: 10, border: `1px solid ${C.border}` }}>
+                                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+                                            <span style={{ fontSize: 11, fontWeight: 600, color: it.color }}>{it.label}</span>
+                                            <span style={{ fontSize: 11, color: C.textMuted }}>{pct}%</span>
+                                          </div>
+                                          <div style={{ fontSize: 20, fontWeight: 700, color: C.text, marginBottom: 6 }}>{it.used} <span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted }}>/ {it.limit}</span></div>
+                                          <div style={{ height: 6, background: C.bg, borderRadius: 3, overflow: "hidden" }}>
+                                            <div style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, pct)}%`, background: pct >= 90 ? C.red : pct >= 70 ? "#FF9800" : it.color, transition: "width .3s" }} />
+                                          </div>
+                                          <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>{Math.max(0, it.limit - it.used)} restants</div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  {items.some(it => it.limit > 0 && (it.used / it.limit) >= 0.9) && (
+                                    <div style={{ padding: "10px 14px", background: "#FFF3E0", borderRadius: 8, fontSize: 12, color: "#E65100", display: "flex", alignItems: "center", gap: 8 }}>
+                                      <AlertTriangle size={16} />
+                                      <span>Vous approchez de votre limite. <b onClick={() => { setSubView("change"); }} style={{ cursor: "pointer", textDecoration: "underline" }}>Upgrader votre plan IA</b></span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </>
+                        ) : (
+                          <div style={{ textAlign: "center", padding: 40, color: C.textMuted }}>Données non disponibles</div>
+                        )}
                       </div>
                     );
                   })()}
@@ -977,8 +1110,14 @@ export function createAdminInlinePages(ctx: any) {
                         <span style={{ color: C.textMuted }}>Entreprise</span><span>{billingInfo.company || "—"}</span>
                         <span style={{ color: C.textMuted }}>Numéro de TVA</span><span>{billingInfo.vat || "—"}</span>
                         <span style={{ color: C.textMuted }}>Rue</span><span>{billingInfo.rue || "—"}</span>
+                        <span style={{ color: C.textMuted }}>Numéro</span><span>{billingInfo.numero || "—"}</span>
+                        <span style={{ color: C.textMuted }}>Complément d'adresse</span><span>{billingInfo.complement || "—"}</span>
+                        <span style={{ color: C.textMuted }}>Case postale</span><span>{billingInfo.case_postale || "—"}</span>
+                        <span style={{ color: C.textMuted }}>Localité</span><span>{billingInfo.localite || "—"}</span>
+                        <span style={{ color: C.textMuted }}>Code postal</span><span>{billingInfo.code_postal || "—"}</span>
                         <span style={{ color: C.textMuted }}>Ville</span><span>{billingInfo.ville || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Code Postal</span><span>{billingInfo.code_postal || "—"}</span>
+                        <span style={{ color: C.textMuted }}>Canton / Région</span><span>{billingInfo.canton || "—"}</span>
+                        <span style={{ color: C.textMuted }}>Pays</span><span>{billingInfo.pays_facturation || billingInfo.pays || "—"}</span>
                       </div>
                     </div>
                   )}
@@ -999,36 +1138,189 @@ export function createAdminInlinePages(ctx: any) {
                       ))}
                     </div>
                   )}
-                  {subTab === "paiement" && (
+                  {subTab === "paiement" && (() => {
+                    // Default to invoice if stripe not configured
+                    const stripeConfigured = false; // TODO: check real Stripe status
+                    const activeMethod = paymentMethod || (stripeConfigured ? "stripe" : "invoice");
+
+                    return (
                     <div>
-                      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-                        <button className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Ajouter</button>
-                      </div>
-                      <div style={{ padding: "30px 0", textAlign: "center", color: C.textMuted, fontSize: 13 }}>
-                        Aucune méthode de paiement enregistrée.<br />
-                        <span style={{ fontSize: 12 }}>Ajoutez une carte bancaire pour activer le paiement automatique via Stripe.</span>
+                      <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Méthode de paiement active</h3>
+                      <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Sélectionnez votre méthode de paiement préférée. Au moins une méthode doit être active.</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                        {/* Stripe */}
+                        <div style={{ border: activeMethod === "stripe" ? `2px solid #635BFF` : `1px solid ${C.border}`, borderRadius: 10, padding: "16px 20px", cursor: "pointer", transition: "all .2s", background: activeMethod === "stripe" ? "#635BFF08" : C.white }}
+                          onClick={() => { if (stripeConfigured) setPaymentMethod("stripe"); else addToast_admin("Configurez d'abord votre carte bancaire via Stripe"); }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div style={{ width: 40, height: 40, borderRadius: 8, background: "#635BFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <span style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>S</span>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+                                  Paiement par carte (Stripe)
+                                  {activeMethod === "stripe" && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 9, fontWeight: 700, background: "#635BFF", color: "#fff" }}>ACTIF</span>}
+                                </div>
+                                <div style={{ fontSize: 12, color: C.textMuted }}>Visa, Mastercard, SEPA — Paiement automatique mensuel</div>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              {!stripeConfigured && <span style={{ fontSize: 10, color: "#FF9800", fontWeight: 600 }}>Non configuré</span>}
+                              <div style={{ width: 22, height: 22, borderRadius: "50%", border: activeMethod === "stripe" ? "none" : `2px solid ${C.border}`, background: activeMethod === "stripe" ? "#635BFF" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {activeMethod === "stripe" && <Check size={13} color="#fff" />}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "6px 16px", fontSize: 12, padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
+                            <span style={{ color: C.textMuted }}>Statut</span>
+                            <span style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: stripeConfigured ? C.green : C.textMuted }} /> {stripeConfigured ? "Configuré" : "Non configuré"}</span>
+                            <span style={{ color: C.textMuted }}>Carte enregistrée</span><span>—</span>
+                            <span style={{ color: C.textMuted }}>Prochaine facturation</span><span>—</span>
+                          </div>
+                        </div>
+
+                        {/* Invoice */}
+                        <div style={{ border: activeMethod === "invoice" ? `2px solid ${C.blue}` : `1px solid ${C.border}`, borderRadius: 10, padding: "16px 20px", cursor: "pointer", transition: "all .2s", background: activeMethod === "invoice" ? C.blueLight + "30" : C.white }}
+                          onClick={() => setPaymentMethod("invoice")}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div style={{ width: 40, height: 40, borderRadius: 8, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <FileText size={18} color="#fff" />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+                                  Paiement par facture
+                                  {activeMethod === "invoice" && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 9, fontWeight: 700, background: C.blue, color: "#fff" }}>ACTIF</span>}
+                                </div>
+                                <div style={{ fontSize: 12, color: C.textMuted }}>Facture 30 jours, virement bancaire (IBAN)</div>
+                              </div>
+                            </div>
+                            <div style={{ width: 22, height: 22, borderRadius: "50%", border: activeMethod === "invoice" ? "none" : `2px solid ${C.border}`, background: activeMethod === "invoice" ? C.blue : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              {activeMethod === "invoice" && <Check size={13} color="#fff" />}
+                            </div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "6px 16px", fontSize: 12, padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
+                            <span style={{ color: C.textMuted }}>Coordonnées bancaires</span>
+                            <div>
+                              <div style={{ fontWeight: 600 }}>Illizeo Sàrl</div>
+                              <div style={{ color: C.textMuted }}>Chemin des Saules 12a, 1260 Nyon</div>
+                              <div style={{ marginTop: 6 }}>IBAN: <span style={{ fontWeight: 600, letterSpacing: 0.5 }}>CH59 0022 8228 1610 9501 U</span></div>
+                              <div>BIC: <span style={{ fontWeight: 600 }}>UBSWCHZH80A</span></div>
+                              <div style={{ color: C.textMuted, marginTop: 6, fontSize: 11 }}>UBS Switzerland AG, Bahnhofstrasse 45, 8048 Zürich</div>
+                            </div>
+                            <span style={{ color: C.textMuted }}>Délai de paiement</span><span>30 jours net</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  )}
-                  {subTab === "protection" && (
+                    );
+                  })()}
+                  {subTab === "protection" && (() => {
+                    const [openSection, setOpenSection] = [ctx.protectionOpenSection ?? null, ctx.setProtectionOpenSection ?? (() => {})];
+                    const sections = [
+                      { id: "annexe", title: "Annexe relative au traitement des données personnelles", content: `Illizeo SA, dont le siège est à Genève (Suisse), agit en qualité de sous-traitant (au sens du RGPD et de la nLPD) pour le compte du Client, responsable de traitement.
+
+**Finalités du traitement :** Gestion de l'onboarding, de l'offboarding, du crossboarding et du reboarding des collaborateurs du Client. Cela inclut la collecte et le stockage des données personnelles des collaborateurs (identité, coordonnées, informations contractuelles, documents administratifs).
+
+**Catégories de données traitées :**
+- Données d'identification : nom, prénom, date de naissance, nationalité, photo, numéro AVS
+- Données de contact : adresse, email, téléphone
+- Données contractuelles : type de contrat, poste, département, site, date de début/fin, salaire
+- Documents administratifs : pièces d'identité, permis de travail, IBAN, certificats
+- Données d'utilisation : logs de connexion, actions effectuées, progression dans les parcours
+
+**Durée de conservation :** Les données sont conservées pendant la durée de la relation contractuelle entre Illizeo et le Client, puis supprimées dans un délai de 90 jours après la résiliation, sauf obligation légale de conservation plus longue.
+
+**Droits des personnes concernées :** Les collaborateurs peuvent exercer leurs droits (accès, rectification, suppression, portabilité) en contactant leur employeur (le Client). Illizeo assiste le Client dans la réponse à ces demandes.
+
+**Transferts internationaux :** Les données sont hébergées en Suisse (Infomaniak, datacenter de Genève). Aucun transfert hors Suisse/EEE n'est effectué, sauf usage explicite d'intégrations tierces configurées par le Client (ex: DocuSign, Microsoft, Slack).` },
+                      { id: "mto", title: "Mesures de sécurité techniques et organisationnelles (MTO)", content: `**Mesures techniques :**
+- Chiffrement TLS 1.3 pour toutes les communications (HTTPS)
+- Chiffrement des mots de passe (bcrypt, 12 rounds)
+- Authentification par tokens Sanctum (Bearer tokens, expiration configurable)
+- Authentification à deux facteurs (2FA) disponible pour tous les comptes admin
+- Isolation des données par tenant (base de données séparée par client)
+- Sauvegardes quotidiennes automatiques
+- Hébergement sur infrastructure Infomaniak (certifiée ISO 27001, datacenter en Suisse)
+
+**Mesures organisationnelles :**
+- Accès aux données de production limité aux administrateurs systèmes autorisés
+- Politique de mots de passe configurable par le Client (longueur, complexité, expiration)
+- Journal d'audit complet de toutes les actions sensibles (connexions, modifications, suppressions)
+- Processus de suppression des données en cas de résiliation (RGPD/nLPD)
+- Gestion des rôles et permissions granulaire (admin, HRBP, manager, collaborateur)
+- Revue régulière des accès et des permissions
+
+**Gestion des incidents :**
+- Notification au Client dans un délai de 72 heures en cas de violation de données
+- Procédure documentée de réponse aux incidents
+- Contact DPO : privacy@illizeo.com` },
+                      { id: "instructions", title: "Qui peut donner des instructions à Illizeo ?", content: `Seules les personnes suivantes sont autorisées à donner des instructions à Illizeo concernant le traitement des données personnelles :
+
+**Côté Client :**
+- Le représentant légal du Client (signataire du contrat)
+- L'administrateur principal désigné lors de la création du compte
+- Les utilisateurs disposant du rôle « Admin RH » ou « Super Admin » dans la plateforme
+
+**Côté Illizeo :**
+- Le Directeur Général
+- Le Responsable Technique (CTO)
+- Le Délégué à la Protection des Données (DPO)
+
+Les instructions doivent être transmises par écrit (email ou via la plateforme). Illizeo n'exécute aucune instruction verbale concernant le traitement de données personnelles.
+
+Tout changement dans la liste des personnes autorisées doit être notifié à Illizeo par le représentant légal du Client.` },
+                      { id: "soustraitants", title: "Sous-traitants", content: `Illizeo fait appel aux sous-traitants suivants pour le traitement des données :
+
+| Sous-traitant | Fonction | Localisation |
+|---|---|---|
+| **Infomaniak** | Hébergement serveurs et bases de données | Suisse (Genève) |
+| **Anthropic (Claude)** | Intelligence artificielle — OCR pièces d'identité, analyse de documents (si add-on IA souscrit) | États-Unis* |
+| **Mailtrap** | Envoi d'emails transactionnels | UE (Pologne) |
+
+*Anthropic : les données envoyées à l'API Claude (images de documents) ne sont pas stockées par Anthropic et ne sont pas utilisées pour l'entraînement des modèles (politique zero-retention de l'API). Le traitement est ponctuel et les données ne transitent que le temps de l'analyse.
+
+**Intégrations optionnelles configurées par le Client :**
+Ces services ne sont activés que si le Client les configure explicitement dans les paramètres d'intégration :
+- DocuSign / UgoSign — Signature électronique (localisation selon le fournisseur)
+- Microsoft Entra ID — SSO et provisionnement (Microsoft, UE/US)
+- Slack / Microsoft Teams — Notifications (localisation selon le fournisseur)
+- SIRH tiers (Personio, BambooHR, Workday, Lucca, etc.) — Synchronisation des données RH
+
+Le Client est informé préalablement de tout changement de sous-traitant et dispose d'un droit d'opposition.` },
+                    ];
+                    return (
                     <div>
                       <p style={{ fontSize: 13, color: C.textLight, marginBottom: 16 }}>Comment Illizeo traite vos données et encadre ses engagements contractuels</p>
-                      {[
-                        { title: "Annexe relative au traitement des données personnelles", desc: "Toutes les suggestions que nous recevons sont étudiées avec attention par notre équipe produit." },
-                        { title: "Mesures de sécurité techniques et organisationnelles (MTO)", desc: "Détail des mesures techniques et organisationnelles mises en œuvre pour protéger vos données." },
-                        { title: "Qui peut donner des instructions à Illizeo ?", desc: "Liste des personnes autorisées à donner des instructions concernant le traitement des données." },
-                        { title: "Sous-traitants", desc: "Liste des sous-traitants impliqués dans le traitement de vos données." },
-                      ].map((item, i) => (
-                        <div key={i} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 20px", marginBottom: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }} className="iz-sidebar-item">
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{item.title}</div>
-                            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{item.desc}</div>
+                      {sections.map(section => (
+                        <div key={section.id} style={{ border: `1px solid ${openSection === section.id ? C.pink : C.border}`, borderRadius: 10, marginBottom: 8, overflow: "hidden", transition: "all .2s" }}>
+                          <div onClick={() => setOpenSection(openSection === section.id ? null : section.id)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", background: openSection === section.id ? C.pinkBg + "40" : "transparent" }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{section.title}</div>
+                            <div style={{ width: 32, height: 32, borderRadius: "50%", background: openSection === section.id ? C.pink : C.bg, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .2s" }}>
+                              {openSection === section.id ? <ChevronLeft size={16} color={C.white} style={{ transform: "rotate(-90deg)" }} /> : <ChevronRight size={16} color={C.textMuted} />}
+                            </div>
                           </div>
-                          <ChevronRight size={18} color={C.textMuted} />
+                          {openSection === section.id && (
+                            <div style={{ padding: "0 20px 20px", fontSize: 13, color: C.text, lineHeight: 1.7 }}>
+                              {section.content.split("\n").map((line: string, li: number) => {
+                                // Parse bold **text**
+                                const parts = line.split(/\*\*(.*?)\*\*/g);
+                                const rendered = parts.map((part: string, pi: number) => pi % 2 === 1 ? <b key={pi}>{part}</b> : part);
+                                // Detect list items
+                                const trimmed = line.trim();
+                                if (trimmed.startsWith("- ") || trimmed.startsWith("| ")) {
+                                  return <div key={li} style={{ paddingLeft: trimmed.startsWith("| ") ? 0 : 12, marginBottom: 2 }}>{rendered}</div>;
+                                }
+                                if (trimmed === "") return <div key={li} style={{ height: 8 }} />;
+                                return <div key={li} style={{ marginBottom: 4 }}>{rendered}</div>;
+                              })}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               </div>
 

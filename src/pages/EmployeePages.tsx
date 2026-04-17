@@ -148,7 +148,7 @@ export function createEmployeeRenders(ctx: any) {
     uploadedPieces, setUploadedPieces, modalPieces, setModalPieces, modalFormFields, setModalFormFields, modalQuestions, setModalQuestions,
     modalSubtasks, setModalSubtasks, phases, setPhases, selectedPhaseId, setSelectedPhaseId, messageCanal, setMessageCanal,
     messageBody, setMessageBody, showWelcomeModal, setShowWelcomeModal, showDocPanel, setShowDocPanel, showDocCategory, setShowDocCategory,
-    showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading, sigContratData, setSigContratData, actionTab, setActionTab, showProfile, setShowProfile, showTeamModal, setShowTeamModal,
+    showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading, sigContratData, setSigContratData, actionTab, setActionTab, showProfile, setShowProfile, showTeamModal, setShowTeamModal, selectedTeamMember, setSelectedTeamMember,
     profileTab, setProfileTab, formData, setFormData, passwordVisible, setPasswordVisible, acceptCGU, setAcceptCGU,
     employeeDocs, setEmployeeDocs, completedActions, setCompletedActions, sharedTimeline, setSharedTimeline, toasts, setToasts,
     auth, _needsPlan, isDemo, apiEnabled, COLLABORATEURS, refetchCollaborateurs, PARCOURS_TEMPLATES, refetchParcours,
@@ -293,7 +293,7 @@ export function createEmployeeRenders(ctx: any) {
             <div style={{ fontSize: 11, color: C.textMuted }}>{auth.user?.roles?.[0] || ""}</div>
           </div>
         </button>
-        <button onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `${window.location.pathname}?tenant=${tid}` : window.location.pathname; }); }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 20px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 12, color: C.textMuted, fontFamily: font }}>
+        <button onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `/${tid}` : "/"; }); }} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 20px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 12, color: C.textMuted, fontFamily: font }}>
           <LogOut size={13} /> {t('auth.logout')}
         </button>
       </div>
@@ -472,31 +472,6 @@ export function createEmployeeRenders(ctx: any) {
         {/* Right sidebar */}
         <div style={{ width: 320, flexShrink: 0 }}>
           {/* Arrival info */}
-          <div style={{ ...sCard, marginBottom: 20 }}>
-            <h3 className="iz-fade-up iz-stagger-1" style={{ fontSize: 16, fontWeight: 600, color: C.text, margin: "0 0 4px" }}>{t('emp.arrival_info')}</h3>
-            <p style={{ fontSize: 13, color: C.textLight, margin: "0 0 16px" }}>{t('emp.arrival_subtitle')}</p>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-              <Calendar size={20} color={C.blue} />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{t('emp.arrival_date')}</div>
-                <div style={{ fontSize: 13, color: C.textLight }}>Rendez-vous le 1er juin 2026</div>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <MapPin size={20} color={C.pink} />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{t('emp.arrival_office')}</div>
-                <div style={{ fontSize: 13, color: C.textLight }}>6 Place Ruth-Bösiger, 1201 Genève</div>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
-              <UserCheck size={20} color={C.green} />
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{t('emp.arrival_contact')}</div>
-                <div style={{ fontSize: 13, color: C.textLight }}>Amira LAROUSSI — Recruteur(se), accueil au 3ème étage</div>
-              </div>
-            </div>
-          </div>
           {/* Team members */}
           <div style={{ ...sCard }}>
             <h3 className="iz-fade-up iz-stagger-2" style={{ fontSize: 16, fontWeight: 600, color: C.text, margin: "0 0 16px" }}>{t('emp.team_members')}</h3>
@@ -507,8 +482,26 @@ export function createEmployeeRenders(ctx: any) {
                   <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{m.name}</div>
                   <div style={{ fontSize: 12, color: C.textLight }}>{m.role}</div>
                 </div>
-                <MessageCircle size={16} color={C.textLight} style={{ cursor: "pointer" }} />
-                <ChevronRight size={16} color={C.textLight} />
+                <MessageCircle size={16} color={C.textLight} style={{ cursor: "pointer" }} onClick={async () => {
+                  // Find user by name in msgUsers
+                  const user = msgUsers.find(u => u.name === m.name);
+                  if (user) {
+                    const existing = msgConversations.find(c => c.other_user?.id === user.id);
+                    if (existing) {
+                      setMsgActiveConvId(existing.id);
+                    } else {
+                      try {
+                        const msg = await apiSendMessage(user.id, "👋");
+                        await getConversations().then(setMsgConversations);
+                        setMsgActiveConvId(msg.conversation_id);
+                      } catch {}
+                    }
+                  }
+                  setDashPage("messagerie");
+                }} />
+                <ChevronRight size={16} color={C.textLight} style={{ cursor: "pointer" }} onClick={() => {
+                  setSelectedTeamMember(m);
+                }} />
               </div>
             ))}
             <div style={{ textAlign: "center", marginTop: 12 }}>
@@ -1063,7 +1056,7 @@ export function createEmployeeRenders(ctx: any) {
           <div style={{ flex: 1, padding: "20px 28px", overflow: "auto" }}>
             {cat.id === "suisse" && (
               <div style={{ background: C.pinkBg, borderRadius: 8, padding: 14, marginBottom: 20, fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-                Document à soumettre pour toutes les démarches administratives. A faire en amont de l'arrivée du collaborateur – Pièce d'identité ou passeport en cours de validité – Carte AVS (si concerné) – Permis de travail/résidence (si concerné)
+                Document à soumettre pour toutes les démarches administratives. A faire en amont de l'arrivée du collaborateur – Pièce d'identité ou passeport en cours de validité – Carte d'assuré social (si concerné) – Permis de travail/résidence (si concerné)
               </div>
             )}
             {cat.id === "supplementaires" && (

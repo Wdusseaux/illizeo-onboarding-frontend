@@ -28,5 +28,6 @@ export function createAdminRenders(ctx: any) {
     ...adminCooptation,
     ...adminIntegrations,
     renderSidebar_admin: adminSidebarComponent.renderSidebar_admin,
+    renderSuperAdminPanel: adminSidebarComponent.renderSuperAdminPanel,
   };
 }

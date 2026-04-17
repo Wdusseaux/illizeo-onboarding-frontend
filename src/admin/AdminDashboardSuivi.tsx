@@ -66,6 +66,7 @@ import {
   getMySubscription, subscribeToPlan, cancelSubscription, getAvailablePlans, getActiveModules, getStorageUsage, getSignatureUsage,
   getDocuments, uploadDocument, validateDocument as apiValidateDoc, refuseDocument as apiRefuseDoc,
   type UploadedDocument,
+  ocrExtractIdentity, type OcrIdentityResult,
   getNpsSurveys, createNpsSurvey as apiCreateNps, updateNpsSurvey as apiUpdateNps, deleteNpsSurvey as apiDeleteNps,
   showNpsSurvey, getNpsStats, sendNpsSurveyToAll as apiSendNpsAll,
   type NpsSurvey, type NpsResponse, type NpsStats,
@@ -631,6 +632,186 @@ export function createAdminDashboardSuivi(ctx: any) {
   
     // ─── COLLABORATEUR PROFILE VIEW ──────────────────────────────
 
+    // ─── OCR Identity Scanner ─────────────────────────────────
+    const { ocrModal, setOcrModal, ocrFile, setOcrFile, ocrPreview, setOcrPreview, ocrLoading, setOcrLoading, ocrResult, setOcrResult, ocrError, setOcrError } = ctx;
+
+    const [ocrWarning, setOcrWarning] = ctx.ocrWarning !== undefined ? [ctx.ocrWarning, ctx.setOcrWarning] : [null, () => {}];
+    const [ocrUsage, setOcrUsage] = ctx.ocrUsage !== undefined ? [ctx.ocrUsage, ctx.setOcrUsage] : [null, () => {}];
+
+    const handleOcrScan = async () => {
+      if (!ocrFile) return;
+      setOcrLoading(true);
+      setOcrError(null);
+      try {
+        const res = await ocrExtractIdentity(ocrFile);
+        setOcrResult(res.data);
+        if (res.usage) setOcrUsage(res.usage);
+        if (res.warning) setOcrWarning(res.warning);
+      } catch (e: any) {
+        const msg = e.message || "Erreur lors de l'extraction";
+        // Check if it's a quota error with upgrade info
+        if (msg.includes("Quota") || msg.includes("quota") || msg.includes("plan IA")) {
+          setOcrError(msg);
+        } else {
+          setOcrError(msg);
+        }
+      } finally {
+        setOcrLoading(false);
+      }
+    };
+
+    const handleOcrApply = async () => {
+      if (!ocrResult || !ocrModal) return;
+      const updates: Record<string, any> = {};
+      if (ocrResult.first_name) updates.prenom = ocrResult.first_name;
+      if (ocrResult.last_name) updates.nom = ocrResult.last_name;
+      if (ocrResult.birth_date) updates.date_naissance = ocrResult.birth_date;
+      if (ocrResult.nationality) updates.nationalite = ocrResult.nationality;
+      if (ocrResult.gender) updates.civilite = ocrResult.gender === 'M' ? 'M.' : 'Mme';
+      if (ocrResult.avs_number) updates.numero_avs = ocrResult.avs_number;
+      if (ocrResult.address) updates.adresse = ocrResult.address;
+      try {
+        await apiUpdateCollab(ocrModal.collabId, updates);
+        refetchCollaborateurs();
+        addToast_admin("Fiche collaborateur mise à jour avec les données extraites");
+        setOcrModal(null); setOcrFile(null); setOcrPreview(null); setOcrResult(null);
+      } catch { addToast_admin("Erreur lors de la mise à jour"); }
+    };
+
+    const renderOcrModal = () => {
+      if (!ocrModal) return null;
+      const OCR_FIELDS: { key: keyof OcrIdentityResult; label: string; collabField?: string }[] = [
+        { key: "document_type", label: "Type de document" },
+        { key: "document_number", label: "N° du document" },
+        { key: "last_name", label: "Nom", collabField: "nom" },
+        { key: "first_name", label: "Prénom", collabField: "prenom" },
+        { key: "birth_date", label: "Date de naissance", collabField: "date_naissance" },
+        { key: "birth_place", label: "Lieu de naissance" },
+        { key: "nationality", label: "Nationalité", collabField: "nationalite" },
+        { key: "gender", label: "Genre", collabField: "civilite" },
+        { key: "avs_number", label: "N° AVS", collabField: "numero_avs" },
+        { key: "address", label: "Adresse", collabField: "adresse" },
+        { key: "expiry_date", label: "Date d'expiration" },
+        { key: "issue_date", label: "Date de délivrance" },
+        { key: "issuing_country", label: "Pays de délivrance" },
+      ];
+      return (
+        <>
+          <div onClick={() => { setOcrModal(null); setOcrFile(null); setOcrPreview(null); setOcrResult(null); setOcrError(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="iz-modal iz-scale-in" onClick={e => e.stopPropagation()} style={{ background: C.white, borderRadius: 16, width: 700, maxHeight: "85vh", overflow: "auto", zIndex: 1201 }}>
+            <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}><Eye size={18} color={C.blue} /> Scanner une pièce d'identité</h2>
+                <p style={{ fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{ocrModal.collab.prenom} {ocrModal.collab.nom}</p>
+              </div>
+              <button onClick={() => { setOcrModal(null); setOcrFile(null); setOcrPreview(null); setOcrResult(null); setOcrError(null); }} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
+            </div>
+            <div style={{ padding: "20px 24px" }}>
+              {/* Upload zone */}
+              {!ocrResult && (
+                <div style={{ marginBottom: 20 }}>
+                  <div
+                    onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = C.pink; }}
+                    onDragLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = C.border; const f = e.dataTransfer.files[0]; if (f) { setOcrFile(f); setOcrPreview(URL.createObjectURL(f)); } }}
+                    onClick={() => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*,.pdf'; inp.onchange = (ev: any) => { const f = ev.target.files[0]; if (f) { setOcrFile(f); setOcrPreview(URL.createObjectURL(f)); } }; inp.click(); }}
+                    style={{ border: `2px dashed ${ocrFile ? C.green : C.border}`, borderRadius: 12, padding: ocrPreview ? 0 : "40px 20px", textAlign: "center", cursor: "pointer", transition: "all .2s", background: ocrFile ? C.greenLight + "20" : C.bg, overflow: "hidden" }}>
+                    {ocrPreview && ocrFile ? (
+                      ocrFile.type === "application/pdf" ? (
+                        <div style={{ padding: "30px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                          <FileText size={40} color={C.pink} />
+                          <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{ocrFile.name}</div>
+                          <div style={{ fontSize: 12, color: C.textMuted }}>{(ocrFile.size / 1024).toFixed(0)} KB — PDF</div>
+                        </div>
+                      ) : (
+                        <img src={ocrPreview} alt="Document" style={{ maxWidth: "100%", maxHeight: 300, display: "block", margin: "0 auto" }} />
+                      )
+                    ) : (
+                      <>
+                        <Upload size={32} color={C.textMuted} style={{ marginBottom: 8 }} />
+                        <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>Déposez une photo ou un scan</div>
+                        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>Passeport, carte d'identité, permis de séjour — JPG, PNG ou PDF</div>
+                      </>
+                    )}
+                  </div>
+                  {ocrFile && (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 12 }}>
+                      <span style={{ fontSize: 12, color: C.textMuted }}>{ocrFile.name} ({(ocrFile.size / 1024).toFixed(0)} KB)</span>
+                      <button onClick={handleOcrScan} disabled={ocrLoading} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "10px 24px", fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                        {ocrLoading ? <><Timer size={14} /> Analyse en cours...</> : <><Sparkles size={14} /> Extraire les informations</>}
+                      </button>
+                    </div>
+                  )}
+                  {ocrError && <div style={{ marginTop: 12, padding: "10px 14px", background: C.redLight, borderRadius: 8, fontSize: 12, color: C.red }}>{ocrError}</div>}
+                </div>
+              )}
+
+              {/* Results */}
+              {ocrResult && (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                    <CheckCircle size={18} color={C.green} />
+                    <span style={{ fontSize: 14, fontWeight: 600, color: C.green }}>Extraction réussie</span>
+                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600,
+                      background: ocrResult.confidence === "high" ? C.greenLight : ocrResult.confidence === "medium" ? "#FFF3E0" : C.redLight,
+                      color: ocrResult.confidence === "high" ? C.green : ocrResult.confidence === "medium" ? "#E65100" : C.red,
+                    }}>Confiance : {ocrResult.confidence === "high" ? "Haute" : ocrResult.confidence === "medium" ? "Moyenne" : "Faible"}</span>
+                  </div>
+
+                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8, fontStyle: "italic" }}>Vous pouvez modifier les valeurs avant de les appliquer.</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px", background: C.border, borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+                    {OCR_FIELDS.map(f => {
+                      const val = ocrResult[f.key] || "";
+                      return (
+                        <div key={f.key} style={{ padding: "10px 14px", background: C.white }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            {f.label}
+                            {f.collabField && val && <span style={{ fontSize: 9, color: C.blue, fontStyle: "normal" }}>→ {f.collabField}</span>}
+                          </div>
+                          <input
+                            value={val}
+                            onChange={e => setOcrResult((prev: any) => prev ? { ...prev, [f.key]: e.target.value } : prev)}
+                            placeholder="—"
+                            style={{ width: "100%", border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 8px", fontSize: 13, fontWeight: 500, color: C.text, fontFamily: font, outline: "none", background: f.collabField ? C.blueLight + "30" : "transparent" }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Usage + warning */}
+                  {ocrUsage && (
+                    <div style={{ padding: "8px 12px", background: C.bg, borderRadius: 8, fontSize: 11, color: C.textMuted, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>Scans OCR ce mois : <b>{ocrUsage.used}/{ocrUsage.limit}</b></span>
+                      <div style={{ width: 100, height: 6, background: C.border, borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, ocrUsage.percent)}%`, background: ocrUsage.percent >= 90 ? C.red : ocrUsage.percent >= 70 ? "#FF9800" : C.green, transition: "width .3s" }} />
+                      </div>
+                    </div>
+                  )}
+                  {ocrWarning && (
+                    <div style={{ padding: "10px 14px", background: "#FFF3E0", borderRadius: 8, fontSize: 12, color: "#E65100", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                      <AlertTriangle size={16} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600 }}>Quota bientôt atteint — {ocrWarning.remaining} scans restants</div>
+                        <div style={{ fontSize: 11, marginTop: 2 }}>Passez au plan supérieur ou achetez des crédits supplémentaires.</div>
+                      </div>
+                      <button onClick={() => { setAdminPage("admin_abonnement" as any); setOcrModal(null); }} style={{ ...sBtn("outline"), fontSize: 10, padding: "4px 10px", whiteSpace: "nowrap", borderColor: "#E65100", color: "#E65100" }}>Upgrader</button>
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={() => { setOcrResult(null); setOcrFile(null); setOcrPreview(null); setOcrWarning(null); setOcrUsage(null); }} className="iz-btn-outline" style={{ ...sBtn("outline"), flex: 1, fontSize: 13 }}>Rescanner</button>
+                    <button onClick={handleOcrApply} className="iz-btn-pink" style={{ ...sBtn("pink"), flex: 2, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><CheckCircle size={14} /> Appliquer à la fiche collaborateur</button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+          </div>
+        </>
+      );
+    };
+
     const renderCollabProfile = () => {
       const collab = COLLABORATEURS.find(c => c.id === collabProfileId);
       if (!collab) return null;
@@ -662,6 +843,14 @@ export function createAdminDashboardSuivi(ctx: any) {
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
               <button onClick={() => setCollabProfileId(null)} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: C.text, fontFamily: font }}><ChevronLeft size={16} /> {t('misc.return')}</button>
               <button onClick={() => { setCollabPanelData({ ...collab, email: collab.email || "" }); setCollabPanelMode("edit"); }} style={{ ...sBtn("pink"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><FilePen size={14} /> Modifier</button>
+              {(() => {
+                const hasAiPlan = tenantSubscriptions.some((s: any) => (s.status === "active" || s.status === "trialing") && s.plan?.addon_type === "ai");
+                return hasAiPlan ? (
+                  <button onClick={() => setOcrModal({ collabId: collab.id, collab })} style={{ ...sBtn("outline"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, borderColor: C.blue, color: C.blue }}><Eye size={14} /> Scanner pièce d'identité</button>
+                ) : (
+                  <button onClick={() => { setAdminPage("admin_abonnement" as any); setSubView("change"); addToast_admin("Souscrivez un add-on IA pour utiliser le scanner de pièce d'identité."); }} title="Nécessite un add-on IA" style={{ ...sBtn("outline"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, borderColor: C.border, color: C.textMuted, opacity: 0.6 }}><Eye size={14} /> Scanner pièce d'identité</button>
+                );
+              })()}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
               <div style={{ width: 64, height: 64, borderRadius: "50%", background: collab.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: C.white, flexShrink: 0 }}>{collab.initials}</div>
@@ -1218,6 +1407,7 @@ export function createAdminDashboardSuivi(ctx: any) {
     renderDashboard_admin,
     renderSuivi,
     renderCollabProfile,
+    renderOcrModal,
     PARCOURS_CAT_META,
     PAGE_MODULE_MAP,
     hasModule,

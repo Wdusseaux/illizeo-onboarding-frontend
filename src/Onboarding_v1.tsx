@@ -3,6 +3,7 @@ import { useApiData } from "./api/useApiData";
 import { apiFetch } from "./api/client";
 import { useAuth } from "./api/useAuth";
 import { t, getLang, setLang, getAllLangs, LANG_META, type Lang } from "./i18n";
+import { parseCurrentUrl, pushAdminPage, pushEmployeePage, pushSuperAdmin, replaceCurrentPage, pushTenantRoot } from "./router";
 const _BUILD_VERSION = "2.1.0";
 import {
   getCollaborateurs, getParcours, getActions, getGroupes, getPhases,
@@ -45,7 +46,7 @@ import {
   superAdminListPlans, superAdminCreatePlan, superAdminUpdatePlan, superAdminDeletePlan,
   superAdminUpdateModules, superAdminListSubscriptions, superAdminListInvoices,
   superAdminGetStripeConfig, superAdminUpdateStripeConfig,
-  getMySubscription, subscribeToPlan, cancelSubscription, getAvailablePlans, getActiveModules, getStorageUsage, getSignatureUsage,
+  getMySubscription, subscribeToPlan, cancelSubscription, getAvailablePlans, getActiveModules, getStorageUsage, getSignatureUsage, getMonthlyConsumption,
   getDocuments, uploadDocument, validateDocument as apiValidateDoc, refuseDocument as apiRefuseDoc,
   type UploadedDocument,
   getNpsSurveys, createNpsSurvey as apiCreateNps, updateNpsSurvey as apiUpdateNps, deleteNpsSurvey as apiDeleteNps,
@@ -139,7 +140,12 @@ export default function OnboardingModule() {
   const [showPricing, setShowPricing] = useState(false);
   const [plans, setPlans] = useState<PlanData[]>([]);
   const [pricingBilling, setPricingBilling] = useState<"monthly" | "yearly">("monthly");
-  const [superAdminMode, setSuperAdminMode] = useState(false);
+  const [superAdminMode, _setSuperAdminMode] = useState(false);
+  const setSuperAdminMode = useCallback((v: boolean) => {
+    _setSuperAdminMode(v);
+    if (v) pushSuperAdmin();
+    else pushAdminPage("admin_dashboard" as AdminPage);
+  }, []);
   const [saTab, setSaTab] = useState<"dashboard" | "tenants" | "plans" | "subscriptions" | "stripe">("dashboard");
   const [saDashData, setSaDashData] = useState<any>(null);
   const [saTenants, setSaTenants] = useState<any[]>([]);
@@ -161,16 +167,22 @@ export default function OnboardingModule() {
       localStorage.setItem("illizeo_tenant_id", parts[0]);
       return true;
     }
-    // 2. URL has ?tenant= param
-    const params = new URLSearchParams(window.location.search);
-    const tenantParam = params.get("tenant");
+    // 2. URL path starts with /:tenantId (e.g. /acme/calendrier)
+    const parsed = parseCurrentUrl();
+    if (parsed.tenantId) {
+      localStorage.setItem("illizeo_tenant_id", parsed.tenantId);
+      return true;
+    }
+    // 3. URL has ?tenant= param
+    const qparams = new URLSearchParams(window.location.search);
+    const tenantParam = qparams.get("tenant");
     if (tenantParam) {
       localStorage.setItem("illizeo_tenant_id", tenantParam);
       return true;
     }
-    // 3. Just registered (needs plan selection) — skip tenant selection
+    // 4. Just registered (needs plan selection) — skip tenant selection
     if (_needsPlan && localStorage.getItem("illizeo_tenant_id")) return true;
-    // 4. Already have a tenant in localStorage
+    // 5. Already have a tenant in localStorage
     if (localStorage.getItem("illizeo_tenant_id")) return true;
     // Otherwise show tenant selection
     return false;
@@ -287,8 +299,44 @@ export default function OnboardingModule() {
   useEffect(() => { setRole(authRole); }, [authRole]);
   const [step, setStep] = useState<OnboardingStep>("dashboard");
   const [showPreboard, setShowPreboard] = useState(false); // Set to true to show preboarding
-  const [dashPage, setDashPage] = useState<DashboardPage>("tableau_de_bord");
-  const [adminPage, setAdminPage] = useState<AdminPage>(_needsPlan ? "admin_abonnement" : "admin_dashboard");
+  const _initialRoute = useMemo(() => parseCurrentUrl(), []);
+  const [dashPage, _setDashPage] = useState<DashboardPage>(_initialRoute.employeePage || "tableau_de_bord");
+  const [adminPage, _setAdminPage] = useState<AdminPage>(_needsPlan ? "admin_abonnement" : (_initialRoute.adminPage || "admin_dashboard"));
+
+  // Wrap setters to also update URL
+  const setDashPage = useCallback((page: DashboardPage) => {
+    _setDashPage(page);
+    pushEmployeePage(page);
+  }, []);
+  const setAdminPage = useCallback((page: AdminPage) => {
+    _setAdminPage(page);
+    pushAdminPage(page);
+  }, []);
+  // ─── URL SYNC: popstate (back/forward) + initial URL set ────
+  useEffect(() => {
+    // Set initial URL if not already matching a page
+    const tid = localStorage.getItem("illizeo_tenant_id");
+    if (tid && auth.isAuthenticated) {
+      const route = parseCurrentUrl();
+      if (!route.adminPage && !route.employeePage && !route.superAdmin) {
+        // No page in URL yet — set it
+        if (role === "rh") replaceCurrentPage("rh", adminPage);
+        else replaceCurrentPage("employee", undefined, dashPage);
+      }
+      if (_initialRoute.superAdmin) _setSuperAdminMode(true);
+    }
+    // Listen for back/forward
+    const onPopState = () => {
+      const route = parseCurrentUrl();
+      if (route.superAdmin) { _setSuperAdminMode(true); return; }
+      _setSuperAdminMode(false);
+      if (route.adminPage) _setAdminPage(route.adminPage);
+      else if (route.employeePage) _setDashPage(route.employeePage);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [auth.isAuthenticated]);
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [adminModal, setAdminModal] = useState<AdminModal>(null);
   const [parcoursFilter, setParcoursFilter] = useState<ParcoursCategorie | "all">("all");
@@ -593,6 +641,36 @@ export default function OnboardingModule() {
   const [actionTab, setActionTab] = useState<DashboardTab>("toutes");
   const [showProfile, setShowProfile] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
+  const [selectedTeamMember, setSelectedTeamMember] = useState<any>(null);
+  const [ocrModal, setOcrModal] = useState<any>(null);
+  const [ocrFile, setOcrFile] = useState<File | null>(null);
+  const [ocrPreview, setOcrPreview] = useState<string | null>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrResult, setOcrResult] = useState<any>(null);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+  const [ocrWarning, setOcrWarning] = useState<any>(null);
+  const [ocrUsage, setOcrUsage] = useState<any>(null);
+  const [saAiConfig, setSaAiConfig] = useState<any>(null);
+  const [saAiTenantUsage, setSaAiTenantUsage] = useState<any[]>([]);
+  const [aiUsageData, setAiUsageData] = useState<any>(null);
+  const [protectionOpenSection, setProtectionOpenSection] = useState<string | null>(null);
+  const [generateContrat, setGenerateContrat] = useState<any>(null);
+  const [generateCollabId, setGenerateCollabId] = useState<number | null>(null);
+  const [generateData, setGenerateData] = useState<any>(null);
+  const [generateLoading, setGenerateLoading] = useState(false);
+  const [consoData, setConsoData] = useState<any>(null);
+  const [consoMonth, setConsoMonth] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() + 1 }; });
+  const [consoLoading, setConsoLoading] = useState(false);
+  const [consoFilter, setConsoFilter] = useState<"all" | "admin" | "employé">("all");
+  const [consoSearch, setConsoSearch] = useState("");
+  const loadConsumption = useCallback(() => {
+    setConsoLoading(true);
+    getMonthlyConsumption(consoMonth.year, consoMonth.month)
+      .then(setConsoData)
+      .catch(() => setConsoData(null))
+      .finally(() => setConsoLoading(false));
+  }, [consoMonth.year, consoMonth.month]);
+  useEffect(() => { if (subTab === "consommation") loadConsumption(); }, [consoMonth.year, consoMonth.month, subTab]);
   const [profileTab, setProfileTab] = useState("infos");
   const [formData, setFormData] = useState({
     prenom: "Nadia", nom: "Ferreira", dateNaissance: "15/09/1990", genre: "Femme",
@@ -609,10 +687,10 @@ export default function OnboardingModule() {
   type Toast = { id: number; message: string; type: "success" | "info" | "warning"; role: UserRole };
 
   const [employeeDocs, setEmployeeDocs] = useState<Record<string, DocStatus>>({
-    "IBAN/BIC Suisse *": "manquant",
+    "IBAN/BIC *": "manquant",
     "Certificats De Travail et Diplômes *": "manquant",
     "Pièce d'identité / Passeport *": "manquant",
-    "Carte AVS": "manquant",
+    "Carte d'assuré social": "manquant",
     "Permis de travail ou de résidence": "manquant",
     "Photo d'identité *": "manquant",
     "Pièce justificative": "manquant",
@@ -1011,7 +1089,11 @@ export default function OnboardingModule() {
     showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading, sigContratData, setSigContratData,
     actionTab, setActionTab,
     showProfile, setShowProfile,
-    showTeamModal, setShowTeamModal,
+    showTeamModal, setShowTeamModal, selectedTeamMember, setSelectedTeamMember,
+    ocrModal, setOcrModal, ocrFile, setOcrFile, ocrPreview, setOcrPreview, ocrLoading, setOcrLoading, ocrResult, setOcrResult, ocrError, setOcrError, ocrWarning, setOcrWarning, ocrUsage, setOcrUsage,
+    saAiConfig, setSaAiConfig, saAiTenantUsage, setSaAiTenantUsage, aiUsageData, setAiUsageData, protectionOpenSection, setProtectionOpenSection,
+    generateContrat, setGenerateContrat, generateCollabId, setGenerateCollabId, generateData, setGenerateData, generateLoading, setGenerateLoading,
+    consoData, setConsoData, consoMonth, setConsoMonth, consoLoading, setConsoLoading, consoFilter, setConsoFilter, consoSearch, setConsoSearch, loadConsumption,
     profileTab, setProfileTab,
     formData, setFormData,
     passwordVisible, setPasswordVisible,
@@ -1273,8 +1355,9 @@ export default function OnboardingModule() {
         const trialStart = localStorage.getItem("illizeo_trial_start");
         const trialExpired = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) > 14 * 24 * 60 * 60 * 1000;
 
-        if (!hasActiveSub && trialExpired) {
-          // Trial expired + no subscription → force subscription page
+        const isInTrialNow = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) <= 14 * 24 * 60 * 60 * 1000;
+        if (!hasActiveSub && !isInTrialNow && trialStart) {
+          // Trial expired or sub not renewed → force subscription page
           setAdminPage("admin_abonnement" as any);
           setSubView("change");
         } else if (!hasActiveSub && !trialStart) {
@@ -1400,7 +1483,7 @@ export default function OnboardingModule() {
     renderDocuments, renderWorkflows, renderTemplates, renderEquipes,
     renderNotifications_admin, renderEntreprise_admin, renderMessagerie_admin,
     renderNPS, renderContrats, renderCooptation, renderIntegrations,
-    renderSidebar_admin: _renderSidebar_admin, PARCOURS_CAT_META, hasModule, isPageAccessible,
+    renderSidebar_admin: _renderSidebar_admin, renderSuperAdminPanel, renderOcrModal, PARCOURS_CAT_META, hasModule, isPageAccessible,
     isEditorTenant, isInTrial, trialExpired, hasActiveSub, SIDEBAR,
   } = adminRenders as any;
   const renderSidebar_admin = typeof _renderSidebar_admin === "function" ? _renderSidebar_admin : () => <div style={{ width: 220, minHeight: "100vh", background: "#fff", borderRight: "1px solid #e0e0e0" }} />;
@@ -1647,6 +1730,11 @@ export default function OnboardingModule() {
     );
   }
 
+  // ─── SUPER ADMIN PANEL ──────────────────────────────────
+  if (superAdminMode && auth.isAuthenticated && renderSuperAdminPanel) {
+    return renderSuperAdminPanel();
+  }
+
   // ─── DASHBOARD (MAIN APP) ────────────────────────────────
   if (role === "rh") {
     return (
@@ -1773,6 +1861,46 @@ export default function OnboardingModule() {
           ) : null;
         })()}
         <div style={{ flex: 1, overflow: "auto" }}>
+        {/* ── Trial expired lock: only allow abonnement + RGPD ── */}
+        {!isEditorTenant && trialExpired && !hasActiveSub && adminPage !== "admin_abonnement" && adminPage !== "admin_donnees" && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: "60px 40px", textAlign: "center" }}>
+            <div style={{ width: 64, height: 64, borderRadius: "50%", background: C.redLight, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+              <Lock size={28} color={C.red} />
+            </div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: C.dark, margin: "0 0 8px" }}>Période d'essai terminée</h2>
+            <p style={{ fontSize: 14, color: C.textMuted, maxWidth: 400, lineHeight: 1.6, margin: "0 0 24px" }}>
+              Votre essai gratuit de 14 jours est terminé. Souscrivez un plan pour continuer à utiliser Illizeo et accéder à toutes vos données.
+            </p>
+            <button onClick={() => { setAdminPage("admin_abonnement" as any); setSubView("change"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "12px 32px", fontSize: 14 }}>
+              Choisir un plan
+            </button>
+          </div>
+        )}
+        {/* ── Subscription page + RGPD: always accessible ───── */}
+        {adminPage === "admin_abonnement" && adminInline.renderAdminAbonnement()}
+        {adminPage === "admin_donnees" && adminInline.renderAdminDonnees()}
+
+        {/* ── All other pages: locked when trial expired ──── */}
+        {(() => {
+          const _locked = !isEditorTenant && !hasActiveSub && !isInTrial;
+          if (_locked && adminPage !== "admin_abonnement" && adminPage !== "admin_donnees") {
+            return (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: "60px 40px", textAlign: "center" }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: C.redLight, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+                  <Lock size={28} color={C.red} />
+                </div>
+                <h2 style={{ fontSize: 20, fontWeight: 700, color: C.dark, margin: "0 0 8px" }}>Période d'essai terminée</h2>
+                <p style={{ fontSize: 14, color: C.textMuted, maxWidth: 400, lineHeight: 1.6, margin: "0 0 24px" }}>
+                  Votre essai gratuit de 14 jours est terminé. Souscrivez un plan pour continuer à utiliser Illizeo et accéder à toutes vos données.
+                </p>
+                <button onClick={() => { setAdminPage("admin_abonnement" as any); setSubView("change"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "12px 32px", fontSize: 14 }}>
+                  Choisir un plan
+                </button>
+              </div>
+            );
+          }
+          if (_locked) return null;
+          return (<>
         {adminPage === "admin_dashboard" && renderDashboard_admin()}
         {adminPage === "admin_suivi" && renderSuivi()}
         {adminPage === "admin_suivi" && collabProfileId && renderCollabProfile()}
@@ -1792,9 +1920,19 @@ export default function OnboardingModule() {
         {adminPage === "admin_users" && adminInline.renderAdminUsers()}
         {adminPanels.renderGroupePanel()}
         {adminPanels.renderActionPanel()}
-        {/* ── Confirm Dialog ──────────────────────────────────── */}
-        {/* ── Subscription page (for non-editor tenants) ───── */}
-        {adminPage === "admin_abonnement" && adminInline.renderAdminAbonnement()}
+        {adminPage === "admin_fields" && adminInline.renderAdminFields()}
+        {adminPage === "admin_apparence" && adminInline.renderAdminApparence()}
+        {adminPage === "admin_2fa" && adminInline.renderAdmin2FA()}
+        {adminPage === "admin_password_policy" && adminInline.renderAdminPasswordPolicy()}
+        {adminPage === "admin_equipements" && adminInline.renderAdminEquipements()}
+        {adminPage === "admin_provisioning" && adminInline.renderAdminProvisioning()}
+        {adminPage === "admin_roles" && adminInline.renderAdminRoles()}
+        {adminPage === "admin_calendar" && adminInline.renderAdminCalendar()}
+        {adminPage === "admin_orgchart" && adminInline.renderAdminOrgChart()}
+        {adminPage === "admin_buddy" && adminInline.renderAdminBuddy()}
+        {adminPage === "admin_audit" && adminInline.renderAdminAuditLog()}
+          </>);
+        })()}
 
         {confirmDialog && (
           <div className="iz-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 2000 }}>
@@ -1811,25 +1949,6 @@ export default function OnboardingModule() {
             </div>
           </div>
         )}
-        {adminPage === "admin_fields" && adminInline.renderAdminFields()}
-        {adminPage === "admin_apparence" && adminInline.renderAdminApparence()}
-        {adminPage === "admin_2fa" && adminInline.renderAdmin2FA()}
-        {adminPage === "admin_password_policy" && adminInline.renderAdminPasswordPolicy()}
-        {/* ═══ EQUIPMENT MANAGEMENT ═══════════════════════════════ */}
-        {adminPage === "admin_equipements" && adminInline.renderAdminEquipements()}
-
-        {adminPage === "admin_donnees" && adminInline.renderAdminDonnees()}
-        {adminPage === "admin_provisioning" && adminInline.renderAdminProvisioning()}
-        {/* ═══ ROLES & PERMISSIONS ═════════════════════════════════ */}
-        {adminPage === "admin_roles" && adminInline.renderAdminRoles()}
-        {/* ═══ CALENDAR ═══════════════════════════════════════════ */}
-        {adminPage === "admin_calendar" && adminInline.renderAdminCalendar()}
-        {/* ═══ ORG CHART ═══════════════════════════════════════════ */}
-        {adminPage === "admin_orgchart" && adminInline.renderAdminOrgChart()}
-        {/* ═══ BUDDY / PARRAIN ════════════════════════════════════ */}
-        {adminPage === "admin_buddy" && adminInline.renderAdminBuddy()}
-        {/* ═══ AUDIT LOG ═══════════════════════════════════════════ */}
-        {adminPage === "admin_audit" && adminInline.renderAdminAuditLog()}
         </div>{/* end content wrapper */}
         </div>{/* end column container */}
         {/* Translation modal */}
@@ -1871,6 +1990,7 @@ export default function OnboardingModule() {
         )}
         {/* (confirm modal unified with confirmDialog above) */}
         {adminPanels.renderPromptModal()}
+        {typeof renderOcrModal === "function" && renderOcrModal()}
         {adminPanels.renderCollabPanel()}
         {adminPanels.renderParcoursPanel()}
         {adminPanels.renderPhasePanel()}
@@ -1878,6 +1998,22 @@ export default function OnboardingModule() {
     );
   }
   // ─── EMPLOYEE MAIN RENDER ────────────────────────────────
+  // Lock employee pages when no active subscription (trial expired or sub not renewed)
+  if (!isEditorTenant && !hasActiveSub && !isInTrial) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text, padding: "60px 40px", textAlign: "center" }}>
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <div style={{ marginBottom: 24 }}><IllizeoLogoBrand style={{ height: 32 }} /></div>
+        <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#FFF3E0", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+          <Lock size={28} color="#E65100" />
+        </div>
+        <h2 style={{ fontSize: 20, fontWeight: 700, color: C.dark, margin: "0 0 8px" }}>Plateforme en maintenance</h2>
+        <p style={{ fontSize: 14, color: C.textMuted, maxWidth: 400, lineHeight: 1.6, margin: 0 }}>
+          La plateforme est temporairement indisponible. Veuillez contacter votre service RH pour plus d'informations.
+        </p>
+      </div>
+    );
+  }
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" /><style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
@@ -2426,6 +2562,52 @@ export default function OnboardingModule() {
                   </button>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Team member detail modal */}
+      {selectedTeamMember && (
+        <div className="iz-overlay" onClick={() => setSelectedTeamMember(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100 }}>
+          <div className="iz-modal iz-scale-in" onClick={e => e.stopPropagation()} style={{ background: C.white, borderRadius: 16, width: 400, position: "relative", overflow: "hidden" }}>
+            {/* Header with avatar */}
+            <div style={{ background: `linear-gradient(135deg, ${selectedTeamMember.color}, ${selectedTeamMember.color}CC)`, padding: "32px 24px", textAlign: "center" }}>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(255,255,255,.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#fff", margin: "0 auto 12px", border: "3px solid rgba(255,255,255,.4)" }}>{selectedTeamMember.initials}</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#fff" }}>{selectedTeamMember.name}</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,.8)", marginTop: 4 }}>{selectedTeamMember.role}</div>
+            </div>
+            <button onClick={() => setSelectedTeamMember(null)} style={{ position: "absolute", top: 12, right: 12, background: "rgba(255,255,255,.2)", border: "none", borderRadius: "50%", width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><X size={14} color="#fff" /></button>
+            {/* Info */}
+            <div style={{ padding: "20px 24px" }}>
+              {selectedTeamMember.email && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <Mail size={15} color={C.textMuted} />
+                  <span style={{ fontSize: 13, color: C.text }}>{selectedTeamMember.email}</span>
+                </div>
+              )}
+              {selectedTeamMember.phone && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <Phone size={15} color={C.textMuted} />
+                  <span style={{ fontSize: 13, color: C.text }}>{selectedTeamMember.phone}</span>
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <Users size={15} color={C.textMuted} />
+                <span style={{ fontSize: 13, color: C.text }}>{selectedTeamMember.role}</span>
+              </div>
+              {/* Action button */}
+              <button onClick={async () => {
+                const user = msgUsers.find((u: any) => u.name === selectedTeamMember.name);
+                if (user) {
+                  const existing = msgConversations.find((c: any) => c.other_user?.id === user.id);
+                  if (existing) { setMsgActiveConvId(existing.id); }
+                  else { try { const msg = await apiSendMessage(user.id, "👋"); await getConversations().then(setMsgConversations); setMsgActiveConvId(msg.conversation_id); } catch {} }
+                }
+                setSelectedTeamMember(null);
+                setDashPage("messagerie");
+              }} className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 0", fontSize: 13 }}>
+                <MessageCircle size={14} /> Envoyer un message
+              </button>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { t, getLang, setLang, getAllLangs, LANG_META, type Lang } from "../i18n";
+import { pushTenantRoot } from "../router";
 import {
   Users, FileText, MessageCircle, Bell, Building2, LayoutDashboard, Zap,
   ChevronRight, ChevronLeft, X, Upload, Download, Plus, Eye, EyeOff,
@@ -287,7 +288,7 @@ export function createAuthPages(ctx: any) {
             </button>
             <div style={{ textAlign: "center", marginTop: 16 }}>
               <p style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>Vous pouvez aussi utiliser un code de récupération</p>
-              <button type="button" onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `${window.location.pathname}?tenant=${tid}` : window.location.pathname; }); }} style={{ background: "none", border: "none", color: C.pink, fontSize: 13, cursor: "pointer", fontFamily: font }}>Retour à la connexion</button>
+              <button type="button" onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `/${tid}` : "/"; }); }} style={{ background: "none", border: "none", color: C.pink, fontSize: 13, cursor: "pointer", fontFamily: font }}>Retour à la connexion</button>
             </div>
           </form>
         </div>
@@ -439,6 +440,7 @@ export function createAuthPages(ctx: any) {
               const data = await res.json();
               if (data.status === "ok") {
                 localStorage.setItem("illizeo_tenant_id", slug);
+                pushTenantRoot(slug);
                 setTenantResolved(true);
               } else { throw new Error(); }
             } catch {
@@ -500,7 +502,7 @@ export function createAuthPages(ctx: any) {
               localStorage.setItem("illizeo_trial_start", new Date().toISOString());
               localStorage.setItem("illizeo_needs_plan", "true");
               // Navigate with tenant param to skip tenant selection
-              window.location.href = `${window.location.pathname}?tenant=${res.tenant_id}`;
+              window.location.href = `/${res.tenant_id}`;
             } catch (err: any) {
               let msg = "Erreur lors de la création";
               try { const parsed = JSON.parse(err?.message || ""); msg = parsed?.message || msg; } catch {}
@@ -575,7 +577,7 @@ export function createAuthPages(ctx: any) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 6 }}>
               <span style={{ fontSize: 12, color: C.textMuted }}>{t('login.space')}</span>
               <span style={{ fontSize: 12, fontWeight: 600, color: C.pink }}>{localStorage.getItem("illizeo_tenant_id") || "illizeo"}</span>
-              <button onClick={() => { localStorage.removeItem("illizeo_tenant_id"); setTenantResolved(false); }} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font, textDecoration: "underline" }}>{t('login.change')}</button>
+              <button onClick={() => { localStorage.removeItem("illizeo_tenant_id"); window.history.replaceState({}, "", "/"); setTenantResolved(false); }} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font, textDecoration: "underline" }}>{t('login.change')}</button>
             </div>
           </div>
           {auth.error && (

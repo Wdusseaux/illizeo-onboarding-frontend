@@ -382,6 +382,22 @@ export async function getContratGenerated(contratId: number, collaborateurId?: n
   return apiFetch<any>(`/contrats/${contratId}/generate${qs}`);
 }
 
+export async function downloadContratMerged(contratId: number, collaborateurId: number, format: 'docx' | 'pdf' = 'pdf') {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+  const tenantId = localStorage.getItem('illizeo_tenant_id') || import.meta.env.VITE_TENANT_ID || 'illizeo';
+  const token = localStorage.getItem('illizeo_auth_token');
+  const res = await fetch(`${baseUrl}/contrats/${contratId}/download?collaborateur_id=${collaborateurId}&format=${format}`, {
+    headers: { 'X-Tenant': tenantId, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error('Download failed');
+  const blob = await res.blob();
+  const filename = res.headers.get('Content-Disposition')?.match(/filename="?(.+?)"?$/)?.[1] || `contrat.${format}`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── Document Categories ────────────────────────────────────
 interface ApiDocCategory {
   id: number; slug: string; titre: string;
@@ -1250,8 +1266,59 @@ export async function getSignatureUsage() {
   return apiFetch<{ total: number; signed: number; sent: number; declined: number }>('/signature-usage');
 }
 
+// ─── OCR / AI ─────────────────────────────────────────────
+export interface OcrIdentityResult {
+  document_type: string | null;
+  document_number: string | null;
+  last_name: string | null;
+  first_name: string | null;
+  birth_date: string | null;
+  birth_place: string | null;
+  nationality: string | null;
+  gender: string | null;
+  expiry_date: string | null;
+  issue_date: string | null;
+  issuing_authority: string | null;
+  issuing_country: string | null;
+  address: string | null;
+  avs_number: string | null;
+  confidence: 'high' | 'medium' | 'low';
+}
+export async function ocrExtractIdentity(file: File): Promise<{ success: boolean; data: OcrIdentityResult; confidence: string }> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+  const tenantId = localStorage.getItem('illizeo_tenant_id') || import.meta.env.VITE_TENANT_ID || 'illizeo';
+  const token = localStorage.getItem('illizeo_token');
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch(`${baseUrl}/ocr/identity`, {
+    method: 'POST',
+    headers: { 'X-Tenant': tenantId, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: formData,
+  });
+  if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || err.message || JSON.stringify(err.errors || {}) || `OCR failed (${res.status})`); }
+  return res.json();
+}
+
 export async function getStorageUsage() {
   return apiFetch<{ used_bytes: number; used_formatted: string; max_bytes: number; max_formatted: string; percent: number; file_count: number; db_size: string }>('/storage-usage');
+}
+
+// ─── Monthly Consumption ─────────────────────────────────────
+export interface ConsumptionUser {
+  id: number; prenom: string; nom: string; email: string; site: string; role: string; departement: string;
+}
+export interface MonthlyConsumption {
+  year: number; month: number; month_label: string;
+  total_active: number; admin_count: number; employee_count: number;
+  min_billed: number; billed_count: number;
+  users: ConsumptionUser[];
+}
+export async function getMonthlyConsumption(year?: number, month?: number) {
+  const params = new URLSearchParams();
+  if (year) params.set('year', String(year));
+  if (month) params.set('month', String(month));
+  const qs = params.toString();
+  return apiFetch<MonthlyConsumption>(`/monthly-consumption${qs ? '?' + qs : ''}`);
 }
 
 // ─── Roles & Permissions ──────────────────────────────────────
