@@ -80,6 +80,9 @@ import {
   uploadSignatureFile, sendSignatureDocToAll, getDocAcknowledgements, acknowledgeDoc, getMyPendingSignatures,
   type SignatureDoc, type DocAcknowledgement,
   checkDossier, validateDossier, exportDossier, resetDossier, type DossierCheck,
+  getApiKeys, createApiKey, revokeApiKey, deleteApiKey,
+  getWebhooksConfig, createWebhookConfig, updateWebhookConfig, deleteWebhookConfig, testWebhook,
+  getApiLogs,
 } from "../api/endpoints";
 import { apiFetch } from "../api/client";
 
@@ -362,27 +365,13 @@ export function createAdminIntegrations(ctx: any) {
 
         {/* ─── API & WEBHOOKS SECTION ──────────────────────── */}
         {(() => {
-          const mockKeys = apiKeys.length > 0 ? apiKeys : (demoMode ? [
-            { id: 1, name: "Production App", key: "ilz_live_sk_7f3a9b2c...d4e8", prefix: "ilz_live_sk_7f3a", scopes: ["collaborateurs:read", "parcours:read", "documents:read", "actions:read"], created_at: "2026-03-15", last_used: "2026-04-13T14:32:00", active: true },
-            { id: 2, name: "Staging/Test", key: "ilz_test_sk_2b8c4d6e...a1f3", prefix: "ilz_test_sk_2b8c", scopes: ["collaborateurs:read", "collaborateurs:write", "parcours:read", "parcours:write"], created_at: "2026-04-01", last_used: null, active: true },
-            { id: 3, name: "Legacy Integration", key: "ilz_live_sk_9e1f...deprecated", prefix: "ilz_live_sk_9e1f", scopes: ["collaborateurs:read"], created_at: "2025-11-20", last_used: "2026-01-15T09:00:00", active: false },
-          ] : []);
-          const mockWebhooks = apiWebhooks.length > 0 ? apiWebhooks : (demoMode ? [
-            { id: 1, url: "https://erp.example.com/api/illizeo/webhook", events: ["collaborateur.created", "collaborateur.updated", "document.validated"], secret: "whsec_a8f3...b2c1", active: true, last_triggered: "2026-04-13T10:15:00", success_rate: 98.5 },
-            { id: 2, url: "https://slack-bot.internal/onboarding-events", events: ["parcours.completed", "action.overdue"], secret: "whsec_d4e7...f6a9", active: true, last_triggered: "2026-04-12T16:45:00", success_rate: 100 },
-          ] : []);
-          const mockLogs = apiLogs.length > 0 ? apiLogs : (demoMode ? [
-            { id: 1, method: "GET", endpoint: "/api/v1/collaborateurs", status: 200, response_time_ms: 45, api_key_name: "Production App", timestamp: "2026-04-13T14:32:00" },
-            { id: 2, method: "POST", endpoint: "/api/v1/collaborateurs", status: 201, response_time_ms: 120, api_key_name: "Production App", timestamp: "2026-04-13T14:30:12" },
-            { id: 3, method: "GET", endpoint: "/api/v1/parcours", status: 200, response_time_ms: 38, api_key_name: "Production App", timestamp: "2026-04-13T14:28:55" },
-            { id: 4, method: "GET", endpoint: "/api/v1/documents", status: 200, response_time_ms: 52, api_key_name: "Staging/Test", timestamp: "2026-04-13T14:25:00" },
-            { id: 5, method: "PUT", endpoint: "/api/v1/collaborateurs/42", status: 200, response_time_ms: 89, api_key_name: "Production App", timestamp: "2026-04-13T14:20:30" },
-            { id: 6, method: "POST", endpoint: "/api/v1/documents/upload", status: 201, response_time_ms: 340, api_key_name: "Production App", timestamp: "2026-04-13T14:15:00" },
-            { id: 7, method: "GET", endpoint: "/api/v1/collaborateurs/99", status: 404, response_time_ms: 12, api_key_name: "Staging/Test", timestamp: "2026-04-13T14:10:00" },
-            { id: 8, method: "GET", endpoint: "/api/v1/actions", status: 200, response_time_ms: 41, api_key_name: "Production App", timestamp: "2026-04-13T14:05:22" },
-            { id: 9, method: "POST", endpoint: "/api/v1/nps-surveys/3/send", status: 200, response_time_ms: 210, api_key_name: "Production App", timestamp: "2026-04-13T13:55:00" },
-            { id: 10, method: "GET", endpoint: "/api/v1/equipments", status: 200, response_time_ms: 33, api_key_name: "Staging/Test", timestamp: "2026-04-13T13:50:00" },
-          ] : []);
+          // Load real data from API on first render
+          if (apiKeys.length === 0 && apiTab === "keys") getApiKeys().then(setApiKeys).catch(() => {});
+          if (apiWebhooks.length === 0 && apiTab === "webhooks") getWebhooksConfig().then(setApiWebhooks).catch(() => {});
+          if (apiLogs.length === 0 && apiTab === "logs") getApiLogs().then(setApiLogs).catch(() => {});
+          const reloadKeys = () => getApiKeys().then(setApiKeys).catch(() => {});
+          const reloadWebhooks = () => getWebhooksConfig().then(setApiWebhooks).catch(() => {});
+          const reloadLogs = () => getApiLogs().then(setApiLogs).catch(() => {});
 
           const SCOPE_COLORS: Record<string, string> = { "collaborateurs:read": "#4CAF50", "collaborateurs:write": "#E53935", "parcours:read": "#1A73E8", "parcours:write": "#7B5EA7", "documents:read": "#F9A825", "documents:write": "#E65100", "actions:read": "#00BCD4" };
           const METHOD_COLORS: Record<string, string> = { GET: "#4CAF50", POST: "#1A73E8", PUT: "#F9A825", DELETE: "#E53935", PATCH: "#7B5EA7" };
@@ -399,27 +388,40 @@ export function createAdminIntegrations(ctx: any) {
           const endpoints = [
             { module: "Collaborateurs", items: [
               { method: "GET", path: "/collaborateurs", desc: lang === 'fr' ? "Lister tous les collaborateurs" : "List all employees" },
-              { method: "POST", path: "/collaborateurs", desc: lang === 'fr' ? "Creer un collaborateur" : "Create employee" },
+              { method: "POST", path: "/collaborateurs", desc: lang === 'fr' ? "Créer un collaborateur" : "Create employee" },
               { method: "GET", path: "/collaborateurs/{id}", desc: lang === 'fr' ? "Obtenir un collaborateur" : "Get employee" },
-              { method: "PUT", path: "/collaborateurs/{id}", desc: lang === 'fr' ? "Mettre a jour un collaborateur" : "Update employee" },
+              { method: "PUT", path: "/collaborateurs/{id}", desc: lang === 'fr' ? "Mettre à jour un collaborateur" : "Update employee" },
+              { method: "DELETE", path: "/collaborateurs/{id}", desc: lang === 'fr' ? "Supprimer un collaborateur" : "Delete employee" },
             ]},
             { module: "Parcours", items: [
               { method: "GET", path: "/parcours", desc: lang === 'fr' ? "Lister tous les parcours" : "List all paths" },
-              { method: "POST", path: "/parcours", desc: lang === 'fr' ? "Creer un parcours" : "Create path" },
+              { method: "POST", path: "/parcours", desc: lang === 'fr' ? "Créer un parcours" : "Create path" },
+              { method: "PUT", path: "/parcours/{id}", desc: lang === 'fr' ? "Mettre à jour un parcours" : "Update path" },
+              { method: "DELETE", path: "/parcours/{id}", desc: lang === 'fr' ? "Supprimer un parcours" : "Delete path" },
             ]},
             { module: "Documents", items: [
               { method: "GET", path: "/documents", desc: lang === 'fr' ? "Lister les documents" : "List documents" },
               { method: "POST", path: "/documents/upload", desc: lang === 'fr' ? "Uploader un document" : "Upload document" },
+              { method: "POST", path: "/documents/{id}/validate", desc: lang === 'fr' ? "Valider un document" : "Validate document" },
+              { method: "POST", path: "/documents/{id}/refuse", desc: lang === 'fr' ? "Refuser un document" : "Refuse document" },
             ]},
             { module: "Actions", items: [
               { method: "GET", path: "/actions", desc: lang === 'fr' ? "Lister les actions" : "List actions" },
+              { method: "POST", path: "/actions", desc: lang === 'fr' ? "Créer une action" : "Create action" },
+              { method: "PUT", path: "/actions/{id}", desc: lang === 'fr' ? "Mettre à jour une action" : "Update action" },
             ]},
             { module: "NPS & Surveys", items: [
-              { method: "GET", path: "/nps-surveys", desc: lang === 'fr' ? "Lister les enquetes" : "List surveys" },
-              { method: "POST", path: "/nps-surveys/{id}/send", desc: lang === 'fr' ? "Envoyer une enquete" : "Send survey" },
+              { method: "GET", path: "/nps-surveys", desc: lang === 'fr' ? "Lister les enquêtes" : "List surveys" },
+              { method: "POST", path: "/nps-surveys/{id}/send", desc: lang === 'fr' ? "Envoyer une enquête" : "Send survey" },
             ]},
-            { module: "Equipment", items: [
-              { method: "GET", path: "/equipments", desc: lang === 'fr' ? "Lister les equipements" : "List equipment" },
+            { module: "Équipements", items: [
+              { method: "GET", path: "/equipments", desc: lang === 'fr' ? "Lister les équipements" : "List equipment" },
+              { method: "POST", path: "/equipments", desc: lang === 'fr' ? "Créer un équipement" : "Create equipment" },
+              { method: "POST", path: "/equipments/{id}/assign", desc: lang === 'fr' ? "Attribuer un équipement" : "Assign equipment" },
+            ]},
+            { module: "Cooptation", items: [
+              { method: "GET", path: "/cooptations", desc: lang === 'fr' ? "Lister les cooptations" : "List referrals" },
+              { method: "POST", path: "/cooptations", desc: lang === 'fr' ? "Créer une cooptation" : "Create referral" },
             ]},
           ];
 
@@ -456,28 +458,35 @@ export function createAdminIntegrations(ctx: any) {
               {apiTab === "keys" && (
                 <div>
                   <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-                    <button onClick={() => {
-                      const newKey = { id: Date.now(), name: "New Key", key: "ilz_live_sk_" + Math.random().toString(36).slice(2, 10) + "...", prefix: "ilz_live_sk_" + Math.random().toString(36).slice(2, 6), scopes: ["collaborateurs:read"], created_at: new Date().toISOString().slice(0, 10), last_used: null, active: true };
-                      setApiKeys([newKey, ...mockKeys]);
-                      addToast_admin(t('api.new_key'));
+                    <button onClick={async () => {
+                      const name = prompt(lang === "fr" ? "Nom de la clé API :" : "API key name:");
+                      if (!name) return;
+                      try {
+                        const res = await createApiKey({ name, scopes: ["collaborateurs:read"] });
+                        if (res.plain_key) {
+                          prompt(lang === "fr" ? "Clé créée — copiez-la maintenant, elle ne sera plus visible :" : "Key created — copy it now, it won't be shown again:", res.plain_key);
+                        }
+                        addToast_admin(t('api.new_key'));
+                        reloadKeys();
+                      } catch { addToast_admin(t('toast.error')); }
                     }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('api.new_key')}</button>
                   </div>
-                  {mockKeys.length === 0 ? (
+                  {apiKeys.length === 0 ? (
                     <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}><Key size={28} style={{ marginBottom: 8, opacity: .4 }} /><div>{t('api.no_keys')}</div></div>
-                  ) : mockKeys.map((k: any) => (
+                  ) : apiKeys.map((k: any) => (
                     <div key={k.id} className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 10, padding: "16px 20px" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{ width: 32, height: 32, borderRadius: 8, background: k.active ? C.greenLight : C.redLight, display: "flex", alignItems: "center", justifyContent: "center" }}><Key size={16} color={k.active ? C.green : C.red} /></div>
+                          <div style={{ width: 32, height: 32, borderRadius: 8, background: !k.revoked_at ? C.greenLight : C.redLight, display: "flex", alignItems: "center", justifyContent: "center" }}><Key size={16} color={!k.revoked_at ? C.green : C.red} /></div>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600 }}>{k.name}</div>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                              <code style={{ fontSize: 11, fontFamily: "monospace", color: C.textMuted, background: C.bg, padding: "2px 6px", borderRadius: 4 }}>{k.prefix}...</code>
-                              <button onClick={() => { navigator.clipboard.writeText(k.key); addToast_admin(t('api.copied')); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><Copy size={12} color={C.textMuted} /></button>
+                              <code style={{ fontSize: 11, fontFamily: "monospace", color: C.textMuted, background: C.bg, padding: "2px 6px", borderRadius: 4 }}>{k.key_prefix}...</code>
+                              <button onClick={() => { navigator.clipboard.writeText(k.key_prefix); addToast_admin(t('api.copied')); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><Copy size={12} color={C.textMuted} /></button>
                             </div>
                           </div>
                         </div>
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 4, background: k.active ? C.greenLight : C.redLight, color: k.active ? C.green : C.red }}>{k.active ? t('api.active') : t('api.revoked')}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 4, background: !k.revoked_at ? C.greenLight : C.redLight, color: !k.revoked_at ? C.green : C.red }}>{!k.revoked_at ? t('api.active') : t('api.revoked')}</span>
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
                         {(k.scopes || []).map((s: string) => (
@@ -487,14 +496,13 @@ export function createAdminIntegrations(ctx: any) {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: C.textMuted }}>
                         <div style={{ display: "flex", gap: 16 }}>
                           <span>{t('api.created_at')}: {fmtDate(k.created_at)}</span>
-                          <span>{t('api.last_used')}: {k.last_used ? fmtDateTime(k.last_used) : t('api.never')}</span>
+                          <span>{t('api.last_used')}: {k.last_used_at ? fmtDateTime(k.last_used_at) : t('api.never')}</span>
                         </div>
-                        {k.active && (
+                        {!k.revoked_at && (
                           <button onClick={() => {
-                            showConfirm(t('api.revoke_confirm'), () => {
-                              const updated = mockKeys.map((mk: any) => mk.id === k.id ? { ...mk, active: false } : mk);
-                              setApiKeys(updated);
-                              addToast_admin(t('api.revoke'));
+                            showConfirm(t('api.revoke_confirm'), async () => {
+                              try { await revokeApiKey(k.id); addToast_admin(t('api.revoke')); reloadKeys(); }
+                              catch { addToast_admin(t('toast.error')); }
                             });
                           }} style={{ ...sBtn("outline"), fontSize: 11, color: C.red, borderColor: C.red, padding: "4px 12px" }}>{t('api.revoke')}</button>
                         )}
@@ -508,15 +516,20 @@ export function createAdminIntegrations(ctx: any) {
               {apiTab === "webhooks" && (
                 <div>
                   <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-                    <button onClick={() => {
-                      const newWh = { id: Date.now(), url: "https://", events: [], secret: "whsec_" + Math.random().toString(36).slice(2, 10), active: true, last_triggered: null, success_rate: 100 };
-                      setApiWebhooks([newWh, ...mockWebhooks]);
-                      addToast_admin(t('api.new_webhook'));
+                    <button onClick={async () => {
+                      const url = prompt(lang === "fr" ? "URL du webhook :" : "Webhook URL:");
+                      if (!url) return;
+                      try {
+                        const res = await createWebhookConfig({ url, events: ["collaborateur.created", "collaborateur.updated"] });
+                        if (res.secret) addToast_admin(`Secret: ${res.secret}`);
+                        else addToast_admin(t('api.new_webhook'));
+                        reloadWebhooks();
+                      } catch { addToast_admin(t('toast.error')); }
                     }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('api.new_webhook')}</button>
                   </div>
-                  {mockWebhooks.length === 0 ? (
+                  {apiWebhooks.length === 0 ? (
                     <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}><Webhook size={28} style={{ marginBottom: 8, opacity: .4 }} /><div>{t('api.no_webhooks')}</div></div>
-                  ) : mockWebhooks.map((wh: any) => (
+                  ) : apiWebhooks.map((wh: any) => (
                     <div key={wh.id} className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 10, padding: "16px 20px" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
@@ -527,9 +540,9 @@ export function createAdminIntegrations(ctx: any) {
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                          <div onClick={() => {
-                            const updated = mockWebhooks.map((w: any) => w.id === wh.id ? { ...w, active: !w.active } : w);
-                            setApiWebhooks(updated);
+                          <div onClick={async () => {
+                            try { await updateWebhookConfig(wh.id, { active: !wh.active }); reloadWebhooks(); }
+                            catch { addToast_admin(t('toast.error')); }
                           }} style={{ width: 36, height: 20, borderRadius: 10, background: wh.active ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s" }}>
                             <div style={{ width: 16, height: 16, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: wh.active ? 18 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
                           </div>
@@ -542,12 +555,11 @@ export function createAdminIntegrations(ctx: any) {
                         ))}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: C.textMuted }}>
-                        <span>{t('api.last_triggered')}: {wh.last_triggered ? fmtDateTime(wh.last_triggered) : t('api.never')}</span>
+                        <span>{t('api.last_triggered')}: {wh.last_triggered_at ? fmtDateTime(wh.last_triggered_at) : t('api.never')}</span>
                         <button onClick={() => {
-                          showConfirm(lang === 'fr' ? "Supprimer ce webhook ?" : "Delete this webhook?", () => {
-                            const updated = mockWebhooks.filter((w: any) => w.id !== wh.id);
-                            setApiWebhooks(updated);
-                            addToast_admin(t('api.delete'));
+                          showConfirm(lang === 'fr' ? "Supprimer ce webhook ?" : "Delete this webhook?", async () => {
+                            try { await deleteWebhookConfig(wh.id); addToast_admin(t('api.delete')); reloadWebhooks(); }
+                            catch { addToast_admin(t('toast.error')); }
                           });
                         }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash2 size={14} color={C.red} /></button>
                       </div>
@@ -561,7 +573,7 @@ export function createAdminIntegrations(ctx: any) {
                 <div>
                   {/* Reference card */}
                   <div className="iz-card" style={{ ...sCard, marginBottom: 16, padding: "20px 24px" }}>
-                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px" }}>{lang === 'fr' ? "Reference API" : "API Reference"}</h3>
+                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px" }}>{lang === 'fr' ? "Référence API" : "API Reference"}</h3>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
                       <div style={{ padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
                         <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{t('api.base_url')}</div>
@@ -580,7 +592,7 @@ export function createAdminIntegrations(ctx: any) {
                       </div>
                       <div style={{ padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
                         <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", marginBottom: 4 }}>{t('api.rate_limit')}</div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>1 000 {lang === 'fr' ? "requetes/heure" : "requests/hour"}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>1 000 {lang === 'fr' ? "requêtes/heure" : "requests/hour"}</span>
                       </div>
                     </div>
 
@@ -630,8 +642,8 @@ export function createAdminIntegrations(ctx: any) {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockLogs.map((log: any) => (
-                        <tr key={log.id} style={{ borderBottom: `1px solid ${C.border}`, background: log.status >= 500 ? `${C.red}06` : log.status >= 200 && log.status < 300 ? "transparent" : "transparent" }}>
+                      {apiLogs.map((log: any) => (
+                        <tr key={log.id} style={{ borderBottom: `1px solid ${C.border}`, background: (log.status_code || log.status) >= 500 ? `${C.red}06` : "transparent" }}>
                           <td style={{ padding: "8px 12px" }}>
                             <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: `${METHOD_COLORS[log.method] || C.textMuted}15`, color: METHOD_COLORS[log.method] || C.textMuted, fontFamily: "monospace" }}>{log.method}</span>
                           </td>
@@ -639,11 +651,11 @@ export function createAdminIntegrations(ctx: any) {
                             <code style={{ fontSize: 11, fontFamily: "monospace", color: C.text }}>{log.endpoint}</code>
                           </td>
                           <td style={{ padding: "8px 12px", textAlign: "center" }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: STATUS_BG(log.status), color: STATUS_COLOR(log.status) }}>{log.status}</span>
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: STATUS_BG(log.status_code || log.status), color: STATUS_COLOR(log.status_code || log.status) }}>{log.status_code || log.status}</span>
                           </td>
                           <td style={{ padding: "8px 12px", textAlign: "right", fontFamily: "monospace", fontSize: 11, color: log.response_time_ms > 1000 ? C.red : C.textMuted }}>{log.response_time_ms}ms</td>
-                          <td style={{ padding: "8px 12px", fontSize: 11, color: C.textMuted }}>{log.api_key_name}</td>
-                          <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 11, color: C.textMuted }}>{fmtDateTime(log.timestamp)}</td>
+                          <td style={{ padding: "8px 12px", fontSize: 11, color: C.textMuted }}>{log.api_key?.name || log.api_key_name || "—"}</td>
+                          <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 11, color: C.textMuted }}>{fmtDateTime(log.created_at || log.timestamp)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1056,7 +1068,7 @@ export function createAdminIntegrations(ctx: any) {
                             { Icon: PartyPopper, color: "#4CAF50", label: t('teams.welcome'), desc: t('teams.welcome_desc'), active: true },
                             { Icon: AlertTriangle, color: "#F9A825", label: t('teams.late_alerts'), desc: t('teams.late_alerts_desc'), active: true },
                             { Icon: FileText, color: "#1A73E8", label: t('teams.documents'), desc: t('teams.documents_desc'), active: true },
-                            { Icon: Trophy, color: "#C2185B", label: t('teams.path_complete'), desc: t('teams.path_complete_desc'), active: true },
+                            { Icon: Trophy, color: "#E41076", label: t('teams.path_complete'), desc: t('teams.path_complete_desc'), active: true },
                             { Icon: CalendarDays, color: "#7B5EA7", label: t('teams.auto_meetings'), desc: t('teams.auto_meetings_desc'), active: !!integrationConfig.graph_connected },
                             { Icon: Bell, color: "#E65100", label: t('teams.reminders'), desc: t('teams.reminders_desc'), active: true },
                           ].map(f => (
@@ -1105,7 +1117,7 @@ export function createAdminIntegrations(ctx: any) {
                             { Icon: PartyPopper, color: "#4CAF50", label: t('teams.welcome'), desc: t('teams.welcome_desc') },
                             { Icon: AlertTriangle, color: "#F9A825", label: t('teams.late_alerts'), desc: t('teams.late_alerts_desc') },
                             { Icon: FileText, color: "#1A73E8", label: t('teams.documents'), desc: t('teams.documents_desc') },
-                            { Icon: Trophy, color: "#C2185B", label: t('teams.path_complete'), desc: t('teams.path_complete_desc') },
+                            { Icon: Trophy, color: "#E41076", label: t('teams.path_complete'), desc: t('teams.path_complete_desc') },
                             { Icon: CalendarDays, color: "#7B5EA7", label: t('teams.auto_meetings'), desc: t('teams.auto_meetings_desc') },
                             { Icon: Bell, color: "#E65100", label: t('teams.reminders'), desc: t('teams.reminders_desc') },
                           ].map(f => (

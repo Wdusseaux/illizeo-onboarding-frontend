@@ -249,10 +249,13 @@ export function createAdminParcoursDocs(ctx: any) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('parcours.title')}</h1>
           <div style={{ display: "flex", gap: 8 }}>
-            {parcoursTab === "parcours" && <button onClick={() => { setParcoursPanelData({ nom: "", categorie: "onboarding", status: "brouillon" }); resetTr(); setParcoursPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new')}</button>}
+            {parcoursTab === "parcours" && <>
+              {(() => { const aiPlan = tenantSubscriptions.find((s: any) => (s.status === "active" || s.status === "trialing") && s.plan?.addon_type === "ai"); const isStarter = aiPlan?.plan?.slug?.includes("starter"); return aiPlan && !isStarter ? <button onClick={() => ctx.setAiParcoursModal(true)} style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px", borderColor: C.blue, color: C.blue }}><Sparkles size={14} /> Générer avec IA</button> : null; })()}
+              <button onClick={() => { setParcoursPanelData({ nom: "", categorie: "onboarding", status: "brouillon" }); resetTr(); setParcoursPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new')}</button>
+            </>}
             {parcoursTab === "phases" && <button onClick={() => { setPhasePanelData({ nom: "", delaiDebut: "J-7", delaiFin: "J-1", couleur: "#4CAF50", parcours_id: null }); resetTr(); setPhasePanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> Nouvelle phase</button>}
             {parcoursTab === "actions" && <button onClick={() => { setActionPanelData({ titre: "", type: "tache", phaseIds: [], delaiRelatif: "J+0", obligatoire: false, description: "", lienExterne: "", dureeEstimee: "", options: {} }); resetTr(); setActionPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new_action')}</button>}
-            {parcoursTab === "groupes" && <button onClick={() => { setGroupePanelData({ nom: "", description: "", couleur: "#C2185B", critereType: "", critereValeur: "", membres: [] }); resetTr(); setGroupePanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new_group')}</button>}
+            {parcoursTab === "groupes" && <button onClick={() => { setGroupePanelData({ nom: "", description: "", couleur: "#E41076", critereType: "", critereValeur: "", membres: [] }); resetTr(); setGroupePanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "8px 20px" }}><Plus size={14} /> {t('parcours.new_group')}</button>}
           </div>
         </div>
         {/* Tabs */}
@@ -383,7 +386,7 @@ export function createAdminParcoursDocs(ctx: any) {
                 {filteredActions.map((a, i) => {
                   const meta = ACTION_TYPE_META[a.type] || ACTION_TYPE_META.tache;
                   return (
-                    <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }} onClick={() => { const phId = PHASE_DEFAULTS.find(ph => ph.nom === a.phase)?.id; setActionPanelData({ id: a.id, titre: a.titre, type: a.type, phaseIds: phId ? [phId] : [], delaiRelatif: a.delaiRelatif, obligatoire: a.obligatoire, description: a.description || "", lienExterne: (a as any).lienExterne || "", dureeEstimee: (a as any).dureeEstimee || "", options: (a as any).options || {} }); setContentTranslations((a as any).translations || {}); setActionPanelMode("edit"); }}>
+                    <tr key={a.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }} onClick={() => { const phId = PHASE_DEFAULTS.find(ph => ph.nom === a.phase)?.id; setActionPanelData({ id: a.id, titre: a.titre, type: a.type, phaseIds: phId ? [phId] : [], delaiRelatif: a.delaiRelatif, obligatoire: a.obligatoire, description: a.description || "", lienExterne: (a as any).lienExterne || "", dureeEstimee: (a as any).dureeEstimee || "", xp: (a as any).xp ?? 50, heureDefault: (a as any).heureDefault || "", accompagnantRole: (a as any).accompagnantRole || "", parcours_id: (a as any).parcours_id ?? null, options: (() => { const opts = { ...((a as any).options || {}) }; if (!opts.pieces && Array.isArray((a as any).piecesRequises)) opts.pieces = (a as any).piecesRequises; return opts; })() }); setContentTranslations((a as any).translations || {}); setActionPanelMode("edit"); }}>
                       <td style={{ padding: "10px 14px", width: 36 }}><div style={{ width: 28, height: 28, borderRadius: 6, background: meta.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><meta.Icon size={13} color={meta.color} /></div></td>
                       <td style={{ padding: "10px 14px" }}><div style={{ fontWeight: 500 }}>{a.titre}</div><div style={{ fontSize: 11, color: C.textLight }}>{a.description?.substring(0, 60) || ""}...</div></td>
                       <td style={{ padding: "10px 14px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: meta.bg, color: meta.color }}>{meta.label}</span></td>
@@ -393,7 +396,7 @@ export function createAdminParcoursDocs(ctx: any) {
                       <td style={{ padding: "10px 14px" }}>{a.obligatoire ? <CheckCircle size={14} color={C.green} /> : <span style={{ color: C.textMuted }}>—</span>}</td>
                       <td style={{ padding: "10px 14px" }}>
                         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                          <button onClick={e => { e.stopPropagation(); const phId = PHASE_DEFAULTS.find(ph => ph.nom === a.phase)?.id; setActionPanelData({ id: a.id, titre: a.titre, type: a.type, phaseIds: phId ? [phId] : [], delaiRelatif: a.delaiRelatif, obligatoire: a.obligatoire, description: a.description || "", lienExterne: (a as any).lienExterne || "", dureeEstimee: (a as any).dureeEstimee || "", options: (a as any).options || {} }); setActionPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "3px 8px", fontSize: 10 }}>{t('common.edit')}</button>
+                          <button onClick={e => { e.stopPropagation(); const phId = PHASE_DEFAULTS.find(ph => ph.nom === a.phase)?.id; setActionPanelData({ id: a.id, titre: a.titre, type: a.type, phaseIds: phId ? [phId] : [], delaiRelatif: a.delaiRelatif, obligatoire: a.obligatoire, description: a.description || "", lienExterne: (a as any).lienExterne || "", dureeEstimee: (a as any).dureeEstimee || "", xp: (a as any).xp ?? 50, heureDefault: (a as any).heureDefault || "", accompagnantRole: (a as any).accompagnantRole || "", parcours_id: (a as any).parcours_id ?? null, options: (() => { const opts = { ...((a as any).options || {}) }; if (!opts.pieces && Array.isArray((a as any).piecesRequises)) opts.pieces = (a as any).piecesRequises; return opts; })() }); setActionPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "3px 8px", fontSize: 10 }}>{t('common.edit')}</button>
                           <button onClick={e => { e.stopPropagation(); showConfirm(`Supprimer l'action "${a.titre}" ?`, async () => { try { await apiDeleteAction(a.id); refetchActions(); addToast_admin("Action supprimée"); } catch { addToast_admin(t('toast.error')); } }); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={12} color={C.red} /></button>
                         </div>
                       </td>
@@ -408,6 +411,9 @@ export function createAdminParcoursDocs(ctx: any) {
         {/* TAB: Groupes */}
         {parcoursTab === "groupes" && (
           <div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+              <button onClick={() => { setGroupePanelData({ nom: "", description: "", couleur: "#E41076", critereType: "", critereValeur: "" }); resetTr(); setGroupePanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}><Plus size={14} /> Nouveau groupe</button>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
               {GROUPES.map(g => (
                 <div key={g.id} className="iz-card iz-fade-up" style={{ ...sCard }}>
@@ -417,21 +423,228 @@ export function createAdminParcoursDocs(ctx: any) {
                       <div style={{ fontSize: 14, fontWeight: 600 }}>{g.nom}</div>
                       <div style={{ fontSize: 11, color: C.textLight }}>{g.description}</div>
                     </div>
-                    <button onClick={() => { setGroupePanelData({ id: g.id, nom: g.nom, description: g.description, couleur: g.couleur, critereType: (g.critereAuto as any)?.type || "", critereValeur: (g.critereAuto as any)?.valeur || "", membres: g.membres || [] }); setContentTranslations((g as any).translations || {}); setGroupePanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
+                    <button onClick={() => { setGroupePanelData({ id: g.id, nom: g.nom, description: g.description || "", couleur: g.couleur || "#E41076", critereType: g.critere_type || "", critereValeur: g.critere_valeur || "" }); setContentTranslations((g as any).translations || {}); setGroupePanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>{t('common.edit')}</button>
                     <button onClick={() => showConfirm(`Supprimer le groupe "${g.nom}" ?`, async () => { try { await apiDeleteGroupe(g.id); refetchGroupes(); addToast_admin("Groupe supprimé"); } catch { addToast_admin(t('toast.error')); } })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={14} color={C.red} /></button>
                   </div>
-                  <div style={{ fontSize: 12, color: C.textLight, marginBottom: 8 }}>{(g.membres || []).length} membres{g.critereAuto && <span style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 4, fontSize: 10, background: C.blueLight, color: C.blue }}>Auto: {(g.critereAuto as any).type} = {(g.critereAuto as any).valeur}</span>}</div>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{(g.membres || []).map((m: string, mi: number) => <span key={mi} style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, background: C.bg }}>{m}</span>)}</div>
+                  <div style={{ fontSize: 12, color: C.textLight, marginBottom: 8 }}>{(g.collaborateurs || g.membres || []).length} membres{g.critere_type && <span style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 4, fontSize: 10, background: C.blueLight, color: C.blue }}>Auto: {g.critere_type} = {g.critere_valeur}</span>}</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>{(g.collaborateurs || g.membres || []).map((m: any, mi: number) => <span key={mi} style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, background: C.bg }}>{typeof m === 'string' ? m : `${m.prenom} ${m.nom}`}</span>)}</div>
                 </div>
               ))}
+              {GROUPES.length === 0 && <div style={{ gridColumn: "span 2", textAlign: "center", padding: 40, color: C.textMuted }}>Aucun groupe. Créez votre premier groupe.</div>}
             </div>
+
+            {/* Groupe create/edit panel */}
+            {groupePanelMode !== "closed" && (
+              <>
+                <div onClick={() => setGroupePanelMode("closed")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
+                <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 480, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
+                  <div style={{ padding: "24px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{groupePanelMode === "create" ? "Nouveau groupe" : "Modifier le groupe"}</h2>
+                    <button onClick={() => setGroupePanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
+                  </div>
+                  <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom du groupe *</label>
+                      <input value={groupePanelData.nom} onChange={e => setGroupePanelData((p: any) => ({ ...p, nom: e.target.value }))} style={sInput} placeholder="Ex: Équipe Tech Paris" />
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label>
+                      <textarea value={groupePanelData.description || ""} onChange={e => setGroupePanelData((p: any) => ({ ...p, description: e.target.value }))} style={{ ...sInput, minHeight: 60, resize: "vertical" }} placeholder="Description du groupe (optionnel)" />
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Couleur</label>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input type="color" value={groupePanelData.couleur || "#E41076"} onChange={e => setGroupePanelData((p: any) => ({ ...p, couleur: e.target.value }))} style={{ width: 44, height: 38, border: `1px solid ${C.border}`, borderRadius: 8, cursor: "pointer", padding: 2 }} />
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {["#E41076", "#1A73E8", "#4CAF50", "#F9A825", "#7B5EA7", "#00897B", "#E53935", "#FF6B35"].map(clr => (
+                            <div key={clr} onClick={() => setGroupePanelData((p: any) => ({ ...p, couleur: clr }))}
+                              style={{ width: 24, height: 24, borderRadius: "50%", background: clr, cursor: "pointer", border: groupePanelData.couleur === clr ? "3px solid #333" : "2px solid transparent" }} />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ padding: 16, background: C.bg, borderRadius: 10, marginBottom: 16 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.blue, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Filter size={14} /> Groupement automatique (optionnel)</div>
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Critère</label>
+                        <select value={groupePanelData.critereType || ""} onChange={e => setGroupePanelData((p: any) => ({ ...p, critereType: e.target.value }))} style={sInput}>
+                          <option value="">Aucun (groupement manuel)</option>
+                          <option value="site">Site</option>
+                          <option value="departement">Département</option>
+                          <option value="contrat">Type de contrat</option>
+                        </select>
+                      </div>
+                      {groupePanelData.critereType && (
+                        <div>
+                          <label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Valeur</label>
+                          <input value={groupePanelData.critereValeur || ""} onChange={e => setGroupePanelData((p: any) => ({ ...p, critereValeur: e.target.value }))} style={sInput} placeholder={`Ex: ${groupePanelData.critereType === 'site' ? 'Paris' : groupePanelData.critereType === 'departement' ? 'Tech' : 'CDI'}`} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 12, justifyContent: "space-between" }}>
+                    <div>{groupePanelMode === "edit" && <button onClick={() => { showConfirm("Supprimer ce groupe ?", async () => { try { await apiDeleteGroupe(groupePanelData.id); addToast_admin("Groupe supprimé"); setGroupePanelMode("closed"); refetchGroupes(); } catch { addToast_admin(t('toast.error')); } }); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>}</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => setGroupePanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
+                      <button onClick={async () => {
+                        if (!groupePanelData.nom?.trim()) { addToast_admin("Le nom du groupe est obligatoire"); return; }
+                        try {
+                          const payload: any = { nom: groupePanelData.nom, description: groupePanelData.description || "", couleur: groupePanelData.couleur || "#E41076" };
+                          if (groupePanelData.critereType) { payload.critere_type = groupePanelData.critereType; payload.critere_valeur = groupePanelData.critereValeur || ""; }
+                          if (groupePanelMode === "create") { await apiCreateGroupe(payload); addToast_admin("Groupe créé"); }
+                          else { await apiUpdateGroupe(groupePanelData.id, payload); addToast_admin("Groupe modifié"); }
+                          setGroupePanelMode("closed"); refetchGroupes();
+                        } catch { addToast_admin(t('toast.error')); }
+                      }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13 }}>{groupePanelMode === "create" ? t('common.create') : t('common.save')}</button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
+
+        {/* ── Modal Génération IA ── */}
+        {ctx.aiParcoursModal && (() => {
+          const aiPrompt = ctx.aiParcoursPrompt || "";
+          const aiLoading = ctx.aiParcoursLoading || false;
+          const aiResult = ctx.aiParcoursResult || null;
+          const aiError = ctx.aiParcoursError || "";
+
+          return (
+            <div className="iz-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+              <div className="iz-modal iz-scale-in" style={{ background: C.white, borderRadius: 16, width: aiResult ? 860 : 560, maxHeight: "85vh", overflow: "auto", position: "relative" }}>
+                <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, #1a1a2e, ${C.blue})`, display: "flex", alignItems: "center", justifyContent: "center" }}><Sparkles size={18} color="#fff" /></div>
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Générer un parcours avec l'IA</h3>
+                      <p style={{ fontSize: 11, color: C.textMuted, margin: 0 }}>Décrivez le parcours souhaité et l'IA le créera pour vous</p>
+                    </div>
+                  </div>
+                  <button onClick={() => { ctx.setAiParcoursModal(false); ctx.setAiParcoursResult(null); ctx.setAiParcoursError(""); ctx.setAiParcoursPrompt(""); }} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
+                </div>
+
+                <div style={{ padding: "20px 24px" }}>
+                  {!aiResult ? (
+                    <>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>Décrivez le parcours à générer</label>
+                      <textarea
+                        value={aiPrompt}
+                        onChange={e => ctx.setAiParcoursPrompt(e.target.value)}
+                        placeholder="Ex: Onboarding pour un développeur frontend basé à Genève, CDI, avec buddy, formations techniques, checklist IT et questionnaire J+30."
+                        rows={4}
+                        style={{ ...sInput, width: "100%", boxSizing: "border-box" as const, resize: "vertical" as const, fontFamily: font, fontSize: 13, lineHeight: 1.5 }}
+                      />
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10, marginBottom: 16 }}>
+                        {["Onboarding commercial terrain, Paris", "Offboarding standard, départ volontaire", "Crossboarding promotion managériale", "Reboarding retour congé maternité"].map(ex => (
+                          <button key={ex} onClick={() => ctx.setAiParcoursPrompt(ex)}
+                            style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, fontSize: 10, color: C.textMuted, cursor: "pointer", fontFamily: font }}>
+                            {ex}
+                          </button>
+                        ))}
+                      </div>
+                      {aiError && <div style={{ padding: "10px 14px", background: C.redLight, borderRadius: 8, fontSize: 12, color: C.red, marginBottom: 12 }}>{aiError}</div>}
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                        <button onClick={() => { ctx.setAiParcoursModal(false); ctx.setAiParcoursPrompt(""); }} style={sBtn("outline")}>Annuler</button>
+                        <button
+                          disabled={!aiPrompt.trim() || aiLoading}
+                          onClick={async () => {
+                            ctx.setAiParcoursLoading(true); ctx.setAiParcoursError("");
+                            try {
+                              const { generateParcoursWithAI } = await import('../api/endpoints');
+                              const res = await generateParcoursWithAI(aiPrompt);
+                              ctx.setAiParcoursResult(res.parcours);
+                            } catch (e: any) {
+                              let errMsg = "Erreur lors de la génération. Vérifiez que le module IA est activé.";
+                              try { const parsed = JSON.parse(e?.message || ""); errMsg = parsed.error || errMsg; } catch { if (e?.message && !e.message.startsWith("{")) errMsg = e.message; }
+                              ctx.setAiParcoursError(errMsg);
+                            }
+                            ctx.setAiParcoursLoading(false);
+                          }}
+                          style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6, opacity: !aiPrompt.trim() || aiLoading ? 0.5 : 1 }}>
+                          {aiLoading ? <><RotateCcw size={14} style={{ animation: "spin 1s linear infinite" }} /> Génération en cours...</> : <><Sparkles size={14} /> Générer</>}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ padding: "12px 16px", background: C.greenLight, borderRadius: 10, marginBottom: 16, fontSize: 13, color: C.green, display: "flex", alignItems: "center", gap: 8 }}>
+                        <CheckCircle size={16} /> Parcours généré avec succès ! Vérifiez et validez.
+                      </div>
+
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>{aiResult.nom}</div>
+                        <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.pinkBg, color: C.pink }}>{aiResult.categorie}</span>
+                      </div>
+
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Phases ({aiResult.phases?.length || 0})</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {(aiResult.phases || []).map((ph: any, i: number) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: C.bg, borderRadius: 8, fontSize: 12 }}>
+                              <div style={{ width: 24, height: 24, borderRadius: "50%", background: C.pink, color: C.white, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
+                              <span style={{ fontWeight: 500 }}>{ph.nom}</span>
+                              <span style={{ fontSize: 10, color: C.textMuted, marginLeft: "auto" }}>{ph.delaiDebut} → {ph.delaiFin}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Actions ({aiResult.actions?.length || 0})</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 250, overflow: "auto" }}>
+                          {(aiResult.actions || []).map((a: any, i: number) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: C.bg, borderRadius: 8, fontSize: 12 }}>
+                              <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: C.blueLight, color: C.blue }}>{a.type}</span>
+                              <span style={{ flex: 1, fontWeight: 500 }}>{a.titre}</span>
+                              {a.obligatoire && <span style={{ fontSize: 9, color: C.red, fontWeight: 600 }}>OBLIGATOIRE</span>}
+                              <span style={{ fontSize: 10, color: C.textMuted }}>{a.delaiRelatif}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                        <button onClick={() => ctx.setAiParcoursResult(null)} style={sBtn("outline")}>Modifier le prompt</button>
+                        <button onClick={async () => {
+                          try {
+                            // Create parcours
+                            const catMap: Record<string, number> = { onboarding: 1, offboarding: 2, crossboarding: 3, reboarding: 4 };
+                            const created = await apiCreateParcours({ nom: aiResult.nom, categorie_id: catMap[aiResult.categorie] || 1, status: "brouillon" });
+                            // Create phases
+                            for (const ph of aiResult.phases || []) {
+                              await apiCreatePhase({ nom: ph.nom, delai_debut: ph.delaiDebut, delai_fin: ph.delaiFin, couleur: "#4CAF50", parcours_ids: [created.id] });
+                            }
+                            // Create actions — map type slugs to action_type_id
+                            const typeMap: Record<string, number> = { document: 1, formulaire: 2, formation: 3, questionnaire: 4, tache: 5, signature: 6, lecture: 7, rdv: 8, message: 9, entretien: 10, checklist_it: 11, passation: 12, visite: 13 };
+                            for (const a of aiResult.actions || []) {
+                              await apiCreateAction({ titre: a.titre, action_type_id: typeMap[a.type] || 5, delai_relatif: a.delaiRelatif, obligatoire: a.obligatoire, description: a.description || "", parcours_id: created.id });
+                            }
+                            refetchParcours(); refetchPhases(); refetchActions();
+                            ctx.setAiParcoursModal(false); ctx.setAiParcoursResult(null); ctx.setAiParcoursPrompt("");
+                            addToast_admin(`Parcours "${aiResult.nom}" créé avec ${aiResult.phases?.length || 0} phases et ${aiResult.actions?.length || 0} actions`);
+                          } catch (e: any) {
+                            let msg = e?.message || ""; try { msg = JSON.parse(msg)?.message || JSON.parse(msg)?.error || msg; } catch {} addToast_admin("Erreur : " + msg);
+                          }
+                          setParcoursFilter(parcoursFilter);
+                        }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}>
+                          <Check size={14} /> Créer ce parcours
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 10, color: C.textMuted, marginTop: 8, textAlign: "center" }}>L'IA peut commettre des erreurs. Vérifiez les informations avant de valider.</div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
       );
     };
 
-  
+
     // ─── DOCUMENTS ─────────────────────────────────────────────
 
     // Translate known document category titles
@@ -471,9 +684,11 @@ export function createAdminParcoursDocs(ctx: any) {
       const DOC_STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
         valide: { label: "Validé", color: C.green, bg: C.greenLight },
         en_attente: { label: "En attente", color: C.amber, bg: C.amberLight },
+        soumis: { label: "Soumis", color: C.amber, bg: C.amberLight },
         refuse: { label: "Refusé", color: C.red, bg: C.redLight },
         manquant: { label: "Manquant", color: C.textMuted, bg: C.bg },
       };
+      const DOC_STATUS_FALLBACK = { label: "Inconnu", color: C.textMuted, bg: C.bg };
 
       const toggleValidationSelect = (key: number) => {
         setSelectedDocsForValidation(prev => {
@@ -611,7 +826,7 @@ export function createAdminParcoursDocs(ctx: any) {
                 {(collabMissing > 0 || collabPending > 0 || collabRefused > 0) && (
                   <div style={{ padding: "0 20px 12px", display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {collabDocs.filter(d => d.status !== "valide").map(d => {
-                      const sm = DOC_STATUS_META[d.status];
+                      const sm = DOC_STATUS_META[d.status] || DOC_STATUS_FALLBACK;
                       return (
                         <span key={d.key} style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, background: sm.bg, color: sm.color, display: "flex", alignItems: "center", gap: 4 }}>
                           {d.status === "manquant" ? <AlertTriangle size={9} /> : d.status === "refuse" ? <XCircle size={9} /> : <Clock size={9} />}
@@ -694,19 +909,70 @@ export function createAdminParcoursDocs(ctx: any) {
               <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description / Instructions</label><TranslatableField multiline rows={4} value={tplPanelDoc.description || ""} onChange={v => setTplPanelDoc({ ...tplPanelDoc, description: v })} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.description} onTranslationsChange={tr => setTr("description", tr)} style={{ ...sInput, minHeight: 80, resize: "vertical" }} placeholder="Instructions pour le collaborateur..." /></div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Fichier modèle (optionnel)</label>
-                <div style={{ padding: "20px 16px", borderRadius: 10, border: `2px dashed ${C.border}`, textAlign: "center", cursor: "pointer", fontSize: 13, color: C.textLight }} className="iz-upload-zone">
-                  <Upload size={20} color={C.textMuted} style={{ marginBottom: 6 }} /><br />
-                  Déposer un fichier modèle ici<br />
-                  <span style={{ fontSize: 11, color: C.textMuted }}>PDF, DOCX, XLSX — max 10 Mo</span>
-                </div>
+                {tplPanelDoc._modeleFile ? (
+                  <div style={{ padding: "12px 16px", borderRadius: 10, border: `1px solid ${C.green}`, background: C.greenLight, display: "flex", alignItems: "center", gap: 8 }}>
+                    <CheckCircle size={16} color={C.green} />
+                    <span style={{ flex: 1, fontSize: 12 }}>{tplPanelDoc._modeleFile.name}</span>
+                    <button onClick={() => setTplPanelDoc({ ...tplPanelDoc, _modeleFile: null })} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={14} color={C.textMuted} /></button>
+                  </div>
+                ) : tplPanelDoc.fichier_modele_original ? (
+                  <div style={{ padding: "12px 16px", borderRadius: 10, border: `1px solid ${C.blue}`, background: C.blueLight, display: "flex", alignItems: "center", gap: 8 }}>
+                    <FileText size={16} color={C.blue} />
+                    <span style={{ flex: 1, fontSize: 12 }}>{tplPanelDoc.fichier_modele_original}</span>
+                    <button onClick={async () => {
+                      try {
+                        const { downloadTemplateFile } = await import('../api/endpoints');
+                        const blob = await downloadTemplateFile(tplPanelDoc.id);
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a'); a.href = url; a.download = tplPanelDoc.fichier_modele_original; a.click(); URL.revokeObjectURL(url);
+                      } catch { addToast_admin("Erreur de téléchargement"); }
+                    }} style={{ ...sBtn("outline"), fontSize: 10, padding: "3px 10px" }}>Télécharger</button>
+                  </div>
+                ) : (
+                  <label style={{ padding: "20px 16px", borderRadius: 10, border: `2px dashed ${C.border}`, textAlign: "center", cursor: "pointer", fontSize: 13, color: C.textLight, display: "block" }}>
+                    <Upload size={20} color={C.textMuted} style={{ marginBottom: 6 }} /><br />
+                    Cliquer ou déposer un fichier modèle ici<br />
+                    <span style={{ fontSize: 11, color: C.textMuted }}>PDF, DOCX, XLSX — max 10 Mo</span>
+                    <input type="file" accept=".pdf,.docx,.xlsx,.doc,.xls,.pptx" style={{ display: "none" }} onChange={e => { if (e.target.files?.[0]) setTplPanelDoc({ ...tplPanelDoc, _modeleFile: e.target.files[0] }); }} />
+                  </label>
+                )}
               </div>
             </div>
             <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
               {tplPanelOpen === "edit" && (
-                <button onClick={() => { showConfirm("Supprimer ce modèle de document ?", () => { setTplPanelOpen("closed"); addToast_admin("Modèle supprimé"); }); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, marginRight: "auto" }}>{t('common.delete')}</button>
+                <button onClick={() => { showConfirm("Supprimer ce modèle de document ?", async () => {
+                  try { const { default: ep } = await import('../api/endpoints'); /* delete via standard endpoint */ await apiFetch(`/documents/${tplPanelDoc.id}`, { method: 'DELETE' }); setTplPanelOpen("closed"); addToast_admin("Modèle supprimé"); refetchGroupes(); } catch { addToast_admin(t('toast.error')); }
+                }); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, marginRight: "auto" }}>{t('common.delete')}</button>
               )}
               <button onClick={() => setTplPanelOpen("closed")} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
-              <button onClick={() => { setTplPanelOpen("closed"); addToast_admin(tplPanelOpen === "create" ? "Modèle créé" : "Modèle modifié"); }} className="iz-btn-pink" style={sBtn("pink")}>{tplPanelOpen === "create" ? t('common.create') : t('common.save')}</button>
+              <button onClick={async () => {
+                if (!tplPanelDoc.nom?.trim()) { addToast_admin("Le nom est obligatoire"); return; }
+                try {
+                  const { createDocumentTemplate, updateDocumentTemplate, uploadTemplateFile } = await import('../api/endpoints');
+                  const payload = {
+                    nom: tplPanelDoc.nom, description: tplPanelDoc.description || "",
+                    obligatoire: !!tplPanelDoc.obligatoire, type: tplPanelDoc.type || "upload",
+                    categorie_id: Number(tplPanelDoc.categorie) || ADMIN_DOC_CATEGORIES[0]?.id,
+                    translations: buildTranslationsPayload(),
+                  };
+                  let docId: number;
+                  if (tplPanelOpen === "create") {
+                    const created = await createDocumentTemplate(payload);
+                    docId = created.id;
+                    addToast_admin("Modèle créé");
+                  } else {
+                    await updateDocumentTemplate(tplPanelDoc.id, payload);
+                    docId = tplPanelDoc.id;
+                    addToast_admin("Modèle modifié");
+                  }
+                  // Upload template file if selected
+                  if (tplPanelDoc._modeleFile) {
+                    await uploadTemplateFile(docId, tplPanelDoc._modeleFile);
+                    addToast_admin("Fichier modèle uploadé");
+                  }
+                  setTplPanelOpen("closed"); refetchGroupes(); // triggers reload
+                } catch (e: any) { addToast_admin(e?.message || t('toast.error')); }
+              }} className="iz-btn-pink" style={sBtn("pink")}>{tplPanelOpen === "create" ? t('common.create') : t('common.save')}</button>
             </div>
           </div>
         )}

@@ -11,12 +11,12 @@ import {
 
 // ─── MOCK DATA ───────────────────────────────────────────────
 export const TEAM_MEMBERS: TeamMember[] = [
-  { initials: "AL", name: "Amira LAROUSSI", role: "Recruteur(se)", color: "#C2185B" },
-  { initials: "JP", name: "Julie PERRIN", role: "HRBP", hasPhoto: true, color: "#8D6E63" },
-  { initials: "RN", name: "Romain NDIAYE", role: "DSI", color: "#1A73E8" },
-  { initials: "SB", name: "Sarah BLANC", role: "Admin RH", color: "#7B5EA7" },
-  { initials: "MK", name: "Mehdi KESSLER", role: "Manager", color: "#4CAF50" },
-  { initials: "LV", name: "Lucas VIEIRA", role: "IT Suisse", color: "#F9A825" },
+  { initials: "AL", name: "Amira LAROUSSI", role: "Recruteur(se)", color: "#E41076", email: "amira.laroussi@illizeo.com", telephone: "+41 22 555 01 23" } as any,
+  { initials: "JP", name: "Julie PERRIN", role: "HRBP", hasPhoto: true, color: "#8D6E63", email: "julie.perrin@illizeo.com", telephone: "+41 22 555 02 34" } as any,
+  { initials: "RN", name: "Romain NDIAYE", role: "DSI", color: "#1A73E8", email: "romain.ndiaye@illizeo.com", telephone: "+41 22 555 03 45" } as any,
+  { initials: "SB", name: "Sarah BLANC", role: "Admin RH", color: "#7B5EA7", email: "sarah.blanc@illizeo.com", telephone: "+41 22 555 04 56" } as any,
+  { initials: "MK", name: "Mehdi KESSLER", role: "Manager", color: "#4CAF50", email: "mehdi.kessler@illizeo.com", telephone: "+41 22 555 05 67" } as any,
+  { initials: "LV", name: "Lucas VIEIRA", role: "IT Suisse", color: "#F9A825", email: "lucas.vieira@illizeo.com", telephone: "+41 22 555 06 78" } as any,
 ];
 
 export const DOC_CATEGORIES = [
@@ -54,7 +54,7 @@ export const NOTIF_RESOURCES = ["Événements"];
 
 // ─── ADMIN MOCK DATA ─────────────────────────────────────────
 export const _MOCK_COLLABORATEURS: Collaborateur[] = [
-  { id: 1, prenom: "Nadia", nom: "FERREIRA", poste: "Chef de Projet", site: "Genève", departement: "B030-Switzerland", dateDebut: "01/06/2026", phase: "Avant date d'arrivée", progression: 15, status: "en_retard", docsValides: 1, docsTotal: 5, actionsCompletes: 0, actionsTotal: 7, initials: "NF", color: "#C2185B", parcours_id: 1 },
+  { id: 1, prenom: "Nadia", nom: "FERREIRA", poste: "Chef de Projet", site: "Genève", departement: "B030-Switzerland", dateDebut: "01/06/2026", phase: "Avant date d'arrivée", progression: 15, status: "en_retard", docsValides: 1, docsTotal: 5, actionsCompletes: 0, actionsTotal: 7, initials: "NF", color: "#E41076", parcours_id: 1 },
   { id: 2, prenom: "Antoine", nom: "MOREL", poste: "Développeur Full Stack", site: "Paris", departement: "Tech-France", dateDebut: "15/06/2026", phase: "Avant date d'arrivée", progression: 45, status: "en_cours", docsValides: 3, docsTotal: 4, actionsCompletes: 2, actionsTotal: 5, initials: "AM", color: "#1A73E8", parcours_id: 1 },
   { id: 3, prenom: "Inès", nom: "CARPENTIER", poste: "UX Designer", site: "Lyon", departement: "Design-France", dateDebut: "01/07/2026", phase: "Avant date d'arrivée", progression: 80, status: "en_cours", docsValides: 4, docsTotal: 4, actionsCompletes: 4, actionsTotal: 5, initials: "IC", color: "#4CAF50", parcours_id: 2 },
   { id: 4, prenom: "Youssef", nom: "HADJ", poste: "Data Analyst", site: "Genève", departement: "Data-Switzerland", dateDebut: "10/03/2026", phase: "Première semaine", progression: 100, status: "termine", docsValides: 5, docsTotal: 5, actionsCompletes: 7, actionsTotal: 7, initials: "YH", color: "#7B5EA7", parcours_id: 1 },
@@ -122,27 +122,27 @@ export const _MOCK_ACTION_TEMPLATES: ActionTemplate[] = [
 ];
 
 export const _MOCK_GROUPES: GroupePersonnes[] = [
-  { id: 1, nom: "Nouveaux arrivants Genève", description: "Tous les collaborateurs intégrant le site de Genève", membres: ["Nadia Ferreira", "Youssef Hadj", "Clara Vogel"], couleur: "#C2185B", critereAuto: { type: "site", valeur: "Genève" } },
+  { id: 1, nom: "Nouveaux arrivants Genève", description: "Tous les collaborateurs intégrant le site de Genève", membres: ["Nadia Ferreira", "Youssef Hadj", "Clara Vogel"], couleur: "#E41076", critereAuto: { type: "site", valeur: "Genève" } },
   { id: 2, nom: "Équipe Tech", description: "Développeurs, data analysts et IT", membres: ["Antoine Morel", "Youssef Hadj"], couleur: "#1A73E8", critereAuto: { type: "departement", valeur: "Tech" } },
   { id: 3, nom: "CDI France & Suisse", description: "Tous les contrats CDI", membres: ["Nadia Ferreira", "Antoine Morel", "Inès Carpentier"], couleur: "#4CAF50", critereAuto: { type: "contrat", valeur: "CDI" } },
   { id: 4, nom: "Managers Suisse", description: "Managers sur les sites suisses", membres: ["Mehdi Kessler"], couleur: "#F9A825" },
   { id: 5, nom: "Stagiaires & Alternants", description: "Contrats stage et alternance", membres: [], couleur: "#7B5EA7", critereAuto: { type: "contrat", valeur: "Stage" } },
 ];
 
-export const ACTION_TYPE_META: Record<ActionType, { label: string; Icon: React.FC<{ size?: number; color?: string }>; bg: string; color: string }> = {
-  document: { label: "Document", Icon: FileUp, bg: "#E3F2FD", color: "#1A73E8" },
-  formulaire: { label: "Formulaire", Icon: ClipboardList, bg: "#FFF0F5", color: "#C2185B" },
-  formation: { label: "Formation", Icon: GraduationCap, bg: "#E8F5E9", color: "#4CAF50" },
-  questionnaire: { label: "Questionnaire", Icon: ListChecks, bg: "#F3E5F5", color: "#7B5EA7" },
-  tache: { label: "Tâche", Icon: ShieldCheck, bg: "#E8F5E9", color: "#388E3C" },
-  signature: { label: "Signature", Icon: PenTool, bg: "#FFF8E1", color: "#F9A825" },
-  lecture: { label: "Lecture", Icon: BookOpen, bg: "#E8EAF6", color: "#3949AB" },
-  rdv: { label: "Rendez-vous", Icon: CalendarClock, bg: "#FCE4EC", color: "#D81B60" },
-  message: { label: "Message", Icon: MessageSquare, bg: "#E0F7FA", color: "#00897B" },
-  entretien: { label: "Entretien", Icon: MessageCircle, bg: "#FFF3E0", color: "#E65100" },
-  checklist_it: { label: "Checklist IT", Icon: Clock, bg: "#E3F2FD", color: "#0D47A1" },
-  passation: { label: "Passation", Icon: ArrowRight, bg: "#F3E5F5", color: "#6A1B9A" },
-  visite: { label: "Visite", Icon: MapPin, bg: "#E8F5E9", color: "#2E7D32" },
+export const ACTION_TYPE_META: Record<ActionType, { label: string; description: string; Icon: React.FC<{ size?: number; color?: string }>; bg: string; color: string }> = {
+  document: { label: "Document", description: "Pièce à téléverser ou document à fournir (IBAN, pièce d'identité, certificats…).", Icon: FileUp, bg: "#E3F2FD", color: "#1A73E8" },
+  formulaire: { label: "Formulaire", description: "Formulaire personnalisé à remplir par l'employé (champs configurables).", Icon: ClipboardList, bg: "#FFF0F5", color: "#E41076" },
+  formation: { label: "Formation", description: "Module e-learning ou formation présentielle (lien, durée, validation).", Icon: GraduationCap, bg: "#E8F5E9", color: "#4CAF50" },
+  questionnaire: { label: "Questionnaire", description: "Quiz ou enquête avec questions multiples (libre, choix, NPS).", Icon: ListChecks, bg: "#F3E5F5", color: "#7B5EA7" },
+  tache: { label: "Tâche", description: "Tâche simple à cocher (sans contenu spécifique attaché).", Icon: ShieldCheck, bg: "#E8F5E9", color: "#388E3C" },
+  signature: { label: "Signature", description: "Document à signer électroniquement (contrat personnalisé ou document identique).", Icon: PenTool, bg: "#FFF8E1", color: "#F9A825" },
+  lecture: { label: "Lecture", description: "Document ou page à lire avec confirmation de lecture (règlement, charte).", Icon: BookOpen, bg: "#E8EAF6", color: "#3949AB" },
+  rdv: { label: "Rendez-vous", description: "Rencontre informelle/logistique avec un lieu (café buddy, welcome DG, visite locaux). Léger, sans agenda précis.", Icon: CalendarClock, bg: "#FCE4EC", color: "#D81B60" },
+  message: { label: "Message", description: "Notification automatique à envoyer (in-app, email, Slack, Teams) avec template.", Icon: MessageSquare, bg: "#E0F7FA", color: "#00897B" },
+  entretien: { label: "Entretien", description: "Échange structuré avec une trame de points à aborder (cadrage objectifs, bilan période d'essai, 1:1 manager). Plus formel qu'un Rendez-vous.", Icon: MessageCircle, bg: "#FFF3E0", color: "#E65100" },
+  checklist_it: { label: "Checklist IT", description: "Liste de provisionnement IT (poste, comptes, accès, équipements).", Icon: Clock, bg: "#E3F2FD", color: "#0D47A1" },
+  passation: { label: "Passation", description: "Transfert de dossiers/responsabilités du sortant vers l'arrivant (offboarding/crossboarding).", Icon: ArrowRight, bg: "#F3E5F5", color: "#6A1B9A" },
+  visite: { label: "Visite", description: "Tour des bureaux, atelier, site industriel — visite physique guidée.", Icon: MapPin, bg: "#E8F5E9", color: "#2E7D32" },
 };
 
 export const PHASE_ICONS: Record<string, React.FC<{ size?: number; color?: string }>> = {
@@ -246,9 +246,9 @@ export const _MOCK_EMAIL_TEMPLATES: EmailTemplate[] = [
   // Rappel RH
   { id: 27, nom: "Rappel RH — Actions en retard", sujet: "Rapport : {{nb_retards}} action(s) en retard", declencheur: "Hebdomadaire (lundi)", variables: ["{{nb_retards}}", "{{lien}}"], actif: true },
   // Évaluations
-  { id: 28, nom: "Évaluation fin de période d'essai", sujet: "Évaluation de fin de période d'essai — {{collab_nom}}", declencheur: "Parcours complété à 100%", variables: ["{{manager}}", "{{collab_nom}}", "{{date_fin_essai}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{manager}},</h2><p>La période d'essai de <strong>{{collab_nom}}</strong> arrive à son terme le <strong>{{date_fin_essai}}</strong>.</p><p>Merci de compléter le formulaire d'évaluation afin de confirmer ou non la poursuite du contrat.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#C2185B;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Compléter l'évaluation</a></p>" },
-  { id: 29, nom: "Entretien de sortie (Exit Interview)", sujet: "Votre avis compte — Entretien de sortie", declencheur: "Création du parcours", variables: ["{{prenom}}", "{{date_depart}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Votre départ est prévu le <strong>{{date_depart}}</strong>. Nous aimerions recueillir votre retour d'expérience afin d'améliorer continuellement notre environnement de travail.</p><p>Ce questionnaire est confidentiel et prend environ 5 minutes.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#C2185B;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Répondre au questionnaire</a></p>" },
-  { id: 30, nom: "Rapport d'étonnement (1 mois)", sujet: "Votre regard compte — Rapport d'étonnement", declencheur: "J+30", variables: ["{{prenom}}", "{{parcours_nom}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Cela fait maintenant 1 mois que vous avez rejoint l'équipe. Nous aimerions recueillir votre regard neuf sur notre entreprise.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#C2185B;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Partager mon retour</a></p>" },
+  { id: 28, nom: "Évaluation fin de période d'essai", sujet: "Évaluation de fin de période d'essai — {{collab_nom}}", declencheur: "Parcours complété à 100%", variables: ["{{manager}}", "{{collab_nom}}", "{{date_fin_essai}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{manager}},</h2><p>La période d'essai de <strong>{{collab_nom}}</strong> arrive à son terme le <strong>{{date_fin_essai}}</strong>.</p><p>Merci de compléter le formulaire d'évaluation afin de confirmer ou non la poursuite du contrat.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#E41076;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Compléter l'évaluation</a></p>" },
+  { id: 29, nom: "Entretien de sortie (Exit Interview)", sujet: "Votre avis compte — Entretien de sortie", declencheur: "Création du parcours", variables: ["{{prenom}}", "{{date_depart}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Votre départ est prévu le <strong>{{date_depart}}</strong>. Nous aimerions recueillir votre retour d'expérience afin d'améliorer continuellement notre environnement de travail.</p><p>Ce questionnaire est confidentiel et prend environ 5 minutes.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#E41076;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Répondre au questionnaire</a></p>" },
+  { id: 30, nom: "Rapport d'étonnement (1 mois)", sujet: "Votre regard compte — Rapport d'étonnement", declencheur: "J+30", variables: ["{{prenom}}", "{{parcours_nom}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Cela fait maintenant 1 mois que vous avez rejoint l'équipe. Nous aimerions recueillir votre regard neuf sur notre entreprise.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#E41076;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Partager mon retour</a></p>" },
 ];
 export const TPL_CATEGORIES: Record<string, { label: string; color: string; bg: string }> = {
   onboarding: { label: "Onboarding", color: "#4CAF50", bg: "#E8F5E9" },
@@ -276,7 +276,7 @@ export const _MOCK_PHASE_DEFAULTS = [
   { id: 1, nom: "Avant le premier jour", delaiDebut: "J-30", delaiFin: "J-1", couleur: "#4CAF50", iconName: "Hand" as const, actionsDefaut: 4 },
   { id: 2, nom: "Premier jour", delaiDebut: "J+0", delaiFin: "J+0", couleur: "#1A73E8", iconName: "PartyPopper" as const, actionsDefaut: 3 },
   { id: 3, nom: "Première semaine", delaiDebut: "J+1", delaiFin: "J+7", couleur: "#F9A825", iconName: "Dumbbell" as const, actionsDefaut: 3 },
-  { id: 4, nom: "3 premiers mois", delaiDebut: "J+8", delaiFin: "J+90", couleur: "#C2185B", iconName: "Package" as const, actionsDefaut: 2 },
+  { id: 4, nom: "3 premiers mois", delaiDebut: "J+8", delaiFin: "J+90", couleur: "#E41076", iconName: "Package" as const, actionsDefaut: 2 },
 ];
 
 export const EQUIPE_ROLES = [

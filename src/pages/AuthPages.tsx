@@ -209,7 +209,7 @@ export function createAuthPages(ctx: any) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 400, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 48, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
@@ -265,7 +265,7 @@ export function createAuthPages(ctx: any) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 400, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 48, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
@@ -303,7 +303,7 @@ export function createAuthPages(ctx: any) {
     return (
       <div style={{ minHeight: "100vh", fontFamily: font, background: C.white }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         {/* Header */}
         <div style={{ padding: "20px 40px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ color: C.pink }}><IllizeoLogoFull height={28} /></div>
@@ -414,13 +414,13 @@ export function createAuthPages(ctx: any) {
   };
 
   // Default Illizeo gradient — used for tenant selection page (not customizable by clients)
-  const ILLIZEO_DEFAULT_GRADIENT = "linear-gradient(135deg, #1a1a2e 0%, #2D1B3D 50%, #C2185B 100%)";
+  const ILLIZEO_DEFAULT_GRADIENT = "linear-gradient(135deg, #1a1a2e 0%, #2D1B3D 50%, #E41076 100%)";
 
   const renderTenantSelection = () => {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: ILLIZEO_DEFAULT_GRADIENT }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 440, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 48, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
@@ -485,7 +485,7 @@ export function createAuthPages(ctx: any) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 480, background: C.white, borderRadius: 16, padding: "36px 40px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 44, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
@@ -565,11 +565,11 @@ export function createAuthPages(ctx: any) {
   const renderLogin = () => {
     const loginBg = loginBgImage
       ? `url(${loginBgImage}) center/cover no-repeat`
-      : `linear-gradient(135deg, ${C.dark} 0%, #2D1B3D 50%, ${C.pink} 100%)`;
+      : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)`;
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBg }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div className="iz-scale-in" style={{ width: 400, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 48, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
@@ -699,7 +699,7 @@ export function createAuthPages(ctx: any) {
           {/* Email metadata */}
           <div style={{ background: "#fff", padding: "16px 24px", borderBottom: `1px solid ${C.border}` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #C2185B, #E91E8C)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #E41076, #E91E8C)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <IllizeoLogo size={20} />
               </div>
               <div style={{ flex: 1 }}>

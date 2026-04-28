@@ -9,6 +9,8 @@
     "start": "serve -s dist -l 3000"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^6.2.0",
+    "@stripe/stripe-js": "^9.2.0",
     "@tiptap/extension-color": "^3.22.2",
     "@tiptap/extension-image": "^3.22.2",
     "@tiptap/extension-link": "^3.22.2",
@@ -21,6 +23,7 @@
     "lucide-react": "^0.383.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "reactflow": "^11.11.4",
     "recharts": "^2.12.7"
   },
   "devDependencies": {

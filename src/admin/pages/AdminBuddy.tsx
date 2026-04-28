@@ -16,7 +16,7 @@ export function createAdminBuddy(ctx: any) {
     lang,
   } = ctx;
 
-  const reloadPairs = () => { getBuddyPairs().then(setBuddyPairs).catch(() => {}); };
+  const reloadPairs = () => { getBuddyPairs().then(setBuddyPairs).catch(() => addToast_admin("Erreur de chargement des binômes")); };
 
   return function renderAdminBuddy() {
     const noteInput = buddyNoteInput;
@@ -53,8 +53,8 @@ export function createAdminBuddy(ctx: any) {
       // Optimistic update
       setBuddyPairs((prev: any[]) => prev.map((p: any) => p.id !== pairId ? p : { ...p, checklist: cl }));
       // Persist
-      updateBuddyPair(pairId, { checklist: cl }).catch(() => {});
-      if (cl.every(Boolean)) completeBuddyPair(pairId).then(() => reloadPairs()).catch(() => {});
+      updateBuddyPair(pairId, { checklist: cl }).catch(() => addToast_admin("Erreur de mise à jour"));
+      if (cl.every(Boolean)) completeBuddyPair(pairId).then(() => { reloadPairs(); addToast_admin("Binôme complété !"); }).catch(() => addToast_admin("Erreur"));
     };
 
     const addNote = (pairId: number) => {
@@ -62,7 +62,8 @@ export function createAdminBuddy(ctx: any) {
       addBuddyNote(pairId, noteInput.trim()).then(() => {
         reloadPairs();
         setNoteInput("");
-      }).catch(() => {});
+        addToast_admin("Note ajoutée");
+      }).catch(() => addToast_admin("Erreur lors de l'ajout de la note"));
     };
 
     const submitFeedback = (pairId: number) => {
@@ -71,8 +72,8 @@ export function createAdminBuddy(ctx: any) {
         reloadPairs();
         setFeedbackRating(0);
         setFeedbackComment("");
-        addToast_admin(lang === "fr" ? "Feedback enregistré" : "Feedback saved");
-      }).catch(() => {});
+        addToast_admin("Feedback enregistré");
+      }).catch(() => addToast_admin("Erreur lors de l'enregistrement du feedback"));
     };
 
     const getProgress = (checklist: boolean[]) => {
@@ -104,10 +105,16 @@ export function createAdminBuddy(ctx: any) {
                 if (!buddyId) return;
                 const bd = COLLABORATEURS.find((c: any) => String(c.id) === buddyId);
                 if (!bd) return;
+                // Check for existing active pair with same newcomer
+                const existing = buddyPairs.find((p: any) => p.newcomer_id === nc.id && p.status === 'active');
+                if (existing) {
+                  addToast_admin(`${nc.prenom} ${nc.nom} a déjà un buddy actif`);
+                  return;
+                }
                 createBuddyPair({ newcomer_id: nc.id, buddy_id: bd.id }).then(() => {
                   reloadPairs();
-                  addToast_admin(lang === "fr" ? "Binôme créé" : "Pair created");
-                }).catch(() => addToast_admin(lang === "fr" ? "Erreur" : "Error"));
+                  addToast_admin("Binôme créé");
+                }).catch(() => addToast_admin("Erreur lors de la création du binôme"));
               }, { options: COLLABORATEURS.filter((c: any) => String(c.id) !== newcomerId).map((c: any) => ({ value: String(c.id), label: `${c.prenom} ${c.nom} — ${c.poste || c.departement || ""}` })), searchable: true }), 100);
             }, { options: COLLABORATEURS.map((c: any) => ({ value: String(c.id), label: `${c.prenom} ${c.nom} — ${c.poste || c.departement || ""}` })), searchable: true });
           }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}>
@@ -131,6 +138,22 @@ export function createAdminBuddy(ctx: any) {
           ))}
         </div>
 
+        {/* Status filter */}
+        {buddyPairs.length > 0 && (
+          <div style={{ display: "flex", gap: 4, padding: 3, background: C.bg, borderRadius: 8, marginBottom: 16, width: "fit-content" }}>
+            {[
+              { key: "all", label: `Tous (${buddyPairs.length})` },
+              { key: "active", label: `Actifs (${activePairs.length})` },
+              { key: "completed", label: `Terminés (${completedPairs.length})` },
+            ].map(f => (
+              <button key={f.key} onClick={() => { ctx._buddyFilter = f.key; setBuddyPairs([...buddyPairs]); }}
+                style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: (ctx._buddyFilter || "all") === f.key ? 600 : 400, border: "none", cursor: "pointer", background: (ctx._buddyFilter || "all") === f.key ? C.pink : "transparent", color: (ctx._buddyFilter || "all") === f.key ? "#fff" : C.textMuted }}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Empty state */}
         {buddyPairs.length === 0 && (
           <div className="iz-card" style={{ ...sCard, padding: "48px 24px", textAlign: "center" }}>
@@ -144,7 +167,12 @@ export function createAdminBuddy(ctx: any) {
           <div style={{ display: "grid", gridTemplateColumns: selectedPair ? "360px 1fr" : "1fr", gap: 16 }}>
             {/* Pairs list */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {buddyPairs.map((pair: any) => {
+              {buddyPairs.filter((p: any) => {
+                const f = ctx._buddyFilter || "all";
+                if (f === "active") return p.status === "active";
+                if (f === "completed") return p.status === "completed";
+                return true;
+              }).map((pair: any) => {
                 const prog = getProgress(pair.checklist);
                 const isSelected = selectedBuddyPair === pair.id;
                 return (

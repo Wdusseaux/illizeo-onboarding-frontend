@@ -431,7 +431,12 @@ export function createAdminCooptation(ctx: any) {
                     <div><span style={{ fontWeight: 600, color: C.text }}>{camp.cooptations_count || 0}</span><br /><span style={{ fontSize: 10, color: C.textMuted }}>{t('coopt.applications')}</span></div>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/cooptation/${camp.share_token}`); addToast_admin(t('toast.saved')); }} title={t('coopt.share')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Link size={12} /> {t('coopt.share')}</button>
+                    <button onClick={() => {
+                      const shareUrl = `${window.location.origin}/cooptation/${camp.share_token}`;
+                      navigator.clipboard.writeText(shareUrl).then(() => addToast_admin(t('emp.link_copied') || "Lien copié !")).catch(() => {
+                        prompt(lang === "fr" ? "Copiez ce lien :" : "Copy this link:", shareUrl);
+                      });
+                    }} title={t('coopt.share')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Link size={12} /> {t('coopt.share')}</button>
                     <button onClick={() => { setCampaignPanelData({ ...camp, date_limite: camp.date_limite || "" }); setCampaignPanelMode("edit"); }} style={{ background: C.bg, border: "none", borderRadius: 6, padding: "6px 8px", cursor: "pointer" }}><FilePen size={14} color={C.textMuted} /></button>
                   </div>
                 </div>
@@ -460,7 +465,7 @@ export function createAdminCooptation(ctx: any) {
             {leaderboard.map((entry, i) => {
               const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
               const initials = entry.referrer_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-              const colors = ["#C2185B", "#1A73E8", "#4CAF50", "#7B5EA7", "#F9A825"];
+              const colors = ["#E41076", "#1A73E8", "#4CAF50", "#7B5EA7", "#F9A825"];
               return (
               <div key={entry.referrer_email} style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 20px", borderBottom: `1px solid ${C.border}` }}>
                 <div style={{ width: 28, textAlign: "center", fontSize: i < 3 ? 20 : 14, fontWeight: 700, color: i < 3 ? C.text : C.textMuted }}>{medal || `${i + 1}`}</div>
@@ -488,11 +493,11 @@ export function createAdminCooptation(ctx: any) {
               <button onClick={() => setCooptPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} /></button>
             </div>
             <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
-              {campaigns.filter(c => c.statut === "active").length > 0 && (
+              {(campaigns.length > 0 || cooptPanelData.campaign_id) && (
                 <div><label style={{ fontSize: 11, color: C.textLight, marginBottom: 4, display: "block" }}>{t('coopt.associated_campaign')}</label>
                   <select value={cooptPanelData.campaign_id || ""} onChange={e => setCooptPanelData({ ...cooptPanelData, campaign_id: e.target.value ? Number(e.target.value) : null })} style={sInput}>
                     <option value="">{t('coopt.no_campaign')}</option>
-                    {campaigns.filter(c => c.statut === "active").map(c => <option key={c.id} value={c.id}>{c.titre} ({c.type_contrat})</option>)}
+                    {campaigns.map(c => <option key={c.id} value={c.id}>{c.titre} ({c.type_contrat}){c.statut !== "active" ? ` — ${c.statut}` : ""}</option>)}
                   </select>
                 </div>
               )}

@@ -17,7 +17,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api
 })();
 
 const getTenantId = () => localStorage.getItem('illizeo_tenant_id') || import.meta.env.VITE_TENANT_ID || 'illizeo';
-const TIMEOUT_MS = 5000;
+const TIMEOUT_MS = 60000;
 const TOKEN_KEY = 'illizeo_token';
 
 export class ApiError extends Error {

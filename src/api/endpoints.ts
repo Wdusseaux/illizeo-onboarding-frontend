@@ -144,6 +144,7 @@ export function transformParcours(p: ApiParcours) {
     collaborateursActifs: p.collaborateurs_actifs,
     status: p.status as "actif" | "brouillon" | "archive",
     categorie: (p.categorie?.slug || 'onboarding') as "onboarding" | "offboarding" | "crossboarding" | "reboarding",
+    translations: (p as any).translations || {},
   };
 }
 
@@ -173,6 +174,7 @@ interface ApiAction {
   id: number; titre: string; action_type_id: number; phase_id: number | null;
   parcours_id: number | null; delai_relatif: string; obligatoire: boolean;
   description: string; lien_externe: string | null; duree_estimee: string | null;
+  xp?: number; heure_default?: string | null; accompagnant_role?: string | null;
   pieces_requises: string[] | null; assignation_mode: string;
   assignation_valeurs: string[] | null;
   action_type?: { id: number; slug: string; label: string };
@@ -189,9 +191,14 @@ export function transformAction(a: ApiAction) {
     assignation: { mode: a.assignation_mode as any, valeurs: a.assignation_valeurs || [] },
     lienExterne: a.lien_externe || undefined,
     dureeEstimee: a.duree_estimee || undefined,
+    xp: a.xp ?? 50,
+    heureDefault: a.heure_default || undefined,
+    accompagnantRole: a.accompagnant_role || undefined,
     parcours: a.parcours?.nom || '',
+    parcours_id: a.parcours_id || null,
     piecesRequises: a.pieces_requises || undefined,
     options: a.options || undefined,
+    translations: (a as any).translations || {},
   };
 }
 
@@ -228,6 +235,7 @@ export function transformPhase(ph: ApiPhase) {
     active: ph.active !== false,
     parcoursIds: ph.parcours ? ph.parcours.map(p => p.id) : [],
     parcoursNoms: ph.parcours ? ph.parcours.map(p => p.nom) : [],
+    translations: (ph as any).translations || {},
   };
 }
 
@@ -260,7 +268,10 @@ export function transformGroupe(g: ApiGroupe) {
     id: g.id, nom: g.nom, description: g.description,
     membres: g.collaborateurs ? g.collaborateurs.map(c => `${c.prenom} ${c.nom}`) : [],
     couleur: g.couleur,
+    critere_type: g.critere_type, critere_valeur: g.critere_valeur,
     critereAuto: g.critere_type ? { type: g.critere_type as any, valeur: g.critere_valeur || '' } : undefined,
+    collaborateurs: g.collaborateurs || [],
+    translations: (g as any).translations || {},
   };
 }
 
@@ -348,6 +359,7 @@ export function transformContrat(c: ApiContrat) {
     id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction,
     variables: c.variables, derniereMaj: isoToFr(c.derniere_maj),
     actif: c.actif, fichier: c.fichier,
+    translations: (c as any).translations || {},
   };
 }
 
@@ -474,6 +486,14 @@ export async function getCollabAccompagnants(collabId: number) {
   return apiFetch<any[]>(`/collaborateurs/${collabId}/accompagnants`);
 }
 
+export async function assignAccompagnant(collabId: number, payload: { user_id: number; role: 'manager' | 'hrbp' | 'buddy' | 'it' | 'recruteur' | 'admin_rh' | 'other' }) {
+  return apiFetch<any>(`/collaborateurs/${collabId}/assign-accompagnant`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export async function removeAccompagnant(accompagnantId: number) {
+  return apiFetch<any>(`/accompagnants/${accompagnantId}`, { method: 'DELETE' });
+}
+
 export async function assignTeamToCollab(collabId: number, teamId: number) {
   return apiFetch<any>(`/collaborateurs/${collabId}/assign-team`, { method: 'POST', body: JSON.stringify({ team_id: teamId }) });
 }
@@ -543,6 +563,108 @@ export async function completeMyActionByActionId(actionId: number) {
 
 export async function reactivateMyActionByActionId(actionId: number) {
   return apiFetch<any>(`/my-actions/by-action/${actionId}/reactivate`, { method: 'POST' });
+}
+
+// ─── Journey milestones / badges auto-award ────────────────
+export interface ApiMilestone { day: number; label: string; badge_name: string; badge_color: string; icon: string; description?: string }
+export async function getMyJourney() {
+  return apiFetch<{ milestones: ApiMilestone[]; day_j: number; categorie: string | null }>('/me/journey');
+}
+export async function checkMilestones() {
+  return apiFetch<{ awarded: any[]; day_j: number; total_milestones: number; reached_milestones: number }>('/me/check-milestones', { method: 'POST' });
+}
+
+// ─── Cohort leaderboard + quiz persistence ─────────────────
+export interface ApiLeaderboardRow {
+  id: number; name: string; initials: string; color: string; xp: number;
+  xp_breakdown: { actions: number; badges: number; quiz: number };
+  is_me: boolean;
+}
+export async function getMyLeaderboard() {
+  return apiFetch<{ cohort: ApiLeaderboardRow[]; my_rank: number | null; my_xp: number; my_breakdown: { actions: number; badges: number; quiz: number } | null }>('/me/leaderboard');
+}
+export async function submitQuizCompletion(payload: { block_id?: number | null; correct: number; total: number; xp_per_correct?: number; answers?: Record<number, number> }) {
+  return apiFetch<{ ok: boolean; xp_earned: number }>('/me/quiz/complete', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+// ─── Feedback hub ──────────────────────────────────────────
+export interface ApiMoodEntry { id: number; mood: number; comment: string | null; created_at: string }
+export async function postMood(mood: number, comment?: string) {
+  return apiFetch<{ ok: boolean; entry: ApiMoodEntry }>('/me/mood', { method: 'POST', body: JSON.stringify({ mood, comment }) });
+}
+export async function getMyMoods() {
+  return apiFetch<ApiMoodEntry[]>('/me/mood');
+}
+export async function postSuggestion(payload: { category?: 'suggestion' | 'bug' | 'improvement' | 'other'; content: string; anonymous?: boolean }) {
+  return apiFetch<{ ok: boolean }>('/me/feedback/suggestion', { method: 'POST', body: JSON.stringify(payload) });
+}
+export async function postBuddyRating(payload: { target_type: 'buddy' | 'manager'; target_user_id?: number | null; rating: number; comment?: string }) {
+  return apiFetch<{ ok: boolean }>('/me/feedback/buddy-rating', { method: 'POST', body: JSON.stringify(payload) });
+}
+export async function getMyBuddyRatings() {
+  return apiFetch<any[]>('/me/feedback/buddy-rating');
+}
+export async function postConfidentialAlert(payload: { category: 'rps' | 'harcelement' | 'discrimination' | 'autre'; content: string; anonymous?: boolean }) {
+  return apiFetch<{ ok: boolean; id: number }>('/me/feedback/confidential', { method: 'POST', body: JSON.stringify(payload) });
+}
+// ─── Admin feedback hub views ──────────────────────────────
+export async function adminGetMoods() {
+  return apiFetch<{ entries: any[]; stats: { avg_30d: number | null; count_30d: number; distribution_30d: Record<string, number>; low_mood_count_30d: number } }>('/admin/feedback/moods');
+}
+export async function adminGetSuggestions(status?: 'open' | 'reviewing' | 'done' | 'dismissed') {
+  const qs = status ? `?status=${status}` : '';
+  return apiFetch<any[]>(`/admin/feedback/suggestions${qs}`);
+}
+export async function adminUpdateSuggestionStatus(id: number, status: 'open' | 'reviewing' | 'done' | 'dismissed') {
+  return apiFetch<{ ok: boolean }>(`/admin/feedback/suggestions/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+}
+export async function adminGetBuddyRatings() {
+  return apiFetch<{ entries: any[]; stats: { avg_buddy: number | null; avg_manager: number | null; low_count: number } }>('/admin/feedback/buddy-ratings');
+}
+export async function adminGetExcited() {
+  return apiFetch<{ entries: any[]; total: number }>('/admin/feedback/excited');
+}
+
+// ─── Quotes (Citations) ─────────────────────────────────────
+export interface ApiQuote { id: number; text: string; author: string | null; source: 'system' | 'tenant'; actif: boolean; translations?: Record<string, any> | null }
+export async function getQuotes() {
+  return apiFetch<ApiQuote[]>('/quotes');
+}
+export async function getQuoteOfTheDay() {
+  return apiFetch<ApiQuote | null>('/quotes/of-the-day');
+}
+export async function createQuote(data: { text: string; author?: string | null; translations?: any }) {
+  return apiFetch<ApiQuote>('/quotes', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function updateQuote(id: number, data: Partial<ApiQuote>) {
+  return apiFetch<ApiQuote>(`/quotes/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function toggleQuote(id: number) {
+  return apiFetch<ApiQuote>(`/quotes/${id}/toggle`, { method: 'PATCH' });
+}
+export async function deleteQuote(id: number) {
+  return apiFetch<{ ok: boolean }>(`/quotes/${id}`, { method: 'DELETE' });
+}
+
+// ─── Recurring meetings ────────────────────────────────────
+export interface ApiRecurringMeeting { id: number; titre: string; description?: string | null; frequence: 'weekly'|'biweekly'|'monthly'|'milestone'; jour_semaine?: number | null; milestones?: number[] | null; heure: string; duree_min: number; lieu?: string | null; participants_roles?: string[] | null; parcours_id?: number | null; auto_sync_calendar: boolean; actif: boolean; parcours?: { id: number; nom: string } | null }
+export async function getRecurringMeetings() {
+  return apiFetch<ApiRecurringMeeting[]>('/recurring-meetings');
+}
+export async function createRecurringMeeting(data: Partial<ApiRecurringMeeting>) {
+  return apiFetch<ApiRecurringMeeting>('/recurring-meetings', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function updateRecurringMeeting(id: number, data: Partial<ApiRecurringMeeting>) {
+  return apiFetch<ApiRecurringMeeting>(`/recurring-meetings/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function deleteRecurringMeeting(id: number) {
+  return apiFetch<{ ok: boolean }>(`/recurring-meetings/${id}`, { method: 'DELETE' });
+}
+export async function getRecurringMeetingInstances(collaborateurId: number) {
+  return apiFetch<{ instances: any[] }>(`/recurring-meetings/instances/${collaborateurId}`);
+}
+export async function syncRecurringInstance(payload: { recurring_meeting_id: number; collaborateur_id: number; scheduled_at: string; provider: 'microsoft'|'google' }) {
+  return apiFetch<{ ok: boolean; instance?: any; join_url?: string | null }>('/recurring-meetings/sync', { method: 'POST', body: JSON.stringify(payload) });
 }
 
 // ─── Company Blocks ─────────────────────────────────────────
@@ -910,8 +1032,41 @@ export async function getDocuments(params?: { collaborateur_id?: number; status?
   return apiFetch<UploadedDocument[]>(`/documents${query}`);
 }
 
-export async function createDocumentTemplate(data: { nom: string; obligatoire: boolean; type: string; categorie_id: number }) {
-  return apiFetch<any>('/documents', { method: 'POST', body: JSON.stringify(data) });
+export async function createDocumentTemplate(data: { nom: string; description?: string; obligatoire: boolean; type: string; categorie_id: number; translations?: any }) {
+  return apiFetch<any>('/documents', { method: 'POST', body: JSON.stringify({ ...data, is_template: true }) });
+}
+
+export async function updateDocumentTemplate(id: number, data: any) {
+  return apiFetch<any>(`/documents/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function getDocumentTemplates() {
+  return apiFetch<any[]>('/document-templates');
+}
+
+export async function uploadTemplateFile(documentId: number, file: File): Promise<any> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+  const token = localStorage.getItem('illizeo_token');
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${baseUrl}/documents/${documentId}/upload-template`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'X-Tenant': localStorage.getItem('illizeo_tenant_id') || import.meta.env.VITE_TENANT_ID || 'illizeo', 'Accept': 'application/json' },
+    body: formData,
+  });
+  if (!res.ok) throw new Error('Upload failed');
+  return res.json();
+}
+
+export async function downloadTemplateFile(documentId: number): Promise<Blob> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+  const token = localStorage.getItem('illizeo_token');
+  const res = await fetch(`${baseUrl}/documents/${documentId}/download-template`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${token}`, 'X-Tenant': localStorage.getItem('illizeo_tenant_id') || import.meta.env.VITE_TENANT_ID || 'illizeo' },
+  });
+  if (!res.ok) throw new Error('Download failed');
+  return res.blob();
 }
 
 export async function uploadDocument(file: File, collaborateurId: number, categorie: string, nom: string) {
@@ -1050,6 +1205,14 @@ export async function sendNpsSurvey(surveyId: number, collaborateurId: number) {
   return apiFetch<any>(`/nps-surveys/${surveyId}/send`, { method: 'POST', body: JSON.stringify({ collaborateur_id: collaborateurId }) });
 }
 
+export async function getMyNpsSurveys() {
+  return apiFetch<{ survey: NpsSurvey; token: string | null; completed: boolean; completed_at: string | null; score?: number; rating?: number }[]>('/my-nps-surveys');
+}
+
+export async function submitNpsResponse(token: string, data: { score?: number | null; rating?: number | null; answers?: Record<string, any>; comment?: string }) {
+  return apiFetch<{ message: string }>(`/nps/respond/${token}`, { method: 'POST', body: JSON.stringify(data) });
+}
+
 export async function sendNpsSurveyToAll(surveyId: number) {
   return apiFetch<any>(`/nps-surveys/${surveyId}/send-all`, { method: 'POST' });
 }
@@ -1079,7 +1242,7 @@ export async function createEquipment(data: Record<string, any>) { return apiFet
 export async function updateEquipment(id: number, data: Record<string, any>) { return apiFetch<Equipment>(`/equipments/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
 export async function deleteEquipment(id: number) { return apiFetch<void>(`/equipments/${id}`, { method: 'DELETE' }); }
 export async function assignEquipment(id: number, collaborateurId: number) { return apiFetch<Equipment>(`/equipments/${id}/assign`, { method: 'POST', body: JSON.stringify({ collaborateur_id: collaborateurId }) }); }
-export async function unassignEquipment(id: number) { return apiFetch<Equipment>(`/equipments/${id}/unassign`, { method: 'POST' }); }
+export async function unassignEquipment(id: number, data?: { returned_at?: string; etat?: string; notes?: string }) { return apiFetch<Equipment>(`/equipments/${id}/unassign`, { method: 'POST', body: data ? JSON.stringify(data) : undefined }); }
 
 export interface EquipmentPackage { id: number; nom: string; description: string | null; icon: string; couleur: string; actif: boolean; items: { id: number; equipment_type_id: number; quantite: number; notes: string | null; type?: EquipmentType }[]; }
 export async function getEquipmentPackages() { return apiFetch<EquipmentPackage[]>('/equipment-packages'); }
@@ -1110,6 +1273,13 @@ export async function getDocAcknowledgements(docId: number) { return apiFetch<Do
 export async function acknowledgeDoc(ackId: number) { return apiFetch<DocAcknowledgement>(`/acknowledgements/${ackId}/sign`, { method: 'POST' }); }
 export async function refuseDoc(ackId: number, commentaire?: string) { return apiFetch<DocAcknowledgement>(`/acknowledgements/${ackId}/refuse`, { method: 'POST', body: JSON.stringify({ commentaire }) }); }
 export async function getMyPendingSignatures() { return apiFetch<DocAcknowledgement[]>('/my-pending-signatures'); }
+export async function getMySignatureDocuments() {
+  return apiFetch<{ id: number; name: string; description: string; type: 'lecture' | 'signature'; obligatoire: boolean; status: string; urgent: boolean; version: number; signed_at: string | null; signed_version: number | null; ack_id: number | null }[]>('/me/signature-documents');
+}
+
+export async function getMySignatureHistory() {
+  return apiFetch<{ ack_id: number; document_id: number; document_title: string; document_description: string; document_type: 'lecture' | 'signature'; document_current_version: number; statut: 'signe' | 'lu'; signed_at: string | null; signed_version: number | null; is_outdated: boolean; ip_address: string | null }[]>('/me/signature-history');
+}
 export async function getMyAcknowledgement(docId: number) { return apiFetch<DocAcknowledgement>(`/signature-documents/${docId}/my-acknowledgement`); }
 
 // ─── Dossier Validation & SIRH Export ───────────────────────
@@ -1148,6 +1318,11 @@ export interface PasswordPolicy {
 
 export async function getPasswordPolicy(): Promise<PasswordPolicy> {
   return apiFetch<PasswordPolicy>('/password-policy');
+}
+
+// ─── Tenant Branding (public, no auth) ─────────────────────
+export async function getTenantBranding() {
+  return apiFetch<Record<string, string>>('/tenant-branding');
 }
 
 // ─── Tenant Registration ────────────────────────────────────
@@ -1246,8 +1421,8 @@ export async function getMySubscription() {
   return apiFetch<{ subscriptions: any[]; active_modules: string[]; tenant_id: string }>('/my-subscription');
 }
 
-export async function subscribeToPlan(plan_id: number, billing_cycle: 'monthly' | 'yearly', payment_method: 'stripe' | 'invoice') {
-  return apiFetch<any>('/subscribe', { method: 'POST', body: JSON.stringify({ plan_id, billing_cycle, payment_method }) });
+export async function subscribeToPlan(plan_id: number, billing_cycle: 'monthly' | 'yearly', payment_method: 'stripe' | 'sepa' | 'invoice', nombre_collaborateurs?: number) {
+  return apiFetch<any>('/subscribe', { method: 'POST', body: JSON.stringify({ plan_id, billing_cycle, payment_method, nombre_collaborateurs: nombre_collaborateurs || 25 }) });
 }
 
 export async function cancelSubscription(subscriptionId: number) {
@@ -1262,8 +1437,98 @@ export async function getActiveModules() {
   return apiFetch<string[]>('/active-modules');
 }
 
+export async function getInvoices() {
+  return apiFetch<any[]>('/invoices');
+}
+
+// ─── Demo Mode ─────────────────────────────────────────────
+export async function seedDemoData() {
+  return apiFetch<{ message: string }>('/demo/seed', { method: 'POST' });
+}
+
+// ─── Support Access ────────────────────────────────────────
+export async function getSupportAccesses() {
+  return apiFetch<any[]>('/support-accesses');
+}
+export async function grantSupportAccess(data: { email: string; allowed_modules?: string[] | null; reason?: string; duration_hours: number }) {
+  return apiFetch<any>('/support-accesses', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function revokeSupportAccess(id: number) {
+  return apiFetch<any>(`/support-accesses/${id}/revoke`, { method: 'POST' });
+}
+
+// ─── Security ──────────────────────────────────────────────
+export async function getSecuritySessions() { return apiFetch<{ sessions: any[] }>('/security/sessions'); }
+export async function revokeSession(id: number) { return apiFetch<any>(`/security/sessions/${id}/revoke`, { method: 'POST' }); }
+export async function revokeAllOtherSessions() { return apiFetch<any>('/security/sessions/revoke-all', { method: 'POST' }); }
+export async function getLoginHistory() { return apiFetch<any[]>('/security/login-history'); }
+export async function getAllLoginHistory() { return apiFetch<any[]>('/security/login-history/all'); }
+export async function getSecuritySettings() { return apiFetch<any>('/security/settings'); }
+export async function updateSecuritySettings(data: Record<string, any>) { return apiFetch<any>('/security/settings', { method: 'PUT', body: JSON.stringify(data) }); }
+export async function createAccessSchedule(data: { label?: string; days: number[]; start_time: string; end_time: string; timezone?: string }) { return apiFetch<any>('/security/schedules', { method: 'POST', body: JSON.stringify(data) }); }
+export async function deleteAccessSchedule(id: number) { return apiFetch<any>(`/security/schedules/${id}`, { method: 'DELETE' }); }
+export async function exportEncrypted(type: string, password: string) {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+  const tenantId = localStorage.getItem('illizeo_tenant_id') || 'illizeo';
+  const token = localStorage.getItem('illizeo_token');
+  const res = await fetch(`${baseUrl}/export/encrypted`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'X-Tenant': tenantId, 'Content-Type': 'application/json' }, body: JSON.stringify({ type, password }) });
+  if (!res.ok) throw new Error('Export failed');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `illizeo-export-${type}-encrypted.aes`; a.click(); URL.revokeObjectURL(url);
+}
+
+// ─── IP Whitelist ──────────────────────────────────────────
+export async function getIpWhitelist() {
+  return apiFetch<{ enabled: boolean; entries: any[]; current_ip: string }>('/ip-whitelist');
+}
+export async function addIpWhitelist(data: { ip_address: string; label?: string }) {
+  return apiFetch<any>('/ip-whitelist', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function toggleIpWhitelist(enabled: boolean) {
+  return apiFetch<any>('/ip-whitelist/toggle', { method: 'POST', body: JSON.stringify({ enabled }) });
+}
+export async function removeIpWhitelist(id: number) {
+  return apiFetch<any>(`/ip-whitelist/${id}`, { method: 'DELETE' });
+}
+
+export async function getAuditLogs(params?: { category?: string; search?: string; limit?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.category) qs.set('category', params.category);
+  if (params?.search) qs.set('search', params.search);
+  if (params?.limit) qs.set('limit', String(params.limit));
+  const query = qs.toString() ? `?${qs}` : '';
+  return apiFetch<any[]>(`/audit-logs${query}`);
+}
+
 export async function getSignatureUsage() {
   return apiFetch<{ total: number; signed: number; sent: number; declined: number }>('/signature-usage');
+}
+
+// ─── Stripe / Payments ────────────────────────────────────
+export async function createStripeSetupIntent() {
+  return apiFetch<{ client_secret: string; customer_id: string; publishable_key: string }>('/stripe/setup-intent', { method: 'POST' });
+}
+export async function getStripePaymentMethods() {
+  return apiFetch<{ methods: { id: string; brand: string; last4: string; exp_month: number; exp_year: number; is_default: boolean }[]; default: string | null }>('/stripe/payment-methods');
+}
+export async function setDefaultPaymentMethod(paymentMethodId: string) {
+  return apiFetch('/stripe/default-payment-method', { method: 'POST', body: JSON.stringify({ payment_method_id: paymentMethodId }), headers: { 'Content-Type': 'application/json' } });
+}
+export async function deleteStripePaymentMethod(paymentMethodId: string) {
+  return apiFetch('/stripe/delete-payment-method', { method: 'POST', body: JSON.stringify({ payment_method_id: paymentMethodId }), headers: { 'Content-Type': 'application/json' } });
+}
+export async function getPaymentConfig() {
+  return apiFetch<any>('/payment-config');
+}
+export async function saveInvoiceConfig(data: { invoice_email?: string; po_number?: string; billing_address?: Record<string, string> }) {
+  return apiFetch('/payment/invoice-config', { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } });
+}
+export async function saveBillingContact(data: Record<string, string>) {
+  return apiFetch('/billing/contact', { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } });
+}
+export async function saveBillingInfo(data: Record<string, string>) {
+  return apiFetch('/billing/info', { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } });
 }
 
 // ─── OCR / AI ─────────────────────────────────────────────
@@ -1387,11 +1652,41 @@ export async function getMyCollaborateur() {
     assignment_status: a.assignment_status || 'a_faire',
     completed_at: a.completed_at || null,
     options: a.options || undefined,
+    duree_estimee: a.duree_estimee || null,
+    xp: a.xp ?? 50,
+    heure_default: a.heure_default || null,
+    accompagnant_role: a.accompagnant_role || null,
+    accompagnant: a.accompagnant || null,
+    piecesRequises: a.pieces_requises || undefined,
+    pieces_requises: a.pieces_requises || undefined,
+    lien_externe: a.lien_externe || null,
+    lienExterne: a.lien_externe || null,
+    dureeEstimee: a.duree_estimee || null,
+    translations: a.translations || undefined,
   }));
   (collab as any).parcours_nom = raw.parcours?.nom || null;
   (collab as any).parcours_categorie = raw.parcours?.categorie?.slug || raw.parcours?.categorie || null;
   (collab as any).accompagnants = raw.accompagnants || [];
   return collab;
+}
+
+/**
+ * Compute presence label + colour from a user's last_seen_at ISO timestamp.
+ * Buckets: <2min = online, <15min = active, <60min = recent, <24h = today,
+ * <7d = this week, older = absent. Null = jamais connecté.
+ */
+export function presenceLabel(lastSeenAt: string | null | undefined): { label: string; color: string; dotColor: string; isOnline: boolean } {
+  if (!lastSeenAt) return { label: "Jamais connecté", color: "#999", dotColor: "#CFD8DC", isOnline: false };
+  const last = new Date(lastSeenAt).getTime();
+  if (isNaN(last)) return { label: "Jamais connecté", color: "#999", dotColor: "#CFD8DC", isOnline: false };
+  const diffSec = Math.max(0, Math.floor((Date.now() - last) / 1000));
+  if (diffSec < 120) return { label: "En ligne", color: "#4CAF50", dotColor: "#4CAF50", isOnline: true };
+  if (diffSec < 900) return { label: `Actif il y a ${Math.floor(diffSec / 60)} min`, color: "#7CB342", dotColor: "#7CB342", isOnline: true };
+  if (diffSec < 3600) return { label: `Vu il y a ${Math.floor(diffSec / 60)} min`, color: "#999", dotColor: "#BDBDBD", isOnline: false };
+  if (diffSec < 86400) return { label: `Vu il y a ${Math.floor(diffSec / 3600)} h`, color: "#999", dotColor: "#BDBDBD", isOnline: false };
+  if (diffSec < 7 * 86400) return { label: `Vu il y a ${Math.floor(diffSec / 86400)} j`, color: "#999", dotColor: "#BDBDBD", isOnline: false };
+  const d = new Date(lastSeenAt);
+  return { label: `Vu le ${d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`, color: "#999", dotColor: "#BDBDBD", isOnline: false };
 }
 
 export async function getMyPermissions() {
@@ -1433,4 +1728,85 @@ export async function addBuddyNote(id: number, text: string) {
 
 export async function completeBuddyPair(id: number) {
   return apiFetch<any>(`/buddy-pairs/${id}/complete`, { method: 'POST' });
+}
+
+// ─── API Keys ─────────────────────────────────────────────
+export async function getApiKeys() {
+  return apiFetch<any[]>('/api-keys');
+}
+export async function createApiKey(data: { name: string; scopes: string[]; expires_at?: string }) {
+  return apiFetch<any>('/api-keys', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function revokeApiKey(id: number) {
+  return apiFetch<any>(`/api-keys/${id}/revoke`, { method: 'POST' });
+}
+export async function deleteApiKey(id: number) {
+  return apiFetch<void>(`/api-keys/${id}`, { method: 'DELETE' });
+}
+
+// ─── Webhooks Config ──────────────────────────────────────
+export async function getWebhooksConfig() {
+  return apiFetch<any[]>('/webhooks-config');
+}
+export async function createWebhookConfig(data: { url: string; events: string[] }) {
+  return apiFetch<any>('/webhooks-config', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function updateWebhookConfig(id: number, data: Record<string, any>) {
+  return apiFetch<any>(`/webhooks-config/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function deleteWebhookConfig(id: number) {
+  return apiFetch<void>(`/webhooks-config/${id}`, { method: 'DELETE' });
+}
+export async function testWebhook(id: number) {
+  return apiFetch<any>(`/webhooks-config/${id}/test`, { method: 'POST' });
+}
+
+// ─── AI Assistant Chat ───────────────────────────────────
+export async function postAiChat(message: string, history: { role: string; content: string }[]) {
+  return apiFetch<{ reply: string }>('/ai/chat', { method: 'POST', body: JSON.stringify({ message, history }) });
+}
+
+export async function getAiAutoRechargeConfig() {
+  return apiFetch<{ enabled: boolean; threshold_percent: number; recharge_amount_chf: number; recharge_credits: number; max_recharges_per_month: number; recharges_this_month: number }>('/ai/auto-recharge');
+}
+
+export async function updateAiAutoRechargeConfig(config: { enabled: boolean; threshold_percent: number; recharge_amount_chf: number; recharge_credits: number; max_recharges_per_month: number }) {
+  return apiFetch<{ success: boolean }>('/ai/auto-recharge', { method: 'POST', body: JSON.stringify(config) });
+}
+
+export async function postAdminAiChat(message: string, history: { role: string; content: string }[]) {
+  return apiFetch<{ reply: string }>('/ai/admin-chat', { method: 'POST', body: JSON.stringify({ message, history }) });
+}
+
+export async function getExchangeRates() {
+  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+  const res = await fetch(`${base}/exchange-rates`);
+  return res.json() as Promise<{ rates: Record<string, number> }>;
+}
+
+export async function getCalendarEvents(year: number, month: number) {
+  return apiFetch<{ date: string; type: string; title: string; subtitle: string; color: string; collaborateur_id?: number; action_id?: number }[]>(`/calendar-events?year=${year}&month=${month}`);
+}
+
+export async function getAiInsights() {
+  return apiFetch<{ insights: { type: string; title: string; message: string; priority: "high" | "medium" | "low" }[] }>('/ai/insights');
+}
+
+export async function generateParcoursWithAI(prompt: string) {
+  return apiFetch<{ parcours: { nom: string; categorie: string; phases: { nom: string; delaiDebut: string; delaiFin: string }[]; actions: { titre: string; type: string; phase: string; delaiRelatif: string; obligatoire: boolean; description: string }[] } }>('/ai/generate-parcours', { method: 'POST', body: JSON.stringify({ prompt }) });
+}
+
+// ─── API Logs ─────────────────────────────────────────────
+export async function getApiLogs(params?: { method?: string; status_code?: number; api_key_id?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.method) qs.set('method', params.method);
+  if (params?.status_code) qs.set('status_code', String(params.status_code));
+  if (params?.api_key_id) qs.set('api_key_id', String(params.api_key_id));
+  const query = qs.toString() ? `?${qs}` : '';
+  return apiFetch<any[]>(`/api-logs${query}`);
+}
+
+// ── AI Translation ──
+export async function aiTranslate(text: string, sourceLang: string, targetLangs: string[]): Promise<{ translations: Record<string, string>; from_cache: boolean }> {
+  return apiFetch('/ai/translate', { method: 'POST', body: JSON.stringify({ text, source_lang: sourceLang, target_langs: targetLangs }) });
 }

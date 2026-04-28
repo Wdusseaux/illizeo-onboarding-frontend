@@ -125,7 +125,7 @@ export function createAdminDashboardSuivi(ctx: any) {
     collabPanelMode, setCollabPanelMode, collabPanelData, setCollabPanelData, collabPanelLoading, setCollabPanelLoading, collabProfileId, setCollabProfileId,
     collabProfileTab, setCollabProfileTab, dossierCheck, setDossierCheck, groupePanelMode, setGroupePanelMode, groupePanelData, setGroupePanelData,
     groupePanelLoading, setGroupePanelLoading, integrationPanelId, setIntegrationPanelId, integrationConfig, setIntegrationConfig, integrationSaving, setIntegrationSaving,
-    apiKeyInput, setApiKeyInput, suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, suiviParcoursFilter, setSuiviParcoursFilter, collabMenuId, setCollabMenuId,
+    apiKeyInput, setApiKeyInput, suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, suiviParcoursFilter, setSuiviParcoursFilter, suiviScope, setSuiviScope, suiviSiteFilter, setSuiviSiteFilter, suiviDeptFilter, setSuiviDeptFilter, collabMenuId, setCollabMenuId,
     adMappings, setAdMappings, adGroups, setAdGroups, syncLoading, setSyncLoading, obTeams, setObTeams,
     teamPanelMode, setTeamPanelMode, teamPanelData, setTeamPanelData, wfPanelMode, setWfPanelMode, wfPanelData, setWfPanelData,
     tplPanelMode, setTplPanelMode, tplPanelData, setTplPanelData, contratPanelMode, setContratPanelMode, contratPanelData, setContratPanelData,
@@ -368,6 +368,187 @@ export function createAdminDashboardSuivi(ctx: any) {
             ))}
           </div>
 
+          {/* ── Alertes IA ── */}
+          {(() => {
+            if (ctx._aiAlertsLoaded) return null;
+            // Build alerts from data
+            const alerts: { type: "danger" | "warning" | "info"; icon: any; message: string }[] = [];
+
+            // Collaborateurs en retard
+            const retards = COLLABORATEURS.filter(c => c.status === "en_retard");
+            if (retards.length > 0) {
+              alerts.push({ type: "danger", icon: AlertTriangle, message: `${retards.length} collaborateur${retards.length > 1 ? "s" : ""} en retard : ${retards.slice(0, 3).map(c => `${c.prenom} ${c.nom}`).join(", ")}${retards.length > 3 ? ` et ${retards.length - 3} autre(s)` : ""}` });
+            }
+
+            // Documents manquants
+            const docsMissing = COLLABORATEURS.filter(c => c.status !== "termine" && c.docsValides < c.docsTotal);
+            if (docsMissing.length > 0) {
+              const totalMissing = docsMissing.reduce((s, c) => s + (c.docsTotal - c.docsValides), 0);
+              alerts.push({ type: "warning", icon: FileText, message: `${totalMissing} document${totalMissing > 1 ? "s" : ""} manquant${totalMissing > 1 ? "s" : ""} chez ${docsMissing.length} collaborateur${docsMissing.length > 1 ? "s" : ""} : ${docsMissing.slice(0, 3).map(c => `${c.prenom} ${c.nom} (${c.docsTotal - c.docsValides})`).join(", ")}` });
+            }
+
+            // Périodes d'essai proches (from custom fields if available)
+            const now = new Date();
+            const essaiProche = COLLABORATEURS.filter(c => {
+              const fin = (c as any).date_fin_essai;
+              if (!fin) return false;
+              const d = new Date(fin);
+              return d > now && d < new Date(now.getTime() + 30 * 86400000);
+            });
+            if (essaiProche.length > 0) {
+              alerts.push({ type: "info", icon: Calendar, message: `${essaiProche.length} période${essaiProche.length > 1 ? "s" : ""} d'essai se terminant dans 30 jours : ${essaiProche.map(c => `${c.prenom} ${c.nom}`).join(", ")}` });
+            }
+
+            // Faible progression moyenne
+            if (avgProgression < 30 && totalCollab > 0) {
+              alerts.push({ type: "warning", icon: Target, message: `Progression moyenne faible : ${avgProgression}%. Vérifiez que les parcours sont bien assignés et que les collaborateurs sont actifs.` });
+            }
+
+            // Pas de parcours actif
+            if (activeParcours.length === 0 && PARCOURS_TEMPLATES.length > 0) {
+              alerts.push({ type: "info", icon: Route, message: `Aucun parcours actif. ${PARCOURS_TEMPLATES.length} parcours en brouillon — activez-en un pour commencer les onboardings.` });
+            }
+
+            if (alerts.length === 0) return null;
+
+            const alertStyles = {
+              danger: { bg: "#FFF0F0", border: "#FFCDD2", color: "#C62828", iconColor: "#E53935" },
+              warning: { bg: "#FFF8E1", border: "#FFE0B2", color: "#E65100", iconColor: "#F9A825" },
+              info: { bg: "#E3F2FD", border: "#BBDEFB", color: "#1565C0", iconColor: "#1A73E8" },
+            };
+
+            return (
+              <div className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 20, padding: "16px 20px", border: `1px solid ${C.pink}30` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <Sparkles size={16} color={C.pink} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Alertes & Insights IA</span>
+                  <span style={{ fontSize: 10, color: C.textMuted, marginLeft: "auto" }}>Analyse automatique</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {alerts.map((a, i) => {
+                    const s = alertStyles[a.type];
+                    const Icon = a.icon;
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px", borderRadius: 8, background: s.bg, border: `1px solid ${s.border}` }}>
+                        <Icon size={16} color={s.iconColor} style={{ marginTop: 1, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: s.color, lineHeight: 1.5 }}>{a.message}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Insights IA (backend Claude) ── */}
+          {(() => {
+            const { aiInsights: insightsState, setAiInsights } = ctx;
+
+            const loadInsights = () => {
+              setAiInsights({ insights: [], reason: "loading" });
+              import('../api/endpoints').then(m => m.getAiInsights()).then((res: any) => {
+                setAiInsights({ insights: res.insights || [], reason: res.reason || "loaded" });
+              }).catch((err: any) => {
+                console.warn("AI Insights error:", err);
+                setAiInsights({ insights: [], reason: "error" });
+              });
+            };
+
+            // Load only once (when null)
+            if (!insightsState && setAiInsights) {
+              loadInsights();
+            }
+
+            const insights = insightsState?.insights;
+            const reason = insightsState?.reason;
+            if (reason === "loading") return <div style={{ padding: "16px 20px", marginBottom: 20, borderRadius: 12, border: `1px solid ${C.blue}30`, display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: C.textMuted }}><Sparkles size={16} color={C.blue} /> Analyse IA en cours...</div>;
+            if (!insights || insights.length === 0) {
+              if (reason === 'plan_upgrade_required') {
+                return (
+                  <div className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 20, padding: "14px 20px", display: "flex", alignItems: "center", gap: 10, border: `1px solid ${C.border}` }}>
+                    <Sparkles size={16} color={C.textMuted} />
+                    <span style={{ fontSize: 12, color: C.textMuted }}>Les insights IA sont disponibles à partir du plan <b>IA Business</b>.</span>
+                    <button onClick={() => { setAdminPage("admin_abonnement" as any); }} style={{ ...sBtn("outline"), fontSize: 10, padding: "4px 10px", marginLeft: "auto" }}>Upgrader</button>
+                  </div>
+                );
+              }
+              return null;
+            }
+            const typeStyles: Record<string, { bg: string; border: string; color: string; icon: any }> = {
+              danger: { bg: "#FFF0F0", border: "#FFCDD2", color: "#C62828", icon: AlertTriangle },
+              warning: { bg: "#FFF8E1", border: "#FFE0B2", color: "#E65100", icon: Clock },
+              success: { bg: "#E8F5E9", border: "#C8E6C9", color: "#2E7D32", icon: CheckCircle },
+              info: { bg: "#E3F2FD", border: "#BBDEFB", color: "#1565C0", icon: Sparkles },
+            };
+            const maxVisible = 3;
+            const hasMore = insights.length > maxVisible;
+            const { aiInsightsModalOpen, setAiInsightsModalOpen } = ctx;
+
+            const renderInsight = (ins: any, i: number) => {
+              const s = typeStyles[ins.type] || typeStyles.info;
+              const Icon = s.icon;
+              return (
+                <div key={i} style={{ padding: "12px 16px", borderRadius: 10, background: s.bg, border: `1px solid ${s.border}` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <Icon size={14} color={s.color} />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{ins.title}</span>
+                    {ins.priority === "high" && <span style={{ fontSize: 8, padding: "1px 5px", borderRadius: 3, background: s.color, color: "#fff", fontWeight: 700 }}>URGENT</span>}
+                  </div>
+                  <div style={{ fontSize: 12, color: s.color, lineHeight: 1.5, opacity: 0.85 }}>{ins.message}</div>
+                </div>
+              );
+            };
+
+            return (
+              <>
+              <div className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 20, padding: "16px 20px", border: `1px solid ${C.blue}30` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg, #1a1a2e, ${C.blue})`, display: "flex", alignItems: "center", justifyContent: "center" }}><Sparkles size={14} color="#fff" /></div>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Insights IA</span>
+                  <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: C.blueLight, color: C.blue, fontWeight: 600 }}>CLAUDE</span>
+                  <span style={{ marginLeft: "auto", fontSize: 10, color: C.textMuted }}>Analyse générée par IA</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {insights.slice(0, maxVisible).map(renderInsight)}
+                </div>
+                <div style={{ fontSize: 9, color: C.textMuted, marginTop: 10 }}>L'IA peut commettre des erreurs. Vérifiez les informations.</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+                  <button onClick={() => loadInsights()}
+                    style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.textMuted, fontFamily: font }}>
+                    <RefreshCw size={12} /> Rafraîchir
+                  </button>
+                  {hasMore && (
+                    <button onClick={() => setAiInsightsModalOpen(true)}
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: C.blue, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                      Voir tout ({insights.length}) <ChevronRight size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal all insights */}
+              {aiInsightsModalOpen && (
+                <div className="iz-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+                  <div className="iz-modal iz-scale-in" style={{ background: C.white, borderRadius: 16, width: 700, maxHeight: "80vh", overflow: "auto" }}>
+                    <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg, #1a1a2e, ${C.blue})`, display: "flex", alignItems: "center", justifyContent: "center" }}><Sparkles size={14} color="#fff" /></div>
+                        <span style={{ fontSize: 16, fontWeight: 700 }}>Tous les insights IA</span>
+                        <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: C.blueLight, color: C.blue, fontWeight: 600 }}>CLAUDE</span>
+                      </div>
+                      <button onClick={() => setAiInsightsModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
+                    </div>
+                    <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 10 }}>
+                      {insights.map(renderInsight)}
+                    </div>
+                    <div style={{ padding: "12px 24px", borderTop: `1px solid ${C.border}`, fontSize: 9, color: C.textMuted, textAlign: "center" }}>L'IA peut commettre des erreurs. Vérifiez les informations.</div>
+                  </div>
+                </div>
+              )}
+              </>
+            );
+          })()}
+
           {/* ── Row 2: Charts ── */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
             {/* Left: Progression moyenne (SVG circular) */}
@@ -473,18 +654,21 @@ export function createAdminDashboardSuivi(ctx: any) {
             {/* Parcours actifs */}
             <div className="iz-card iz-fade-up iz-stagger-7" style={sCard}>
               <h3 style={{ ...sectionTitle, display: "flex", alignItems: "center", gap: 8 }}><Route size={16} color={C.purple} /> {t('dash.active_parcours')}</h3>
-              {activeParcours.map(p => (
-                <div key={p.id} onClick={() => { setSuiviParcoursFilter(p.nom); setAdminPage("admin_suivi"); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${C.border}`, cursor: "pointer", borderRadius: 6, transition: "background .15s" }} className="iz-sidebar-item">
+              {activeParcours.map(p => {
+                const realCount = COLLABORATEURS.filter((c: any) => c.parcours_id === p.id && c.status !== "termine").length;
+                return (
+                <div key={p.id} onClick={() => { setSuiviParcoursFilter(p.nom); setSuiviScope("actifs"); setAdminPage("admin_suivi"); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${C.border}`, cursor: "pointer", borderRadius: 6, transition: "background .15s" }} className="iz-sidebar-item">
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{p.nom}</div>
                     <div style={{ fontSize: 11, color: C.textMuted }}>{p.actionsCount} actions &middot; {p.docsCount} documents &middot; {p.phases.length} phases</div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: C.pink }}>{p.collaborateursActifs}</span>
-                    <span style={{ fontSize: 10, color: C.textMuted }}>collabs</span>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: realCount > 0 ? C.pink : C.textMuted }}>{realCount}</span>
+                    <span style={{ fontSize: 10, color: C.textMuted }}>{realCount > 1 ? "collabs" : "collab"}</span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {activeParcours.length === 0 && <div style={{ padding: 20, textAlign: "center", color: C.textMuted, fontSize: 12 }}>Aucun parcours actif</div>}
             </div>
 
@@ -521,27 +705,83 @@ export function createAdminDashboardSuivi(ctx: any) {
         ? PARCOURS_TEMPLATES.find(p => p.nom === suiviParcoursFilter)?.id ?? null
         : null;
 
+      const siteFilter = suiviSiteFilter || '';
+      const deptFilter = suiviDeptFilter || '';
+      const scope: "actifs" | "tous" = suiviScope;
+      const setScope = setSuiviScope;
+
+      const totalAll = COLLABORATEURS.length;
+      const totalActifs = COLLABORATEURS.filter(c => c.status !== "termine").length;
+      const cohortActifs = COLLABORATEURS.filter(c => c.status !== "termine");
+      const rails = cohortActifs.filter(c => c.status === "en_cours" && c.progression >= 30).length;
+      const attention = cohortActifs.filter(c => c.status === "en_cours" && c.progression < 30).length;
+      const enRetard = cohortActifs.filter(c => c.status === "en_retard").length;
+      const firstAttention = cohortActifs.find(c => c.status === "en_cours" && c.progression < 30);
+      const firstRetard = cohortActifs.find(c => c.status === "en_retard");
+      const shortName = (n: string) => { const p = n.split(" "); return p[0] + (p[1] ? " " + p[1][0] + "." : ""); };
+
       const filtered = COLLABORATEURS
+        .filter(c => scope === "tous" ? true : c.status !== "termine")
         .filter(c => suiviFilter === "all" || c.status === suiviFilter)
         .filter(c => !suiviSearch || `${c.prenom} ${c.nom} ${c.email || ""} ${c.poste}`.toLowerCase().includes(suiviSearch.toLowerCase()))
-        .filter(c => !filterParcoursId || (c as any).parcours_id === filterParcoursId);
+        .filter(c => !filterParcoursId || (c as any).parcours_id === filterParcoursId)
+        .filter(c => !siteFilter || c.site === siteFilter)
+        .filter(c => !deptFilter || c.departement === deptFilter);
+
+      const uniqueSites = [...new Set(COLLABORATEURS.map(c => c.site).filter(Boolean))].sort();
+      const uniqueDepts = [...new Set(COLLABORATEURS.map(c => c.departement).filter(Boolean))].sort();
+      const activeFilterCount = [siteFilter, deptFilter, suiviParcoursFilter].filter(Boolean).length;
       return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('collab.tracking_title')}</h1>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('collab.tracking_title')}</h1>
+            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+              {scope === "actifs" ? `${totalActifs} arrivant${totalActifs > 1 ? "s" : ""} en cours d'intégration` : `${totalAll} collaborateur${totalAll > 1 ? "s" : ""} (incluant terminés)`}
+            </div>
+          </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => { setCollabPanelData({ prenom: "", nom: "", email: "", poste: "", site: "", departement: "", dateDebut: "" }); setCollabPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><UserPlus size={16} /> {t('collab.new')}</button>
           </div>
         </div>
 
-        {/* Active parcours filter badge */}
-        {suiviParcoursFilter && (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", borderRadius: 8, background: C.pinkBg, color: C.pink, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
-            <Route size={14} />
-            {suiviParcoursFilter}
-            <button onClick={() => setSuiviParcoursFilter(null)} style={{ background: "none", border: "none", cursor: "pointer", color: C.pink, padding: 0, display: "flex" }}><X size={14} /></button>
+        {/* Scope toggle: Actifs / Tous */}
+        <div style={{ display: "flex", gap: 4, padding: 4, background: C.bg, borderRadius: 10, marginBottom: 16, width: "fit-content" }}>
+          {([
+            { id: "actifs", label: `Actifs (${totalActifs})` },
+            { id: "tous", label: `Tous (${totalAll})` },
+          ] as const).map(s => (
+            <button key={s.id} onClick={() => setScope(s.id)} style={{
+              padding: "8px 18px", borderRadius: 6, fontSize: 13, fontWeight: scope === s.id ? 600 : 400,
+              border: "none", cursor: "pointer", fontFamily: font,
+              background: scope === s.id ? C.white : "transparent",
+              color: scope === s.id ? C.pink : C.textMuted,
+              boxShadow: scope === s.id ? "0 1px 3px rgba(0,0,0,.06)" : "none",
+              transition: "all .15s",
+            }}>{s.label}</button>
+          ))}
+        </div>
+
+        {/* KPI cards — only on Actifs scope */}
+        {scope === "actifs" && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12, marginBottom: 20 }}>
+            {[
+              { label: "EFFECTIF EN COURS", value: totalActifs, sub: `${totalActifs} actif${totalActifs > 1 ? "s" : ""}`, color: C.text },
+              { label: "SUR LES RAILS", value: rails, sub: totalActifs > 0 ? `${Math.round(rails / totalActifs * 100)}%` : "0%", color: C.green },
+              { label: "À SURVEILLER", value: attention, sub: firstAttention ? shortName(`${firstAttention.prenom} ${firstAttention.nom}`) : "—", color: C.amber },
+              { label: "EN RETARD", value: enRetard, sub: firstRetard ? shortName(`${firstRetard.prenom} ${firstRetard.nom}`) : "—", color: C.red },
+              { label: "SCORE eNPS", value: "+47", sub: "Excellent", color: C.pink },
+            ].map(k => (
+              <div key={k.label} className="iz-card" style={{ ...sCard, padding: "14px 16px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1 }}>{k.label}</div>
+                <div style={{ fontSize: 26, fontWeight: 700, color: k.color, marginTop: 4 }}>{k.value}</div>
+                <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{k.sub}</div>
+              </div>
+            ))}
           </div>
         )}
+
+        {/* Active filters badge removed — now using dropdown selects above */}
 
         {/* Search + filter bar */}
         <div className="iz-card" style={{ ...sCard, marginBottom: 16, display: "flex", alignItems: "center", gap: 12, padding: "10px 16px" }}>
@@ -557,6 +797,32 @@ export function createAdminDashboardSuivi(ctx: any) {
               }}>{label}</button>
             ))}
           </div>
+        </div>
+
+        {/* Advanced filters */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <select value={siteFilter} onChange={e => setSuiviSiteFilter(e.target.value)}
+            style={{ ...sInput, padding: "6px 10px", fontSize: 11, minWidth: 140, color: siteFilter ? C.text : C.textMuted }}>
+            <option value="">Tous les sites</option>
+            {uniqueSites.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={deptFilter} onChange={e => setSuiviDeptFilter(e.target.value)}
+            style={{ ...sInput, padding: "6px 10px", fontSize: 11, minWidth: 140, color: deptFilter ? C.text : C.textMuted }}>
+            <option value="">Tous les départements</option>
+            {uniqueDepts.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select value={suiviParcoursFilter || ''} onChange={e => setSuiviParcoursFilter(e.target.value || null)}
+            style={{ ...sInput, padding: "6px 10px", fontSize: 11, minWidth: 140, color: suiviParcoursFilter ? C.text : C.textMuted }}>
+            <option value="">Tous les parcours</option>
+            {PARCOURS_TEMPLATES.map((p: any) => <option key={p.id} value={p.nom}>{p.nom}</option>)}
+          </select>
+          {activeFilterCount > 0 && (
+            <button onClick={() => { setSuiviSiteFilter(''); setSuiviDeptFilter(''); setSuiviParcoursFilter(null); }}
+              style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: C.pink, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+              <X size={12} /> Effacer les filtres ({activeFilterCount})
+            </button>
+          )}
+          <span style={{ marginLeft: "auto", fontSize: 11, color: C.textMuted }}>{filtered.length} / {COLLABORATEURS.length} collaborateurs</span>
         </div>
 
         {/* Invite bar */}
@@ -582,7 +848,14 @@ export function createAdminDashboardSuivi(ctx: any) {
                 <div style={{ position: "absolute", bottom: -1, right: -1, width: 10, height: 10, borderRadius: "50%", background: c.status === "termine" ? C.green : c.status === "en_retard" ? C.red : C.blue, border: `2px solid ${C.white}` }} />
               </div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{c.prenom} {c.nom}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>
+                  {c.prenom} {c.nom}
+                  {!(c as any).parcours_id && (
+                    <span title="Aucun parcours assigné — ce collaborateur ne voit aucune action" style={{ display: "inline-flex", alignItems: "center", gap: 3, padding: "2px 7px", borderRadius: 10, fontSize: 10, fontWeight: 600, background: C.amberLight, color: C.amber, lineHeight: 1 }}>
+                      <AlertTriangle size={10} /> Sans parcours
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 11, color: C.textMuted }}>{c.poste} · {c.site}</div>
               </div>
             </div>
@@ -843,6 +1116,20 @@ export function createAdminDashboardSuivi(ctx: any) {
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
               <button onClick={() => setCollabProfileId(null)} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: C.text, fontFamily: font }}><ChevronLeft size={16} /> {t('misc.return')}</button>
               <button onClick={() => { setCollabPanelData({ ...collab, email: collab.email || "" }); setCollabPanelMode("edit"); }} style={{ ...sBtn("pink"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><FilePen size={14} /> Modifier</button>
+              {/* Générer un contrat */}
+              <button onClick={() => {
+                const contrats = ctx.contrats || [];
+                const activeContrats = contrats.filter((c: any) => c.actif);
+                if (activeContrats.length === 0) {
+                  addToast_admin("Aucun modèle de contrat actif. Créez-en un dans Contrats & Documents.");
+                  return;
+                }
+                ctx.setGenerateContrat(activeContrats[0]);
+                ctx.setGenerateCollabId(collab.id);
+              }} style={{ ...sBtn("outline"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, borderColor: C.green, color: C.green }}>
+                <FileSignature size={14} /> Générer un contrat
+              </button>
+              {/* Scanner OCR */}
               {(() => {
                 const hasAiPlan = tenantSubscriptions.some((s: any) => (s.status === "active" || s.status === "trialing") && s.plan?.addon_type === "ai");
                 return hasAiPlan ? (
@@ -984,7 +1271,7 @@ export function createAdminDashboardSuivi(ctx: any) {
               {(() => {
                 const activeFields = fieldConfig.filter(f => f.actif);
                 const fieldSections = [
-                  { key: "personal", label: "Informations personnelles", icon: Users, color: "#C2185B" },
+                  { key: "personal", label: "Informations personnelles", icon: Users, color: "#E41076" },
                   { key: "contract", label: "Informations contractuelles", icon: FileSignature, color: "#1A73E8" },
                   { key: "job", label: "Job Information", icon: ClipboardList, color: "#E65100" },
                   { key: "position", label: "Position Information", icon: Navigation, color: "#00897B" },
@@ -1028,7 +1315,7 @@ export function createAdminDashboardSuivi(ctx: any) {
             {collabProfileTab === "infos" && (() => {
               const activeFields = fieldConfig.filter(f => f.actif);
               const fieldSections = [
-                { key: "personal", label: lang === "fr" ? "Informations personnelles" : "Personal information", icon: Users, color: "#C2185B" },
+                { key: "personal", label: lang === "fr" ? "Informations personnelles" : "Personal information", icon: Users, color: "#E41076" },
                 { key: "contract", label: lang === "fr" ? "Informations contractuelles" : "Contract information", icon: FileSignature, color: "#1A73E8" },
                 { key: "job", label: "Job Information", icon: ClipboardList, color: "#E65100" },
                 { key: "position", label: "Position Information", icon: Navigation, color: "#00897B" },

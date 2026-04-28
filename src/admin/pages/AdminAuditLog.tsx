@@ -2,16 +2,17 @@
 import { t } from '../../i18n';
 import { C, colorWithAlpha, sCard, sBtn, sInput } from '../../constants';
 import {
-  Download, Search, Clock, ChevronRight, ClipboardCheck,
+  Download, Search, Clock, ChevronRight, ClipboardCheck, RefreshCw,
 } from 'lucide-react';
-import { exportAuditLog } from '../../api/endpoints';
+import { exportAuditLog, getAuditLogs } from '../../api/endpoints';
 
 export function createAdminAuditLog(ctx: any) {
   const {
     auditFilter, setAuditFilter, auditSearch, setAuditSearch,
     auditExpandedEntry, setAuditExpandedEntry,
     auditVisibleCount, setAuditVisibleCount,
-    addToast_admin, demoMode,
+    auditEntries, setAuditEntries, auditLoaded, setAuditLoaded,
+    addToast_admin,
   } = ctx;
 
   return function renderAdminAuditLog() {
@@ -20,58 +21,72 @@ export function createAdminAuditLog(ctx: any) {
     const visibleCount = auditVisibleCount;
     const setVisibleCount = setAuditVisibleCount;
 
-    const AUDIT_TYPES = {
-      collab_created: { label: "Collaborateur cree", cat: "collabs", color: "#4CAF50", bg: "#E8F5E9" },
-      collab_updated: { label: "Collaborateur modifié", cat: "collabs", color: "#1A73E8", bg: "#E3F2FD" },
-      collab_deleted: { label: "Collaborateur supprimé", cat: "collabs", color: "#E53935", bg: "#FFEBEE" },
-      doc_validated: { label: "Document validé", cat: "docs", color: "#4CAF50", bg: "#E8F5E9" },
-      doc_refused: { label: "Document refusé", cat: "docs", color: "#E53935", bg: "#FFEBEE" },
+    // Action → display metadata
+    const ACTION_META: Record<string, { label: string; cat: string; color: string; bg: string }> = {
+      collaborateur_created: { label: "Collaborateur créé", cat: "collabs", color: "#4CAF50", bg: "#E8F5E9" },
+      collaborateur_updated: { label: "Collaborateur modifié", cat: "collabs", color: "#1A73E8", bg: "#E3F2FD" },
+      collaborateur_deleted: { label: "Collaborateur supprimé", cat: "collabs", color: "#E53935", bg: "#FFEBEE" },
+      document_created: { label: "Document ajouté", cat: "docs", color: "#4CAF50", bg: "#E8F5E9" },
+      document_updated: { label: "Document modifié", cat: "docs", color: "#1A73E8", bg: "#E3F2FD" },
+      document_deleted: { label: "Document supprimé", cat: "docs", color: "#E53935", bg: "#FFEBEE" },
+      signaturedocument_created: { label: "Signature créée", cat: "docs", color: "#4CAF50", bg: "#E8F5E9" },
+      signaturedocument_updated: { label: "Signature modifiée", cat: "docs", color: "#1A73E8", bg: "#E3F2FD" },
+      signaturedocument_deleted: { label: "Signature supprimée", cat: "docs", color: "#E53935", bg: "#FFEBEE" },
       parcours_created: { label: "Parcours créé", cat: "parcours", color: "#4CAF50", bg: "#E8F5E9" },
       parcours_updated: { label: "Parcours modifié", cat: "parcours", color: "#1A73E8", bg: "#E3F2FD" },
-      role_assigned: { label: "Rôle assigné", cat: "roles", color: "#7B5EA7", bg: "#F3E5F5" },
+      parcours_deleted: { label: "Parcours supprimé", cat: "parcours", color: "#E53935", bg: "#FFEBEE" },
+      action_created: { label: "Action créée", cat: "parcours", color: "#4CAF50", bg: "#E8F5E9" },
+      action_updated: { label: "Action modifiée", cat: "parcours", color: "#1A73E8", bg: "#E3F2FD" },
+      action_deleted: { label: "Action supprimée", cat: "parcours", color: "#E53935", bg: "#FFEBEE" },
+      phase_created: { label: "Phase créée", cat: "parcours", color: "#4CAF50", bg: "#E8F5E9" },
+      phase_updated: { label: "Phase modifiée", cat: "parcours", color: "#1A73E8", bg: "#E3F2FD" },
+      phase_deleted: { label: "Phase supprimée", cat: "parcours", color: "#E53935", bg: "#FFEBEE" },
+      user_created: { label: "Utilisateur créé", cat: "roles", color: "#4CAF50", bg: "#E8F5E9" },
+      user_updated: { label: "Utilisateur modifié", cat: "roles", color: "#1A73E8", bg: "#E3F2FD" },
+      user_deleted: { label: "Utilisateur supprimé", cat: "roles", color: "#E53935", bg: "#FFEBEE" },
+      role_created: { label: "Rôle créé", cat: "roles", color: "#7B5EA7", bg: "#F3E5F5" },
       role_updated: { label: "Rôle modifié", cat: "roles", color: "#1A73E8", bg: "#E3F2FD" },
-      settings_updated: { label: "Paramètre modifié", cat: "settings", color: "#F9A825", bg: "#FFF8E1" },
+      role_deleted: { label: "Rôle supprimé", cat: "roles", color: "#E53935", bg: "#FFEBEE" },
       login: { label: "Connexion", cat: "settings", color: "#00897B", bg: "#E0F2F1" },
+      logout: { label: "Déconnexion", cat: "settings", color: "#607D8B", bg: "#ECEFF1" },
       password_changed: { label: "Mot de passe changé", cat: "settings", color: "#FF6B35", bg: "#FFF3E0" },
       export_data: { label: "Export de données", cat: "settings", color: "#3F51B5", bg: "#E8EAF6" },
+      companysetting_updated: { label: "Paramètre modifié", cat: "settings", color: "#F9A825", bg: "#FFF8E1" },
+      integration_updated: { label: "Intégration modifiée", cat: "settings", color: "#1A73E8", bg: "#E3F2FD" },
+      workflow_created: { label: "Workflow créé", cat: "settings", color: "#4CAF50", bg: "#E8F5E9" },
+      workflow_updated: { label: "Workflow modifié", cat: "settings", color: "#1A73E8", bg: "#E3F2FD" },
+      workflow_deleted: { label: "Workflow supprimé", cat: "settings", color: "#E53935", bg: "#FFEBEE" },
+      equipment_created: { label: "Matériel créé", cat: "collabs", color: "#4CAF50", bg: "#E8F5E9" },
+      equipment_updated: { label: "Matériel modifié", cat: "collabs", color: "#1A73E8", bg: "#E3F2FD" },
+      equipment_deleted: { label: "Matériel supprimé", cat: "collabs", color: "#E53935", bg: "#FFEBEE" },
+      contrat_created: { label: "Contrat créé", cat: "docs", color: "#4CAF50", bg: "#E8F5E9" },
+      contrat_updated: { label: "Contrat modifié", cat: "docs", color: "#1A73E8", bg: "#E3F2FD" },
+      contrat_deleted: { label: "Contrat supprimé", cat: "docs", color: "#E53935", bg: "#FFEBEE" },
+      cooptation_created: { label: "Cooptation créée", cat: "collabs", color: "#E91E8C", bg: "#FCE4EC" },
+      cooptation_updated: { label: "Cooptation modifiée", cat: "collabs", color: "#1A73E8", bg: "#E3F2FD" },
+      cooptation_deleted: { label: "Cooptation supprimée", cat: "collabs", color: "#E53935", bg: "#FFEBEE" },
+      groupe_created: { label: "Groupe créé", cat: "collabs", color: "#4CAF50", bg: "#E8F5E9" },
+      groupe_updated: { label: "Groupe modifié", cat: "collabs", color: "#1A73E8", bg: "#E3F2FD" },
+      groupe_deleted: { label: "Groupe supprimé", cat: "collabs", color: "#E53935", bg: "#FFEBEE" },
+      emailtemplate_created: { label: "Template email créé", cat: "settings", color: "#4CAF50", bg: "#E8F5E9" },
+      emailtemplate_updated: { label: "Template email modifié", cat: "settings", color: "#1A73E8", bg: "#E3F2FD" },
+      emailtemplate_deleted: { label: "Template email supprimé", cat: "settings", color: "#E53935", bg: "#FFEBEE" },
     };
-    type AuditType = keyof typeof AUDIT_TYPES;
 
-    const MOCK_USERS = demoMode ? ["Sophie Martin", "Julien Dupont", "Marie Bernard", "Thomas Petit", "Camille Robert", "Admin RH"] : [];
-    const now = Date.now();
-    const MOCK_ENTRIES = (() => {
-      if (!demoMode) return [];
-      const types: AuditType[] = Object.keys(AUDIT_TYPES) as AuditType[];
-      const entries: { id: number; type: AuditType; description: string; user: string; timestamp: number; details: Record<string, any> }[] = [];
-      const descriptions: Record<AuditType, string[]> = {
-        collab_created: ["Ajout de Pierre Durand (Dev)", "Ajout de Claire Moreau (Marketing)", "Ajout de Lucas Leroy (Commercial)"],
-        collab_updated: ["Modification du poste de J. Dupont", "Changement de département pour M. Bernard", "MAJ coordonnées de T. Petit"],
-        collab_deleted: ["Suppression du profil de A. Blanc (départ)", "Archivage du collaborateur R. Morel"],
-        doc_validated: ["CNI validée pour P. Durand", "RIB validé pour C. Moreau", "Attestation SS validée pour L. Leroy"],
-        doc_refused: ["Justificatif domicile refusé pour T. Petit (illisible)", "Photo identité refusée pour M. Bernard (format)"],
-        parcours_created: ["Création du parcours 'Onboarding Dev 2026'", "Nouveau parcours 'Accueil Marketing'"],
-        parcours_updated: ["MAJ phases du parcours 'Onboarding Standard'", "Ajout d'une action au parcours 'Commercial'"],
-        role_assigned: ["Rôle 'RH Manager' assigné à S. Martin", "Rôle 'Team Lead' assigné à J. Dupont"],
-        role_updated: ["Modification des permissions du rôle 'Éditeur'", "Mise à jour du rôle 'Lecteur'"],
-        settings_updated: ["Changement du thème de couleur", "MAJ des paramètres de notification", "Activation du module Cooptation"],
-        login: ["Connexion depuis 192.168.1.45", "Connexion depuis 10.0.0.12", "Connexion depuis mobile"],
-        password_changed: ["Réinitialisation du mot de passe", "Changement de mot de passe (utilisateur)"],
-        export_data: ["Export CSV des collaborateurs", "Export du journal d'audit", "Export des documents RH"],
-      };
-      for (let i = 0; i < 32; i++) {
-        const type = types[i % types.length];
-        const descs = descriptions[type];
-        entries.push({
-          id: i + 1,
-          type,
-          description: descs[i % descs.length],
-          user: MOCK_USERS[i % MOCK_USERS.length],
-          timestamp: now - i * 3600000 * (2 + Math.floor(i / 5)),
-          details: { ip: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`, agent: "Chrome/126.0", module: AUDIT_TYPES[type].cat },
-        });
-      }
-      return entries;
-    })();
+    const DEFAULT_META = { label: "Action", cat: "settings", color: "#607D8B", bg: "#ECEFF1" };
+
+    // Load entries from API
+    if (!auditLoaded) {
+      setAuditLoaded(true);
+      getAuditLogs({ limit: 200 }).then(setAuditEntries).catch(() => {});
+    }
+
+    const reload = () => {
+      setAuditLoaded(false);
+      getAuditLogs({ category: auditFilter !== "all" ? auditFilter : undefined, search: auditSearch || undefined, limit: 200 })
+        .then(setAuditEntries).catch(() => {});
+      setAuditLoaded(true);
+    };
 
     const filterTabs: { key: string; label: string }[] = [
       { key: "all", label: t('audit.all') },
@@ -82,22 +97,24 @@ export function createAdminAuditLog(ctx: any) {
       { key: "roles", label: t('audit.roles') },
     ];
 
+    const entries: any[] = auditEntries || [];
     const search = auditSearch.toLowerCase();
-    const filtered = MOCK_ENTRIES.filter(e => {
-      if (auditFilter !== "all" && AUDIT_TYPES[e.type].cat !== auditFilter) return false;
-      if (search && !e.description.toLowerCase().includes(search) && !e.user.toLowerCase().includes(search) && !AUDIT_TYPES[e.type].label.toLowerCase().includes(search)) return false;
+    const filtered = entries.filter((e: any) => {
+      const meta = ACTION_META[e.action] || DEFAULT_META;
+      if (auditFilter !== "all" && meta.cat !== auditFilter) return false;
+      if (search && !(e.description || "").toLowerCase().includes(search) && !(e.user_name || "").toLowerCase().includes(search) && !(e.entity_label || "").toLowerCase().includes(search)) return false;
       return true;
     });
     const visible = filtered.slice(0, visibleCount);
 
-    const fmtTs = (ts: number) => {
+    const fmtTs = (ts: string) => {
       const d = new Date(ts);
       const pad = (n: number) => n.toString().padStart(2, "0");
       return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
 
-    const borderColor = (type: AuditType) => {
-      const cat = AUDIT_TYPES[type].cat;
+    const borderColor = (action: string) => {
+      const cat = (ACTION_META[action] || DEFAULT_META).cat;
       if (cat === "collabs") return "#4CAF50";
       if (cat === "docs") return "#1A73E8";
       if (cat === "parcours") return "#F9A825";
@@ -113,10 +130,23 @@ export function createAdminAuditLog(ctx: any) {
             <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('audit.title')}</h1>
             <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>{t('audit.desc')}</p>
           </div>
-          <button onClick={() => { exportAuditLog().catch(() => addToast_admin(t('audit.export'), "success")); }}
-            className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}>
-            <Download size={14} /> {t('audit.export')}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={reload}
+              className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6 }}>
+              <RefreshCw size={14} /> Actualiser
+            </button>
+            <button onClick={async () => {
+              try {
+                const blob = await exportAuditLog();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url);
+                addToast_admin(t('audit.export'));
+              } catch { addToast_admin("Erreur d'export"); }
+            }}
+              className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}>
+              <Download size={14} /> {t('audit.export')}
+            </button>
+          </div>
         </div>
 
         {/* Filter tabs */}
@@ -144,18 +174,18 @@ export function createAdminAuditLog(ctx: any) {
         {visible.length === 0 ? (
           <div style={{ textAlign: "center", padding: "60px 0", color: C.textMuted }}>
             <ClipboardCheck size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
-            <div style={{ fontSize: 14 }}>{t('audit.no_entries')}</div>
+            <div style={{ fontSize: 14 }}>{entries.length === 0 ? "Aucune activité enregistrée" : t('audit.no_entries')}</div>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {visible.map((entry, idx) => {
-              const meta = AUDIT_TYPES[entry.type];
+            {visible.map((entry: any, idx: number) => {
+              const meta = ACTION_META[entry.action] || DEFAULT_META;
               const isExpanded = expandedEntry === entry.id;
               return (
                 <div key={entry.id}
                   onClick={() => setExpandedEntry(isExpanded ? null : entry.id)}
                   style={{
-                    cursor: "pointer", padding: "14px 20px", borderLeft: `4px solid ${borderColor(entry.type)}`,
+                    cursor: "pointer", padding: "14px 20px", borderLeft: `4px solid ${borderColor(entry.action)}`,
                     background: isExpanded ? colorWithAlpha(meta.color, 0.04) : (idx % 2 === 0 ? C.white : C.bg),
                     borderBottom: `1px solid ${C.border}`, transition: "background 0.15s",
                   }}
@@ -163,33 +193,43 @@ export function createAdminAuditLog(ctx: any) {
                   onMouseOut={e => { if (!isExpanded) e.currentTarget.style.background = idx % 2 === 0 ? C.white : C.bg; }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-                      {/* Type badge */}
                       <span style={{
                         fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 99,
                         background: meta.bg, color: meta.color, whiteSpace: "nowrap",
                       }}>{meta.label}</span>
-                      {/* Description */}
-                      <span style={{ fontSize: 13, color: C.text, flex: 1 }}>{entry.description}</span>
+                      <span style={{ fontSize: 13, color: C.text, flex: 1 }}>{entry.description || entry.entity_label || entry.action}</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}>
-                      {/* Timestamp */}
                       <span style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>
-                        <Clock size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{fmtTs(entry.timestamp)}
+                        <Clock size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />{fmtTs(entry.created_at)}
                       </span>
-                      {/* User */}
-                      <span style={{ fontSize: 12, fontWeight: 600, color: C.textLight, minWidth: 120, textAlign: "right" }}>{entry.user}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: C.textLight, minWidth: 120, textAlign: "right" }}>{entry.user_name || "—"}</span>
                       <ChevronRight size={14} color={C.textMuted} style={{ transform: isExpanded ? "rotate(90deg)" : "none", transition: "transform 0.2s" }} />
                     </div>
                   </div>
-                  {/* Expanded details */}
                   {isExpanded && (
                     <div style={{ marginTop: 12, padding: "12px 16px", background: C.bg, borderRadius: 8, fontSize: 12, fontFamily: "monospace", color: C.textLight, lineHeight: 1.8 }}>
-                      {Object.entries(entry.details).map(([k, v]) => (
-                        <div key={k}><span style={{ color: C.pink, fontWeight: 600 }}>"{k}"</span>: <span style={{ color: C.blue }}>"{v}"</span></div>
-                      ))}
-                      <div><span style={{ color: C.pink, fontWeight: 600 }}>"timestamp"</span>: <span style={{ color: C.blue }}>"{new Date(entry.timestamp).toISOString()}"</span></div>
-                      <div><span style={{ color: C.pink, fontWeight: 600 }}>"user"</span>: <span style={{ color: C.blue }}>"{entry.user}"</span></div>
-                      <div><span style={{ color: C.pink, fontWeight: 600 }}>"type"</span>: <span style={{ color: C.blue }}>"{entry.type}"</span></div>
+                      {entry.ip_address && <div><span style={{ color: C.pink, fontWeight: 600 }}>"ip"</span>: <span style={{ color: C.blue }}>"{entry.ip_address}"</span></div>}
+                      <div><span style={{ color: C.pink, fontWeight: 600 }}>"action"</span>: <span style={{ color: C.blue }}>"{entry.action}"</span></div>
+                      {entry.entity_type && <div><span style={{ color: C.pink, fontWeight: 600 }}>"entity"</span>: <span style={{ color: C.blue }}>"{entry.entity_type}#{entry.entity_id}"</span></div>}
+                      <div><span style={{ color: C.pink, fontWeight: 600 }}>"user"</span>: <span style={{ color: C.blue }}>"{entry.user_name}"</span></div>
+                      <div><span style={{ color: C.pink, fontWeight: 600 }}>"timestamp"</span>: <span style={{ color: C.blue }}>"{entry.created_at}"</span></div>
+                      {entry.old_values && Object.keys(entry.old_values).length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontWeight: 600, color: C.red, marginBottom: 4 }}>Anciennes valeurs :</div>
+                          {Object.entries(entry.old_values).map(([k, v]) => (
+                            <div key={k} style={{ paddingLeft: 12 }}><span style={{ color: C.textMuted }}>{k}:</span> <span style={{ color: C.red }}>{String(v)}</span></div>
+                          ))}
+                        </div>
+                      )}
+                      {entry.new_values && Object.keys(entry.new_values).length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontWeight: 600, color: C.green, marginBottom: 4 }}>Nouvelles valeurs :</div>
+                          {Object.entries(entry.new_values).map(([k, v]) => (
+                            <div key={k} style={{ paddingLeft: 12 }}><span style={{ color: C.textMuted }}>{k}:</span> <span style={{ color: C.green }}>{String(v)}</span></div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -201,9 +241,9 @@ export function createAdminAuditLog(ctx: any) {
         {/* Load more */}
         {visibleCount < filtered.length && (
           <div style={{ textAlign: "center", marginTop: 20 }}>
-            <button onClick={() => setVisibleCount(v => v + 15)}
+            <button onClick={() => setVisibleCount((v: number) => v + 15)}
               style={{ ...sBtn("outline"), fontSize: 13, padding: "10px 28px", color: C.pink, border: `1px solid ${C.pink}`, borderRadius: 8 }}>
-              {t('audit.all')} ({filtered.length - visibleCount} restants)
+              Voir plus ({filtered.length - visibleCount} restants)
             </button>
           </div>
         )}
@@ -211,7 +251,7 @@ export function createAdminAuditLog(ctx: any) {
         {/* Summary bar */}
         <div style={{ display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap" }}>
           {filterTabs.filter(f => f.key !== "all").map(ft => {
-            const count = MOCK_ENTRIES.filter(e => AUDIT_TYPES[e.type].cat === ft.key).length;
+            const count = entries.filter((e: any) => (ACTION_META[e.action] || DEFAULT_META).cat === ft.key).length;
             const colors: Record<string, string> = { collabs: "#4CAF50", docs: "#1A73E8", parcours: "#F9A825", settings: "#00897B", roles: "#7B5EA7" };
             return (
               <div key={ft.key} className="iz-card" style={{ ...sCard, padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, flex: 1, minWidth: 120 }}>

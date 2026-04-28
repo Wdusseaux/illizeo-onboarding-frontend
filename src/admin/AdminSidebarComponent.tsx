@@ -183,6 +183,7 @@ export function createAdminSidebarComponent(ctx: any) {
       admin_gamification: "gamification",
       admin_equipements: "onboarding",
       admin_nps: "nps",
+      admin_feedback_hub: "nps",
       admin_2fa: "sso",
       admin_provisioning: "provisioning",
     };
@@ -205,10 +206,14 @@ export function createAdminSidebarComponent(ctx: any) {
 
   // ─── ADMIN SIDEBAR DATA ─────────────────────────────────
     const SIDEBAR = [
-      { section: t('admin.dashboard_title'), items: [{ id: "admin_dashboard" as AdminPage, label: t('sidebar.dashboard'), icon: LayoutDashboard }] },
+      { section: t('admin.dashboard_title'), items: [
+        { id: "admin_dashboard" as AdminPage, label: t('sidebar.dashboard'), icon: LayoutDashboard },
+        { id: "admin_assistant_ia" as AdminPage, label: "Assistant IA", icon: Sparkles },
+      ] },
       { section: t('admin.management'), items: [
         { id: "admin_parcours" as AdminPage, label: t('admin.parcours_actions'), icon: Route },
         { id: "admin_suivi" as AdminPage, label: t('admin.collaborateur_tracking'), icon: Users },
+        { id: "admin_manager_view" as AdminPage, label: "Vue Manager", icon: UserCheck },
         { id: "admin_documents" as AdminPage, label: t('admin.documents'), icon: FileText },
         { id: "admin_equipes" as AdminPage, label: t('admin.teams_groups'), icon: Users },
         { id: "admin_messagerie" as AdminPage, label: t('admin.messaging'), icon: MessageCircle },
@@ -223,8 +228,11 @@ export function createAdminSidebarComponent(ctx: any) {
       ]},
       { section: t('admin.content'), items: [
         { id: "admin_entreprise" as AdminPage, label: t('admin.company_page'), icon: Building2 },
+        { id: "admin_quotes" as AdminPage, label: "Citations du jour", icon: BookOpen },
+        { id: "admin_recurring_meetings" as AdminPage, label: "RDV récurrents", icon: CalendarClock },
         { id: "admin_equipements" as AdminPage, label: t('admin.equipment'), icon: Laptop },
         { id: "admin_nps" as AdminPage, label: t('admin.nps'), icon: Star },
+        { id: "admin_feedback_hub" as AdminPage, label: "Feedback collaborateurs", icon: MessageSquare },
         { id: "admin_contrats" as AdminPage, label: t('admin.contracts_signatures'), icon: FileSignature },
         { id: "admin_cooptation" as AdminPage, label: t('admin.cooptation'), icon: Handshake },
         { id: "admin_gamification" as AdminPage, label: t('admin.gamification'), icon: Trophy },
@@ -369,7 +377,7 @@ export function createAdminSidebarComponent(ctx: any) {
     const loadSA = () => {
       superAdminDashboard().then(setSaDashData).catch(e => { console.error("SA dashboard error:", e); setSaDashData({ total_tenants: 0, active_subscriptions: 0, mrr_eur: 0, mrr_chf: 0, total_collaborateurs: 0 }); });
       superAdminListTenants().then(setSaTenants).catch(() => setSaTenants([]));
-      superAdminListPlans().then(setSaPlans).catch(() => setSaPlans([]));
+      superAdminListPlans().then(data => { console.log('SA plans loaded:', data?.length); setSaPlans(data || []); }).catch(e => { console.error('SA plans error:', e); setSaPlans([]); });
       superAdminListSubscriptions().then(setSaSubscriptions).catch(() => setSaSubscriptions([]));
       superAdminGetStripeConfig().then(setSaStripe).catch(() => setSaStripe({ has_key: false, has_secret: false, has_webhook: false }));
     };
@@ -377,7 +385,7 @@ export function createAdminSidebarComponent(ctx: any) {
     return (
       <div style={{ display: "flex", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text }}>
         <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         {/* Sidebar */}
         <div style={{ width: 220, minHeight: "100vh", background: C.dark, display: "flex", flexDirection: "column", flexShrink: 0 }}>
           <div style={{ padding: "20px 16px", color: C.white, fontSize: 16, fontWeight: 700 }}>{t('role.super_admin')}</div>
@@ -388,6 +396,7 @@ export function createAdminSidebarComponent(ctx: any) {
             { id: "subscriptions" as const, label: t('sa.subscriptions'), icon: FileSignature },
             { id: "stripe" as const, label: "Stripe", icon: CircleDollarSign },
             { id: "ai" as const, label: "IA & Claude", icon: Sparkles },
+            { id: "ai_protection" as const, label: "Protection IA", icon: ShieldCheck },
           ]).map(item => (
             <button key={item.id} onClick={() => setSaTab(item.id)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 16px", border: "none", background: saTab === item.id ? "rgba(255,255,255,.1)" : "transparent", color: saTab === item.id ? C.white : "rgba(255,255,255,.5)", cursor: "pointer", fontFamily: font, fontSize: 13, fontWeight: saTab === item.id ? 600 : 400, borderLeft: saTab === item.id ? `3px solid ${C.pink}` : "3px solid transparent" }}>
               <item.icon size={16} /> {item.label}
@@ -426,16 +435,118 @@ export function createAdminSidebarComponent(ctx: any) {
                 <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 0.8fr 0.5fr", gap: 0, padding: "10px 16px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
                   <span>Tenant</span><span>Plan</span><span>Email facturation</span><span>Statut</span><span></span>
                 </div>
-                {saTenants.map(t => (
-                  <div key={t.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 0.8fr 0.5fr", gap: 0, padding: "12px 16px", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13 }}>
-                    <div><div style={{ fontWeight: 600 }}>{t.nom || t.id}</div><div style={{ fontSize: 11, color: C.textMuted }}>{t.id}.illizeo.com</div></div>
-                    <div style={{ fontSize: 12 }}>{t.plan || "—"}</div>
-                    <div style={{ fontSize: 12, color: C.textLight }}>{t.billing_email || "—"}</div>
-                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: t.actif ? C.greenLight : C.redLight, color: t.actif ? C.green : C.red }}>{t.actif ? "Actif" : "Inactif"}</span>
-                    <button onClick={() => showConfirm(`Supprimer le tenant ${t.id} et toutes ses données ?`, async () => { try { await superAdminDeleteTenant(t.id); loadSA(); addToast_admin("Tenant supprimé"); } catch { addToast_admin(t('toast.error')); } })} style={{ background: C.redLight, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><Trash size={14} color={C.red} /></button>
+                {saTenants.map(tn => (
+                  <div key={tn.id} onClick={() => { ctx._saSelectedTenant = tn; ctx._saSelectedTenantDetail = null; apiFetch(`/super-admin/tenants/${tn.id}`).then((d: any) => { ctx._saSelectedTenantDetail = d; loadSA(); }).catch(() => {}); loadSA(); }}
+                    style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 0.8fr 0.5fr", gap: 0, padding: "12px 16px", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13, cursor: "pointer", transition: "background .1s" }}
+                    onMouseEnter={e => e.currentTarget.style.background = C.bg} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <div><div style={{ fontWeight: 600 }}>{tn.nom || tn.id}</div><div style={{ fontSize: 11, color: C.textMuted }}>{tn.id}.illizeo.com</div></div>
+                    <div style={{ fontSize: 12 }}>{tn.plan || "—"}</div>
+                    <div style={{ fontSize: 12, color: C.textLight }}>{tn.billing_email || "—"}</div>
+                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: tn.actif ? C.greenLight : C.redLight, color: tn.actif ? C.green : C.red }}>{tn.actif ? "Actif" : "Inactif"}</span>
+                    <button onClick={(e) => { e.stopPropagation(); showConfirm(`Supprimer le tenant ${tn.id} et toutes ses données ?`, async () => { try { await superAdminDeleteTenant(tn.id); loadSA(); addToast_admin("Tenant supprimé"); } catch { addToast_admin("Erreur"); } }); }} style={{ background: C.redLight, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><Trash size={14} color={C.red} /></button>
                   </div>
                 ))}
               </div>
+
+              {/* ── Tenant Detail Panel ── */}
+              {ctx._saSelectedTenant && (() => {
+                const tn = ctx._saSelectedTenant;
+                const detail = ctx._saSelectedTenantDetail;
+                const aiUsage = (ctx.saAiTenantUsage || []).find((u: any) => u.tenant_id === tn.id);
+                return (
+                  <>
+                    <div onClick={() => { ctx._saSelectedTenant = null; loadSA(); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
+                    <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 640, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
+                      <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div>
+                          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{tn.nom || tn.id}</h2>
+                          <div style={{ fontSize: 12, color: C.textMuted }}>{tn.id}.illizeo.com</div>
+                        </div>
+                        <button onClick={() => { ctx._saSelectedTenant = null; loadSA(); }} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
+                      </div>
+                      <div style={{ flex: 1, padding: 24, overflow: "auto" }}>
+
+                        {/* Info cards */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+                          <div style={{ padding: "14px 16px", borderRadius: 10, background: C.bg }}>
+                            <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>Plan</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{tn.plan || "—"}</div>
+                          </div>
+                          <div style={{ padding: "14px 16px", borderRadius: 10, background: tn.actif ? C.greenLight : C.redLight }}>
+                            <div style={{ fontSize: 10, color: tn.actif ? C.green : C.red, marginBottom: 4 }}>Statut</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: tn.actif ? C.green : C.red }}>{tn.actif ? "Actif" : "Inactif"}</div>
+                          </div>
+                          <div style={{ padding: "14px 16px", borderRadius: 10, background: C.blueLight }}>
+                            <div style={{ fontSize: 10, color: C.blue, marginBottom: 4 }}>Collaborateurs</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: C.blue }}>{tn.nombre_collaborateurs || 0}</div>
+                          </div>
+                        </div>
+
+                        {/* Subscription details */}
+                        <div className="iz-card" style={{ ...sCard, marginBottom: 16 }}>
+                          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Abonnement</h3>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 12 }}>
+                            <div><span style={{ color: C.textMuted }}>Email facturation :</span> <b>{tn.billing_email || "—"}</b></div>
+                            <div><span style={{ color: C.textMuted }}>Statut :</span> <b>{tn.subscription_status || "—"}</b></div>
+                            <div><span style={{ color: C.textMuted }}>Créé le :</span> <b>{tn.created_at ? fmtDate(tn.created_at) : "—"}</b></div>
+                            {detail?.subscription && <div><span style={{ color: C.textMuted }}>Période :</span> <b>{fmtDate(detail.subscription.current_period_start)} → {fmtDate(detail.subscription.current_period_end)}</b></div>}
+                          </div>
+                        </div>
+
+                        {/* AI Usage */}
+                        {aiUsage && (
+                          <div className="iz-card" style={{ ...sCard, marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} color={C.blue} /> Consommation IA</h3>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+                              <div style={{ textAlign: "center", padding: "10px", borderRadius: 8, background: C.bg }}>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: C.blue }}>{aiUsage.ocr_scans}</div>
+                                <div style={{ fontSize: 10, color: C.textMuted }}>OCR</div>
+                              </div>
+                              <div style={{ textAlign: "center", padding: "10px", borderRadius: 8, background: C.bg }}>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: "#7B5EA7" }}>{aiUsage.bot_messages}</div>
+                                <div style={{ fontSize: 10, color: C.textMuted }}>Messages IA</div>
+                              </div>
+                              <div style={{ textAlign: "center", padding: "10px", borderRadius: 8, background: C.bg }}>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: C.pink }}>{aiUsage.contrat_generations}</div>
+                                <div style={{ fontSize: 10, color: C.textMuted }}>Contrats IA</div>
+                              </div>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                              <div style={{ padding: "8px 12px", borderRadius: 8, background: C.bg, fontSize: 12 }}>
+                                <div style={{ color: C.textMuted, fontSize: 10 }}>Coût Claude</div>
+                                <div style={{ fontWeight: 600 }}>{aiUsage.cost_chf?.toFixed(2)} CHF</div>
+                              </div>
+                              <div style={{ padding: "8px 12px", borderRadius: 8, background: C.greenLight, fontSize: 12 }}>
+                                <div style={{ color: C.green, fontSize: 10 }}>Facturé (x2)</div>
+                                <div style={{ fontWeight: 600, color: C.green }}>{aiUsage.billed_chf?.toFixed(2)} CHF</div>
+                              </div>
+                              <div style={{ padding: "8px 12px", borderRadius: 8, background: "#E8F5E9", fontSize: 12 }}>
+                                <div style={{ color: "#2E7D32", fontSize: 10 }}>Marge</div>
+                                <div style={{ fontWeight: 600, color: "#2E7D32" }}>{aiUsage.margin_chf?.toFixed(2)} CHF</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Invoices */}
+                        {detail?.invoices && detail.invoices.length > 0 && (
+                          <div className="iz-card" style={{ ...sCard }}>
+                            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Factures ({detail.invoices.length})</h3>
+                            {detail.invoices.slice(0, 10).map((inv: any) => (
+                              <div key={inv.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: 12 }}>
+                                <span>{inv.numero || `#${inv.id}`}</span>
+                                <span style={{ color: C.textMuted }}>{fmtDate(inv.date || inv.created_at)}</span>
+                                <span style={{ fontWeight: 600 }}>{inv.montant_chf || inv.montant || 0} CHF</span>
+                                <span style={{ padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: inv.statut === "payee" ? C.greenLight : C.amberLight, color: inv.statut === "payee" ? C.green : C.amber }}>{inv.statut || "—"}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           )}
 
@@ -454,8 +565,10 @@ export function createAdminSidebarComponent(ctx: any) {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
-                {saPlans.sort((a, b) => a.ordre - b.ordre).map(plan => {
+              {/* ── Section Plans ── */}
+              <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}><Package size={18} color={C.pink} /> Plans</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20, marginBottom: 32 }}>
+                {saPlans.filter(p => !p.is_addon && !p.addon_type).sort((a, b) => a.ordre - b.ordre).map(plan => {
                   const allModules = ["onboarding","offboarding","crossboarding","cooptation","nps","signature","sso","provisioning","api","white_label","gamification"];
                   const moduleLabels: Record<string, string> = { onboarding: "Onboarding", offboarding: "Offboarding", crossboarding: "Crossboarding", cooptation: "Cooptation", nps: "NPS", signature: "Signature", sso: "SSO", provisioning: "Provisionnement", api: "API", white_label: "White-label", gamification: "Gamification" };
                   return (
@@ -535,7 +648,82 @@ export function createAdminSidebarComponent(ctx: any) {
                   );
                 })}
               </div>
-              {saPlans.length === 0 && <div style={{ padding: 40, textAlign: "center", color: C.textMuted }}>Chargement des plans...</div>}
+
+              {/* ── Section Apps / Add-ons ── */}
+              {saPlans.filter(p => p.is_addon || p.addon_type).length > 0 && (
+                <>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px", display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={18} color={C.blue} /> Apps & Modules complémentaires</h2>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20, marginBottom: 20 }}>
+                    {saPlans.filter(p => p.is_addon || p.addon_type).sort((a, b) => a.ordre - b.ordre).map(plan => {
+                      const allModules = ["onboarding","offboarding","crossboarding","cooptation","nps","signature","sso","provisioning","api","white_label","gamification"];
+                      const moduleLabels: Record<string, string> = { onboarding: "Onboarding", offboarding: "Offboarding", crossboarding: "Crossboarding", cooptation: "Cooptation", nps: "NPS", signature: "Signature", sso: "SSO", provisioning: "Provisionnement", api: "API", white_label: "White-label", gamification: "Gamification" };
+                      const isAi = plan.addon_type === "ai" || plan.slug?.startsWith("ia_");
+                      const addonColor = isAi ? C.blue : "#7B5EA7";
+                      const addonLabel = isAi ? "IA" : plan.addon_type === "cooptation" ? "Cooptation" : "Add-on";
+                      return (
+                      <div key={plan.id} className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden", borderTop: `3px solid ${addonColor}` }}>
+                        <div style={{ padding: "20px 24px" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                            <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 9, fontWeight: 700, background: addonColor + "15", color: addonColor, textTransform: "uppercase", letterSpacing: .5 }}>{addonLabel}</span>
+                            <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: plan.actif ? C.greenLight : C.redLight, color: plan.actif ? C.green : C.red }}>{plan.actif ? "Actif" : "Inactif"}</span>
+                          </div>
+                          <h3 style={{ fontSize: 18, fontWeight: 700, margin: "8px 0 12px" }}>{plan.nom}</h3>
+
+                          <div style={{ background: C.bg, borderRadius: 10, padding: "12px 14px", marginBottom: 14 }}>
+                            <div style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{plan.prix_chf_mensuel} <span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted }}>CHF/mois</span></div>
+                            {plan.description && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{plan.description}</div>}
+                          </div>
+
+                          {/* AI quotas */}
+                          {isAi && (
+                            <div style={{ marginBottom: 14 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: addonColor }}>Quotas IA</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11, color: C.textLight }}>
+                                {plan.ai_ocr_scans > 0 && <span>OCR : <b style={{ color: C.text }}>{plan.ai_ocr_scans}</b> scans/mois</span>}
+                                {plan.ai_bot_messages > 0 && <span>Messages IA : <b style={{ color: C.text }}>{plan.ai_bot_messages}</b>/mois</span>}
+                                {plan.ai_contrat_generations > 0 && <span>Contrats IA : <b style={{ color: C.text }}>{plan.ai_contrat_generations}</b>/mois</span>}
+                                {plan.ai_translations > 0 && <span>Traductions IA : <b style={{ color: C.text }}>{plan.ai_translations}</b>/mois</span>}
+                                {plan.ai_model && <span>Modèle : <b style={{ color: C.text }}>{plan.ai_model}</b></span>}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Price conversions */}
+                          {(() => {
+                            const rates = ctx._exchangeRates?.rates;
+                            if (!rates && !ctx._exchangeRatesLoaded) {
+                              ctx._exchangeRatesLoaded = true;
+                              import('../api/endpoints').then(m => m.getExchangeRates()).then((d: any) => {
+                                ctx._exchangeRates = d;
+                                loadSA();
+                              }).catch(() => {});
+                            }
+                            const chf = Number(plan.prix_chf_mensuel) || 0;
+                            return rates ? (
+                              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                <span>≈ {(chf * (rates.EUR || 1.09)).toFixed(0)} EUR</span>
+                                <span>≈ {(chf * (rates.USD || 1.28)).toFixed(0)} USD</span>
+                                <span>≈ {(chf * (rates.GBP || 0.95)).toFixed(0)} GBP</span>
+                              </div>
+                            ) : null;
+                          })()}
+
+                          {/* Stripe */}
+                          <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>
+                            <div>Stripe : {plan.stripe_price_id_chf || <span style={{ color: C.amber }}>Non configuré</span>}</div>
+                          </div>
+                        </div>
+                        <div style={{ padding: "10px 24px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "flex-end" }}>
+                          <button onClick={() => { setSaPlanData({ ...plan, stripe_price_id_eur: plan.stripe_price_id_eur || "", stripe_price_id_chf: plan.stripe_price_id_chf || "" }); setSaPlanPanel("edit"); }} style={{ background: C.bg, border: "none", borderRadius: 4, padding: "4px 12px", cursor: "pointer", fontSize: 11, color: C.textMuted }}>{t('common.edit')}</button>
+                        </div>
+                      </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {saPlans.length === 0 && <div style={{ padding: 40, textAlign: "center", color: C.textMuted }}>{saLoaded ? "Aucun plan trouvé. Vérifiez la connexion API." : "Chargement des plans..."}</div>}
 
               {/* Plan Create/Edit Panel */}
               {saPlanPanel !== "closed" && (
@@ -584,23 +772,28 @@ export function createAdminSidebarComponent(ctx: any) {
                         </div>
                       )}
 
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 4 }}>Limites <span style={{ fontWeight: 400, fontSize: 11, color: C.textMuted }}>(vide = illimité)</span></div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 10 }}>
-                        {[
-                          { key: "max_collaborateurs", label: "Collabs" },
-                          { key: "max_admins", label: "Admins" },
-                          { key: "max_parcours", label: "Parcours" },
-                          { key: "max_integrations", label: "Intégr." },
-                          { key: "max_workflows", label: "Workflows" },
-                        ].map(f => (
-                          <div key={f.key}><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>{f.label}</label><input type="number" value={saPlanData[f.key] ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, [f.key]: e.target.value ? Number(e.target.value) : null }))} style={sInput} placeholder="∞" /></div>
-                        ))}
-                      </div>
+                      {/* Limites — only for main plans, not add-ons */}
+                      {!saPlanData.is_addon && !saPlanData.addon_type && (
+                        <>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 4 }}>Limites <span style={{ fontWeight: 400, fontSize: 11, color: C.textMuted }}>(vide = illimité)</span></div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 10 }}>
+                            {[
+                              { key: "max_collaborateurs", label: "Collabs" },
+                              { key: "max_admins", label: "Admins" },
+                              { key: "max_parcours", label: "Parcours" },
+                              { key: "max_integrations", label: "Intégr." },
+                              { key: "max_workflows", label: "Workflows" },
+                            ].map(f => (
+                              <div key={f.key}><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>{f.label}</label><input type="number" value={saPlanData[f.key] ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, [f.key]: e.target.value ? Number(e.target.value) : null }))} style={sInput} placeholder="∞" /></div>
+                            ))}
+                          </div>
+                        </>
+                      )}
 
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 4 }}>Stripe</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                        <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Stripe Price ID (EUR)</label><input value={saPlanData.stripe_price_id_eur || ""} onChange={e => setSaPlanData((p: any) => ({ ...p, stripe_price_id_eur: e.target.value }))} style={sInput} placeholder="price_..." /></div>
-                        <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Stripe Price ID (CHF)</label><input value={saPlanData.stripe_price_id_chf || ""} onChange={e => setSaPlanData((p: any) => ({ ...p, stripe_price_id_chf: e.target.value }))} style={sInput} placeholder="price_..." /></div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 4 }}>Stripe (CHF)</div>
+                      <div>
+                        <label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Stripe Price ID (CHF)</label>
+                        <input value={saPlanData.stripe_price_id_chf || ""} onChange={e => setSaPlanData((p: any) => ({ ...p, stripe_price_id_chf: e.target.value }))} style={sInput} placeholder="price_..." />
                       </div>
 
                       {/* AI config — only for AI addon plans */}
@@ -622,6 +815,7 @@ export function createAdminSidebarComponent(ctx: any) {
                             <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Scans OCR/mois</label><input type="number" value={saPlanData.ai_ocr_scans ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, ai_ocr_scans: e.target.value ? Number(e.target.value) : null }))} style={sInput} /></div>
                             <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Messages bot/mois</label><input type="number" value={saPlanData.ai_bot_messages ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, ai_bot_messages: e.target.value ? Number(e.target.value) : null }))} style={sInput} /></div>
                             <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Contrats IA/mois</label><input type="number" value={saPlanData.ai_contrat_generations ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, ai_contrat_generations: e.target.value ? Number(e.target.value) : null }))} style={sInput} /></div>
+                            <div><label style={{ fontSize: 10, color: C.textLight, display: "block", marginBottom: 4 }}>Traductions IA/mois</label><input type="number" value={saPlanData.ai_translations ?? ""} onChange={e => setSaPlanData((p: any) => ({ ...p, ai_translations: e.target.value ? Number(e.target.value) : null }))} style={sInput} /></div>
                           </div>
                         </>
                       )}
@@ -679,34 +873,129 @@ export function createAdminSidebarComponent(ctx: any) {
           )}
 
           {saTab === "stripe" && (
-            <div style={{ maxWidth: 600 }}>
+            <div style={{ maxWidth: 640 }}>
               <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 20 }}>Configuration Stripe</h1>
-              <div className="iz-card" style={{ ...sCard }}>
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+
+              {/* ── Mode Toggle ── */}
+              <div className="iz-card" style={{ ...sCard, marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ width: 10, height: 10, borderRadius: "50%", background: saStripe?.has_secret ? C.green : C.red }} />
                     <span style={{ fontSize: 13, fontWeight: 500 }}>{saStripe?.has_secret ? "Stripe connecté" : "Stripe non configuré"}</span>
+                    {saStripe?.mode && (
+                      <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: saStripe.mode === "test" ? "#FF980020" : "#4CAF5020", color: saStripe.mode === "test" ? "#FF9800" : "#4CAF50" }}>
+                        {saStripe.mode === "test" ? "MODE TEST" : "PRODUCTION"}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 0, background: C.bg, borderRadius: 6, padding: 2 }}>
+                    {(["live", "test"] as const).map(mode => (
+                      <button key={mode} onClick={async () => {
+                        try {
+                          await superAdminUpdateStripeConfig({ stripe_mode: mode });
+                          loadSA();
+                          addToast_admin(mode === "test" ? "Mode test activé — cartes test uniquement" : "Mode production activé");
+                        } catch { addToast_admin(t('toast.error')); }
+                      }} style={{ padding: "5px 14px", fontSize: 11, fontWeight: saStripe?.mode === mode ? 600 : 400, borderRadius: 5, border: "none", cursor: "pointer", background: saStripe?.mode === mode ? (mode === "test" ? "#FF9800" : C.green) : "transparent", color: saStripe?.mode === mode ? "#fff" : C.textMuted, transition: "all .15s" }}>
+                        {mode === "live" ? "Production" : "Test"}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                {[
-                  { key: "stripe_key", label: "Publishable Key", placeholder: "pk_..." },
-                  { key: "stripe_secret", label: "Secret Key", placeholder: "sk_..." },
-                  { key: "stripe_webhook_secret", label: "Webhook Secret", placeholder: "whsec_..." },
-                ].map(field => (
-                  <div key={field.key} style={{ marginBottom: 14 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{field.label}</label>
-                    <input id={`sa-${field.key}`} type="password" placeholder={field.placeholder} style={sInput} />
-                  </div>
-                ))}
-                <button onClick={async () => {
-                  const data: any = {};
-                  ["stripe_key", "stripe_secret", "stripe_webhook_secret"].forEach(k => {
-                    const el = document.getElementById(`sa-${k}`) as HTMLInputElement;
-                    if (el?.value) data[k] = el.value;
-                  });
-                  if (Object.keys(data).length === 0) { addToast_admin("Aucune clé saisie"); return; }
-                  try { await superAdminUpdateStripeConfig(data); loadSA(); addToast_admin("Configuration Stripe enregistrée"); } catch { addToast_admin(t('toast.error')); }
-                }} className="iz-btn-pink" style={sBtn("pink")}>{t('common.save')}</button>
+              </div>
+
+              {/* ── Live Keys ── */}
+              <div className="iz-card" style={{ ...sCard, marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: saStripe?.live_configured ? C.green : C.textMuted }} />
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>Clés Production</span>
+                  <span style={{ fontSize: 10, color: C.textMuted }}>(live)</span>
+                </div>
+                {saStripe?.live_configured ? (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "6px 16px", fontSize: 13, marginBottom: 14 }}>
+                      <span style={{ color: C.textMuted }}>Publishable Key</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>pk_live_•••••••••</span>
+                      <span style={{ color: C.textMuted }}>Secret Key</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>sk_live_•••••••••</span>
+                      <span style={{ color: C.textMuted }}>Webhook Secret</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>whsec_•••••••••</span>
+                    </div>
+                    <button onClick={() => showConfirm("Supprimer les clés production Stripe ?", async () => {
+                      try {
+                        await superAdminUpdateStripeConfig({ stripe_key: "", stripe_secret: "", stripe_webhook_secret: "" });
+                        loadSA();
+                        addToast_admin("Clés production supprimées");
+                      } catch { addToast_admin(t('toast.error')); }
+                    })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 11, padding: "4px 12px" }}>Supprimer clés live</button>
+                  </>
+                ) : (
+                  <>
+                    {[
+                      { key: "stripe_key", label: "Publishable Key", placeholder: "pk_live_..." },
+                      { key: "stripe_secret", label: "Secret Key", placeholder: "sk_live_..." },
+                      { key: "stripe_webhook_secret", label: "Webhook Secret", placeholder: "whsec_..." },
+                    ].map(field => (
+                      <div key={field.key} style={{ marginBottom: 10 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>{field.label}</label>
+                        <input id={`sa-${field.key}`} type="password" placeholder={field.placeholder} style={sInput} />
+                      </div>
+                    ))}
+                    <button onClick={async () => {
+                      const data: any = {};
+                      ["stripe_key", "stripe_secret", "stripe_webhook_secret"].forEach(k => {
+                        const el = document.getElementById(`sa-${k}`) as HTMLInputElement;
+                        if (el?.value) data[k] = el.value;
+                      });
+                      if (Object.keys(data).length === 0) { addToast_admin("Aucune clé saisie"); return; }
+                      try { await superAdminUpdateStripeConfig(data); loadSA(); addToast_admin("Clés production enregistrées"); } catch { addToast_admin(t('toast.error')); }
+                    }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12 }}>Enregistrer clés live</button>
+                  </>
+                )}
+              </div>
+
+              {/* ── Test Keys ── */}
+              <div className="iz-card" style={{ ...sCard }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: saStripe?.test_configured ? "#FF9800" : C.textMuted }} />
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>Clés Test</span>
+                  <span style={{ fontSize: 10, color: C.textMuted }}>(sandbox)</span>
+                </div>
+                {saStripe?.test_configured ? (
+                  <>
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "6px 16px", fontSize: 13, marginBottom: 14 }}>
+                      <span style={{ color: C.textMuted }}>Publishable Key</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>pk_test_•••••••••</span>
+                      <span style={{ color: C.textMuted }}>Secret Key</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>sk_test_•••••••••</span>
+                      <span style={{ color: C.textMuted }}>Webhook Secret</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>whsec_•••••••••</span>
+                    </div>
+                    <button onClick={() => showConfirm("Supprimer les clés test Stripe ?", async () => {
+                      try {
+                        await superAdminUpdateStripeConfig({ stripe_test_key: "", stripe_test_secret: "", stripe_test_webhook_secret: "" });
+                        loadSA();
+                        addToast_admin("Clés test supprimées");
+                      } catch { addToast_admin(t('toast.error')); }
+                    })} style={{ ...sBtn("outline"), color: "#FF9800", borderColor: "#FF9800", fontSize: 11, padding: "4px 12px" }}>Supprimer clés test</button>
+                  </>
+                ) : (
+                  <>
+                    {[
+                      { key: "stripe_test_key", label: "Publishable Key", placeholder: "pk_test_..." },
+                      { key: "stripe_test_secret", label: "Secret Key", placeholder: "sk_test_..." },
+                      { key: "stripe_test_webhook_secret", label: "Webhook Secret", placeholder: "whsec_..." },
+                    ].map(field => (
+                      <div key={field.key} style={{ marginBottom: 10 }}>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>{field.label}</label>
+                        <input id={`sa-${field.key}`} type="password" placeholder={field.placeholder} style={sInput} />
+                      </div>
+                    ))}
+                    <button onClick={async () => {
+                      const data: any = {};
+                      ["stripe_test_key", "stripe_test_secret", "stripe_test_webhook_secret"].forEach(k => {
+                        const el = document.getElementById(`sa-${k}`) as HTMLInputElement;
+                        if (el?.value) data[k] = el.value;
+                      });
+                      if (Object.keys(data).length === 0) { addToast_admin("Aucune clé saisie"); return; }
+                      try { await superAdminUpdateStripeConfig(data); loadSA(); addToast_admin("Clés test enregistrées"); } catch { addToast_admin(t('toast.error')); }
+                    }} style={{ ...sBtn("outline"), borderColor: "#FF9800", color: "#FF9800", fontSize: 12, fontWeight: 600 }}>Enregistrer clés test</button>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -781,7 +1070,30 @@ export function createAdminSidebarComponent(ctx: any) {
               {/* Usage per tenant */}
               <div className="iz-card" style={{ ...sCard }}>
                 <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Consommation IA par client</h3>
-                <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Mois en cours — tous les tenants avec un plan IA actif</p>
+                <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Mois en cours — marge x2 sur le coût Claude</p>
+
+                {/* Summary cards */}
+                {aiTenantUsage.length > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+                    <div style={{ padding: "12px 16px", borderRadius: 10, background: C.bg }}>
+                      <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>Coût Claude total</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{aiTenantUsage.reduce((s: number, t: any) => s + (t.cost_chf || 0), 0).toFixed(2)} <span style={{ fontSize: 11, fontWeight: 400 }}>CHF</span></div>
+                    </div>
+                    <div style={{ padding: "12px 16px", borderRadius: 10, background: C.greenLight }}>
+                      <div style={{ fontSize: 10, color: C.green, marginBottom: 4 }}>Facturé clients (x2)</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: C.green }}>{aiTenantUsage.reduce((s: number, t: any) => s + (t.billed_chf || 0), 0).toFixed(2)} <span style={{ fontSize: 11, fontWeight: 400 }}>CHF</span></div>
+                    </div>
+                    <div style={{ padding: "12px 16px", borderRadius: 10, background: "#E8F5E9" }}>
+                      <div style={{ fontSize: 10, color: "#2E7D32", marginBottom: 4 }}>Marge</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "#2E7D32" }}>{aiTenantUsage.reduce((s: number, t: any) => s + (t.margin_chf || 0), 0).toFixed(2)} <span style={{ fontSize: 11, fontWeight: 400 }}>CHF</span></div>
+                    </div>
+                    <div style={{ padding: "12px 16px", borderRadius: 10, background: C.blueLight }}>
+                      <div style={{ fontSize: 10, color: C.blue, marginBottom: 4 }}>Tokens ce mois</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: C.blue }}>{Math.round(aiTenantUsage.reduce((s: number, t: any) => s + (t.input_tokens || 0) + (t.output_tokens || 0), 0) / 1000)} <span style={{ fontSize: 11, fontWeight: 400 }}>k tokens</span></div>
+                    </div>
+                  </div>
+                )}
+
                 {aiTenantUsage.length === 0 ? (
                   <div style={{ textAlign: "center", padding: 20, color: C.textMuted, fontSize: 13 }}>Aucune consommation IA ce mois</div>
                 ) : (
@@ -794,22 +1106,135 @@ export function createAdminSidebarComponent(ctx: any) {
                           <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>OCR</th>
                           <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Bot</th>
                           <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Contrats</th>
-                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Coût API</th>
+                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Coût Claude</th>
+                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Facturé (x2)</th>
+                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, fontSize: 10, textTransform: "uppercase", color: C.textLight }}>Marge</th>
                         </tr>
                       </thead>
                       <tbody>
                         {aiTenantUsage.map((t: any, i: number) => (
                           <tr key={t.tenant_id} style={{ borderTop: `1px solid ${C.border}`, background: i % 2 ? C.bg + "60" : "transparent" }}>
-                            <td style={{ padding: "8px 12px", fontWeight: 500 }}>{t.tenant_id}</td>
-                            <td style={{ padding: "8px 12px", textAlign: "center" }}><span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.blueLight, color: C.blue }}>{t.plan_name}</span></td>
-                            <td style={{ padding: "8px 12px", textAlign: "center" }}><span style={{ fontWeight: 600 }}>{t.ocr_scans}</span><span style={{ color: C.textMuted }}>/{t.ocr_limit}</span></td>
-                            <td style={{ padding: "8px 12px", textAlign: "center" }}><span style={{ fontWeight: 600 }}>{t.bot_messages}</span><span style={{ color: C.textMuted }}>/{t.bot_limit}</span></td>
-                            <td style={{ padding: "8px 12px", textAlign: "center" }}><span style={{ fontWeight: 600 }}>{t.contrat_generations}</span><span style={{ color: C.textMuted }}>/{t.contrat_limit}</span></td>
-                            <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: t.total_cost_usd > 5 ? C.red : C.text }}>${t.total_cost_usd?.toFixed(2)}</td>
+                            <td style={{ padding: "8px 12px", fontWeight: 500 }}>{t.tenant_name || t.tenant_id}</td>
+                            <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                              <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.blueLight, color: C.blue }}>{t.plan_name}</span>
+                              <div style={{ fontSize: 9, color: C.textMuted, marginTop: 2 }}>{t.plan_price_chf} CHF/mois</div>
+                            </td>
+                            <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600 }}>{t.ocr_scans || 0}</td>
+                            <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600 }}>{t.bot_messages || 0}</td>
+                            <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600 }}>{t.contrat_generations || 0}</td>
+                            <td style={{ padding: "8px 12px", textAlign: "right", fontSize: 11, color: C.textMuted }}>{t.cost_chf?.toFixed(2)} CHF</td>
+                            <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: C.text }}>{t.billed_chf?.toFixed(2)} CHF</td>
+                            <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: C.green }}>{t.margin_chf?.toFixed(2)} CHF</td>
                           </tr>
                         ))}
+                        {/* Totals row */}
+                        <tr style={{ borderTop: `2px solid ${C.text}`, background: C.bg, fontWeight: 700 }}>
+                          <td style={{ padding: "10px 12px" }} colSpan={5}>Total</td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", fontSize: 11, color: C.textMuted }}>{aiTenantUsage.reduce((s: number, t: any) => s + (t.cost_chf || 0), 0).toFixed(2)} CHF</td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", color: C.text }}>{aiTenantUsage.reduce((s: number, t: any) => s + (t.billed_chf || 0), 0).toFixed(2)} CHF</td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", color: C.green }}>{aiTenantUsage.reduce((s: number, t: any) => s + (t.margin_chf || 0), 0).toFixed(2)} CHF</td>
+                        </tr>
                       </tbody>
                     </table>
+                  </div>
+                )}
+              </div>
+            </div>
+            );
+          })()}
+
+          {saTab === "ai_protection" && (() => {
+            // Load spending caps per tenant
+            if (!ctx._protLoaded) {
+              ctx._protLoaded = true;
+              // Reuse tenant usage data
+              apiFetch('/super-admin/ai-usage').then((d: any) => ctx.setSaAiTenantUsage?.(d)).catch(() => {});
+            }
+            const tenantUsage = ctx.saAiTenantUsage || [];
+
+            return (
+            <div>
+              <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}><ShieldCheck size={22} color={C.green} /> Protection IA</h1>
+              <p style={{ fontSize: 13, color: C.textMuted, marginBottom: 24 }}>Protections actives contre la surconsommation IA par tenant</p>
+
+              {/* Active protections */}
+              <div className="iz-card" style={{ ...sCard, marginBottom: 24 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Protections actives</h3>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div style={{ padding: "14px 16px", borderRadius: 10, background: C.greenLight, border: `1px solid ${C.green}30` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: C.green }}>Rate Limiting</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: C.text }}>Max <b>10 appels/minute</b> par tenant</div>
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>Empêche les appels trop fréquents</div>
+                  </div>
+                  <div style={{ padding: "14px 16px", borderRadius: 10, background: C.greenLight, border: `1px solid ${C.green}30` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: C.green }}>Anti-boucle</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: C.text }}>Max <b>20 appels/5 minutes</b> — blocage 5 min</div>
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>Détecte les boucles infinies frontend</div>
+                  </div>
+                  <div style={{ padding: "14px 16px", borderRadius: 10, background: C.greenLight, border: `1px solid ${C.green}30` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: C.green }}>Plafond mensuel</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: C.text }}>Max <b>200 CHF/mois</b> facturés par tenant (configurable)</div>
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>Le tenant peut modifier son plafond</div>
+                  </div>
+                  <div style={{ padding: "14px 16px", borderRadius: 10, background: C.greenLight, border: `1px solid ${C.green}30` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.green }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: C.green }}>Logs & Alertes</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: C.text }}>Chaque déclenchement est <b>loggé</b></div>
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>Warning/Error dans laravel.log</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Spending per tenant */}
+              <div className="iz-card" style={{ ...sCard }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Consommation par tenant — ce mois</h3>
+                <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Coût Claude réel vs montant facturé (x2)</p>
+
+                {tenantUsage.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: 20, color: C.textMuted, fontSize: 13 }}>Aucune donnée</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {tenantUsage.map((t: any) => {
+                      const costChf = t.cost_chf || 0;
+                      const billedChf = t.billed_chf || 0;
+                      const cap = 200; // default
+                      const pct = cap > 0 ? Math.min(100, Math.round((billedChf / cap) * 100)) : 0;
+                      return (
+                        <div key={t.tenant_id} style={{ padding: "16px 20px", borderRadius: 10, border: `1px solid ${C.border}` }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <div>
+                              <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{t.tenant_name || t.tenant_id}</span>
+                              <span style={{ marginLeft: 8, padding: "2px 8px", borderRadius: 4, fontSize: 9, fontWeight: 600, background: C.blueLight, color: C.blue }}>{t.plan_name}</span>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: billedChf > cap * 0.8 ? C.red : C.text }}>{billedChf.toFixed(2)} CHF</div>
+                              <div style={{ fontSize: 10, color: C.textMuted }}>facturé / {cap} CHF plafond</div>
+                            </div>
+                          </div>
+                          <div style={{ height: 6, borderRadius: 3, background: C.bg, overflow: "hidden", marginBottom: 8 }}>
+                            <div style={{ height: "100%", borderRadius: 3, width: `${pct}%`, background: pct > 80 ? C.red : pct > 50 ? "#FF9800" : C.green, transition: "width .3s" }} />
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, fontSize: 11 }}>
+                            <div><span style={{ color: C.textMuted }}>OCR:</span> <b>{t.ocr_scans || 0}</b></div>
+                            <div><span style={{ color: C.textMuted }}>Bot:</span> <b>{t.bot_messages || 0}</b></div>
+                            <div><span style={{ color: C.textMuted }}>Contrats:</span> <b>{t.contrat_generations || 0}</b></div>
+                            <div><span style={{ color: C.textMuted }}>Trad:</span> <b>{t.translation || 0}</b></div>
+                            <div><span style={{ color: C.textMuted }}>Coût:</span> <b>{costChf.toFixed(2)} CHF</b></div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

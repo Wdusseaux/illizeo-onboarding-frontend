@@ -41,6 +41,12 @@ const ADMIN_PAGE_TO_SLUG: Record<AdminPage, string> = {
   admin_buddy: "parrainage",
   admin_audit: "audit",
   admin_password_policy: "securite",
+  admin_assistant_ia: "assistant-ia",
+  admin_manager_view: "vue-manager",
+  admin_cohorte_rh: "cohorte",
+  admin_templates_profil: "templates-profil",
+  admin_quotes: "citations",
+  admin_recurring_meetings: "rdv-recurrents",
 };
 
 const EMPLOYEE_PAGE_TO_SLUG: Record<DashboardPage, string> = {
@@ -53,6 +59,14 @@ const EMPLOYEE_PAGE_TO_SLUG: Record<DashboardPage, string> = {
   suivi: "suivi",
   cooptation: "cooptation",
   satisfaction: "satisfaction",
+  mon_profil: "mon-profil",
+  assistant_ia: "assistant-ia",
+  organigramme: "organigramme",
+  mes_rdv: "mes-rdv",
+  documents: "mes-signatures",
+  mes_signatures: "mes-signatures",
+  formations: "formations",
+  bureaux: "bureaux",
 };
 
 // Build reverse maps
@@ -65,6 +79,8 @@ const SLUG_TO_EMPLOYEE_PAGE: Record<string, DashboardPage> = {};
 for (const [page, slug] of Object.entries(EMPLOYEE_PAGE_TO_SLUG)) {
   SLUG_TO_EMPLOYEE_PAGE[slug] = page as DashboardPage;
 }
+// Legacy redirect: old "documents" slug → mes_signatures (merged page)
+SLUG_TO_EMPLOYEE_PAGE["documents"] = "mes_signatures";
 
 // ─── URL PARSING ────────────────────────────────────────────────────
 

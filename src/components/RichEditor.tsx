@@ -10,7 +10,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { useEffect, useState } from 'react';
 
 const C = {
-  pink: "#C2185B",
+  pink: "#E41076",
   text: "#333",
   textMuted: "#aaa",
   textLight: "#888",
@@ -20,7 +20,7 @@ const C = {
   pinkBg: "#FFF0F5",
 };
 
-const font = `'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif`;
+const font = `'Inter', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif`;
 
 const VARIABLES = [
   "{{prenom}}", "{{nom}}", "{{email}}", "{{date_debut}}", "{{site}}",
@@ -47,7 +47,7 @@ export default function RichEditor({ value, onChange, placeholder }: RichEditorP
       Underline,
       TextStyle,
       Color,
-      Link.configure({ openOnClick: false, HTMLAttributes: { style: 'color: #C2185B; text-decoration: underline;' } }),
+      Link.configure({ openOnClick: false, HTMLAttributes: { style: 'color: #E41076; text-decoration: underline;' } }),
       Image.configure({ inline: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Placeholder.configure({ placeholder: placeholder || 'Rédigez votre email...' }),
@@ -116,7 +116,7 @@ export default function RichEditor({ value, onChange, placeholder }: RichEditorP
           const url = prompt("URL du bouton :", "{{lien}}");
           if (text && url) {
             editor.chain().focus().insertContent(
-              `<a href="${url}" style="display:inline-block;padding:10px 28px;background:#C2185B;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">${text}</a>`
+              `<a href="${url}" style="display:inline-block;padding:10px 28px;background:#E41076;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">${text}</a>`
             ).run();
           }
         }, "⬛ Bouton", "Insérer un bouton CTA")}

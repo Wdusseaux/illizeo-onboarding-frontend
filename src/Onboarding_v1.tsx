@@ -38,7 +38,7 @@ import {
   exportAllData, exportCollaborateursCSV, exportAuditLog, rgpdDeleteCollaborateur, rgpdDeleteAccount,
   get2FAStatus, setup2FA, confirm2FA, disable2FA, regenerate2FARecoveryCodes,
   registerTenant, checkTenantAvailability,
-  getCompanySettings, updateCompanySettings,
+  getCompanySettings, updateCompanySettings, getTenantBranding,
   getBadges, getMyBadges, getBadgeTemplates, createBadgeTemplate as apiCreateBadgeTpl, updateBadgeTemplate as apiUpdateBadgeTpl, deleteBadgeTemplate as apiDeleteBadgeTpl, awardBadge, revokeBadge,
   type Badge, type BadgeTemplate,
   getPlans, type PlanData,
@@ -51,6 +51,7 @@ import {
   type UploadedDocument,
   getNpsSurveys, createNpsSurvey as apiCreateNps, updateNpsSurvey as apiUpdateNps, deleteNpsSurvey as apiDeleteNps,
   showNpsSurvey, getNpsStats, sendNpsSurveyToAll as apiSendNpsAll,
+  getMyNpsSurveys, submitNpsResponse,
   type NpsSurvey, type NpsResponse, type NpsStats,
   duplicateEmailTemplate as apiDuplicateEmailTpl, sendTestEmail, getMailConfig,
   getEquipmentTypes, getEquipments, getEquipmentStats, createEquipment as apiCreateEquip, updateEquipment as apiUpdateEquip, deleteEquipment as apiDeleteEquip,
@@ -80,13 +81,16 @@ import {
   Palette, Trash, DatabaseBackup, Languages, ChevronsRight, ChevronsLeft, Settings, Crown, Lock,
   Phone, Linkedin, Paperclip, TrendingUp, Percent, FileCheck2, CalendarCheck, Rocket, Heart, Gem,
   Laptop, Monitor, Headphones, KeyRound, Mouse, Car, Armchair, Boxes, RotateCcw, PenLine,
-  Moon, Sun
+  Moon, Sun, Lightbulb, Bug, Briefcase, BarChart3
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
 import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode } from './constants';
 import type { OnboardingStep, DashboardPage, DashboardTab, UserRole, AdminPage, AdminModal, Collaborateur, ParcoursCategorie, ParcourTemplate, ActionTemplate, ActionType, AssignTarget, GroupePersonnes, DocCategory, WorkflowRule, EmailTemplate, TeamMember } from './types';
 import RichEditor from './components/RichEditor';
+import AdminQuotesPage from './admin/AdminQuotesPage';
+import AdminRecurringMeetingsPage from './admin/AdminRecurringMeetingsPage';
+import EmployeeMyRdvPage from './pages/EmployeeMyRdvPage';
 import TranslatableField, { type Translations } from './components/TranslatableField';
 import { DOC_CATEGORIES, ACTIONS, _MOCK_NOTIFICATIONS_LIST, NOTIF_RESOURCES, TEAM_MEMBERS, ACTION_TYPE_META, PHASE_ICONS, SITES, DEPARTEMENTS, TYPES_CONTRAT, _MOCK_COLLABORATEURS, _MOCK_PARCOURS_TEMPLATES, _MOCK_ACTION_TEMPLATES, _MOCK_ADMIN_DOC_CATEGORIES, _MOCK_WORKFLOW_RULES, _MOCK_EMAIL_TEMPLATES, _MOCK_PHASE_DEFAULTS, _MOCK_GROUPES, EQUIPE_ROLES, TPL_CATEGORIES, guessTplCategory } from './mockData';
 
@@ -132,8 +136,21 @@ export default function OnboardingModule() {
   const [subTab, setSubTab] = useState<"facturation" | "factures" | "paiement" | "protection" | "consommation">("facturation");
   const [subView, setSubView] = useState<"overview" | "change" | "apps">(_needsPlan ? "change" : "overview");
   const [subEmployeeCount, setSubEmployeeCount] = useState(25);
-  const [billingInfo, setBillingInfo] = useState({ company: "", email: "", prenom: "", nom: "", telephone: "", pays: "Suisse", rue: "", ville: "", code_postal: "", vat: "" });
+  const [billingInfo, setBillingInfo] = useState({ company: "", email: "", prenom: "", nom: "", telephone: "", pays: "Suisse", rue: "", numero: "", complement: "", case_postale: "", localite: "", ville: "", code_postal: "", canton: "", pays_facturation: "", vat: "" });
   const [paymentMethod, setPaymentMethod] = useState<"stripe" | "invoice">("stripe");
+  const [stripeModalOpen, setStripeModalOpen] = useState(false);
+  const [stripeMethods, setStripeMethods] = useState<{ id: string; brand: string; last4: string; exp_month: number; exp_year: number; is_default: boolean }[]>([]);
+  const [invoiceConfigOpen, setInvoiceConfigOpen] = useState(false);
+  const [invoiceConfig, setInvoiceConfig] = useState({ invoice_email: "", po_number: "" });
+  const [billingContactEdit, setBillingContactEdit] = useState(false);
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
+  const [invoicesList, setInvoicesList] = useState<any[]>([]);
+  const [supportAccesses, setSupportAccesses] = useState<any[]>([]);
+  const [supportAccessForm, setSupportAccessForm] = useState<any>(null);
+  const billingModalCallback = useRef<(() => void) | null>(null);
+  const [billingInfoEdit, setBillingInfoEdit] = useState(false);
+  const [stripePromise, setStripePromise] = useState<any>(null);
+  const [subStep, setSubStep] = useState<"plan" | "apps">("plan");
   const [storageUsage, setStorageUsage] = useState<{ used_formatted: string; max_formatted: string; percent: number; file_count: number; db_size: string } | null>(null);
   const [signatureUsage, setSignatureUsage] = useState<{ total: number; signed: number; sent: number; declined: number } | null>(null);
   // Pricing & Super Admin
@@ -211,6 +228,31 @@ export default function OnboardingModule() {
   // Employee NPS
   const [empSurveys, setEmpSurveys] = useState<any[]>([]);
   const [empNpsAnswers, setEmpNpsAnswers] = useState<Record<string, any>>({});
+  // Feedback hub local state
+  const [feedbackTab, setFeedbackTab] = useState<"surveys" | "mood" | "suggestion" | "buddy">("surveys");
+  const [openSurveyId, setOpenSurveyId] = useState<number | null>(null);
+  // Admin feedback hub state
+  const [adminFeedbackTab, setAdminFeedbackTab] = useState<"mood" | "suggestion" | "buddy" | "excited">("mood");
+  const [adminMoods, setAdminMoods] = useState<{ entries: any[]; stats: any } | null>(null);
+  const [adminSuggestions, setAdminSuggestions] = useState<any[] | null>(null);
+  const [adminSuggStatusFilter, setAdminSuggStatusFilter] = useState<"" | "open" | "reviewing" | "done" | "dismissed">("");
+  const [adminBuddyRatings, setAdminBuddyRatings] = useState<{ entries: any[]; stats: any } | null>(null);
+  const [adminExcited, setAdminExcited] = useState<{ entries: any[]; total: number } | null>(null);
+  const [moodHistory, setMoodHistory] = useState<any[]>([]);
+  const [moodHistoryLoaded, setMoodHistoryLoaded] = useState(false);
+  const [moodDraft, setMoodDraft] = useState<{ mood: number | null; comment: string }>({ mood: null, comment: "" });
+  const [suggestionDraft, setSuggestionDraft] = useState<{ category: "suggestion" | "bug" | "improvement" | "other"; content: string; anonymous: boolean }>({ category: "suggestion", content: "", anonymous: false });
+  const [buddyRatingDraft, setBuddyRatingDraft] = useState<{ target_type: "buddy" | "manager"; rating: number; comment: string }>({ target_type: "buddy", rating: 0, comment: "" });
+  // Lazy-load mood history the first time the user opens the mood tab.
+  // Using a separate "loaded" flag so an empty history doesn't trigger an
+  // infinite re-fetch loop (length === 0 stays true forever otherwise).
+  useEffect(() => {
+    if (feedbackTab !== "mood" || moodHistoryLoaded) return;
+    setMoodHistoryLoaded(true);
+    import('./api/endpoints').then(async m => {
+      try { const list = await m.getMyMoods(); if (list) setMoodHistory(list); } catch {}
+    });
+  }, [feedbackTab, moodHistoryLoaded]);
   // Notification bell
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   // Employee cooptation
@@ -257,6 +299,68 @@ export default function OnboardingModule() {
   const [userRoleSlugs, setUserRoleSlugs] = useState<string[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [myCollabProfile, setMyCollabProfile] = useState<any>(null);
+  const [dailyQuote, setDailyQuote] = useState<{ text: string; author: string | null } | null>(null);
+  const [journeyData, setJourneyData] = useState<{ milestones: any[]; day_j: number; categorie: string | null } | null>(null);
+  const [cultureQuizState, setCultureQuizState] = useState<{ idx: number; answers: Record<number, number>; finished: boolean }>({ idx: 0, answers: {}, finished: false });
+  const [leaderboardData, setLeaderboardData] = useState<{ cohort: any[]; my_rank: number | null; my_xp: number; my_breakdown: any } | null>(null);
+  const [employeeSignatureDocs, setEmployeeSignatureDocs] = useState<any[]>([]);
+  const [employeeSignatureHistory, setEmployeeSignatureHistory] = useState<any[]>([]);
+  const [suiviView, setSuiviView] = useState<"chrono" | "phases">("chrono");
+  const [dashboardActionsView, setDashboardActionsView] = useState<"timeline" | "calendar">("timeline");
+  // Number of weeks offset from "current week" (0). Negative = past, positive = future.
+  const [calendarWeekOffset, setCalendarWeekOffset] = useState<number>(0);
+  // Selected action for the timeline focus card. Null = use default priority order.
+  const [dashboardFocusActionId, setDashboardFocusActionId] = useState<number | null>(null);
+  // Accompagnants management in collab edit panel
+  const [collabAccompagnants, setCollabAccompagnants] = useState<any[]>([]);
+  const [tenantUsersList, setTenantUsersList] = useState<any[]>([]);
+  const [accompagnantDraft, setAccompagnantDraft] = useState<{ role: string; user_id: number | null }>({ role: "", user_id: null });
+  const [mesActionsView, setMesActionsView] = useState<"list" | "timeline" | "kanban">("list");
+  // Track viewport width (single global listener) so child components can render
+  // a mobile-optimised layout below 768px without each one wiring its own resize.
+  const [viewportWidth, setViewportWidth] = useState<number>(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isMobile = viewportWidth < 768;
+  const [officeTourState, setOfficeTourState] = useState<any>(null);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem("illizeo_sidebar_collapsed") === "1"; } catch { return false; }
+  });
+  useEffect(() => {
+    if (auth.isAuthenticated) {
+      import('./api/endpoints').then(m => m.getQuoteOfTheDay()).then(q => { if (q) setDailyQuote({ text: q.text, author: q.author }); }).catch(() => {});
+      // Fetch journey config + auto-award reached milestones
+      import('./api/endpoints').then(async m => {
+        try {
+          const j = await m.getMyJourney();
+          setJourneyData(j);
+          const result = await m.checkMilestones();
+          if (result?.awarded?.length > 0) {
+            // Refresh notifications so the badge notification appears
+            (m.getUserNotifications as any)?.().then(setUserNotifs).catch(() => {});
+            (m.getNotifUnreadCount as any)?.().then((c: any) => setNotifUnread(c.count ?? c)).catch(() => {});
+          }
+        } catch {}
+        try {
+          const lb = await (m as any).getMyLeaderboard?.();
+          if (lb) setLeaderboardData(lb);
+        } catch {}
+        try {
+          const docs = await (m as any).getMySignatureDocuments?.();
+          if (docs) setEmployeeSignatureDocs(docs);
+        } catch {}
+        try {
+          const hist = await (m as any).getMySignatureHistory?.();
+          if (hist) setEmployeeSignatureHistory(hist);
+        } catch {}
+      });
+    }
+  }, [auth.isAuthenticated]);
   useEffect(() => {
     if (auth.isAuthenticated) {
       getMyCollaborateur().then(c => { if (c) setMyCollabProfile(c); }).catch(() => {});
@@ -280,19 +384,22 @@ export default function OnboardingModule() {
 
   // ═══ API DATA (fallback-first — only fetch when authenticated) ═══
   const apiEnabled = { enabled: auth.isAuthenticated };
+  // Admin-scoped preloads: backend gates these behind admin permissions, so don't
+  // fire them for plain employees (they'd 403 and pollute the console for nothing).
+  const adminApiEnabled = { enabled: auth.isAuthenticated && auth.isAdmin };
   // Only show mock data for the editor tenant (illizeo). Other tenants get empty arrays.
   const isDemo = (localStorage.getItem("illizeo_tenant_id") || "illizeo") === "illizeo";
   const [demoMode, setDemoMode] = useState<boolean>(localStorage.getItem("illizeo_demo_mode") === "true");
-  const { data: COLLABORATEURS, refetch: refetchCollaborateurs } = useApiData(getCollaborateurs, isDemo ? _MOCK_COLLABORATEURS : [], apiEnabled);
-  const { data: PARCOURS_TEMPLATES, refetch: refetchParcours } = useApiData(getParcours, isDemo ? _MOCK_PARCOURS_TEMPLATES : [], apiEnabled);
-  const { data: ACTION_TEMPLATES, refetch: refetchActions } = useApiData(getActions, isDemo ? _MOCK_ACTION_TEMPLATES as any : [], apiEnabled);
-  const { data: GROUPES, refetch: refetchGroupes } = useApiData(getGroupes, isDemo ? _MOCK_GROUPES as any : [], apiEnabled);
-  const { data: PHASE_DEFAULTS, refetch: refetchPhases } = useApiData(getPhases, isDemo ? _MOCK_PHASE_DEFAULTS : [], apiEnabled);
-  const { data: WORKFLOW_RULES } = useApiData(getWorkflows, isDemo ? _MOCK_WORKFLOW_RULES : [], apiEnabled);
-  const { data: EMAIL_TEMPLATES } = useApiData(getEmailTemplates, isDemo ? _MOCK_EMAIL_TEMPLATES : [], apiEnabled);
-  const { data: ADMIN_DOC_CATEGORIES } = useApiData(getDocumentCategories, isDemo ? _MOCK_ADMIN_DOC_CATEGORIES : [], apiEnabled);
-  const { data: NOTIFICATIONS_LIST } = useApiData(getNotificationsConfig, isDemo ? _MOCK_NOTIFICATIONS_LIST as string[] : [], apiEnabled);
-  const { data: integrations, refetch: refetchIntegrations } = useApiData(getIntegrations, [] as any[], apiEnabled);
+  const { data: COLLABORATEURS, refetch: refetchCollaborateurs } = useApiData(getCollaborateurs, isDemo ? _MOCK_COLLABORATEURS : [], adminApiEnabled);
+  const { data: PARCOURS_TEMPLATES, refetch: refetchParcours } = useApiData(getParcours, isDemo ? _MOCK_PARCOURS_TEMPLATES : [], adminApiEnabled);
+  const { data: ACTION_TEMPLATES, refetch: refetchActions } = useApiData(getActions, isDemo ? _MOCK_ACTION_TEMPLATES as any : [], adminApiEnabled);
+  const { data: GROUPES, refetch: refetchGroupes } = useApiData(getGroupes, isDemo ? _MOCK_GROUPES as any : [], adminApiEnabled);
+  const { data: PHASE_DEFAULTS, refetch: refetchPhases } = useApiData(getPhases, isDemo ? _MOCK_PHASE_DEFAULTS : [], adminApiEnabled);
+  const { data: WORKFLOW_RULES, refetch: refetchWorkflows } = useApiData(getWorkflows, isDemo ? _MOCK_WORKFLOW_RULES : [], adminApiEnabled);
+  const { data: EMAIL_TEMPLATES, refetch: refetchEmailTemplates } = useApiData(getEmailTemplates, isDemo ? _MOCK_EMAIL_TEMPLATES : [], adminApiEnabled);
+  const { data: ADMIN_DOC_CATEGORIES } = useApiData(getDocumentCategories, isDemo ? _MOCK_ADMIN_DOC_CATEGORIES : [], adminApiEnabled);
+  const { data: NOTIFICATIONS_LIST } = useApiData(getNotificationsConfig, isDemo ? _MOCK_NOTIFICATIONS_LIST as string[] : [], adminApiEnabled);
+  const { data: integrations, refetch: refetchIntegrations } = useApiData(getIntegrations, [] as any[], adminApiEnabled);
 
   const authRole: UserRole = auth.isAdmin ? "rh" : "employee";
   const [role, setRole] = useState<UserRole>(authRole);
@@ -301,7 +408,14 @@ export default function OnboardingModule() {
   const [showPreboard, setShowPreboard] = useState(false); // Set to true to show preboarding
   const _initialRoute = useMemo(() => parseCurrentUrl(), []);
   const [dashPage, _setDashPage] = useState<DashboardPage>(_initialRoute.employeePage || "tableau_de_bord");
-  const [adminPage, _setAdminPage] = useState<AdminPage>(_needsPlan ? "admin_abonnement" : (_initialRoute.adminPage || "admin_dashboard"));
+  // Backward-compat: redirect retired admin pages to their replacements
+  const _initialAdminPage = (() => {
+    const p = _initialRoute.adminPage as any;
+    if (p === "admin_cohorte_rh") return "admin_suivi";
+    if (p === "admin_templates_profil") return "admin_parcours";
+    return p || "admin_dashboard";
+  })();
+  const [adminPage, _setAdminPage] = useState<AdminPage>(_needsPlan ? "admin_abonnement" : _initialAdminPage);
 
   // Wrap setters to also update URL
   const setDashPage = useCallback((page: DashboardPage) => {
@@ -337,7 +451,6 @@ export default function OnboardingModule() {
     return () => window.removeEventListener("popstate", onPopState);
   }, [auth.isAuthenticated]);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [adminModal, setAdminModal] = useState<AdminModal>(null);
   const [parcoursFilter, setParcoursFilter] = useState<ParcoursCategorie | "all">("all");
   const [actionFilter, setActionFilter] = useState("all");
@@ -386,6 +499,20 @@ export default function OnboardingModule() {
     site: string; departement: string; dateDebut: string;
   }>({ prenom: "", nom: "", email: "", poste: "", site: "", departement: "", dateDebut: "" });
   const [collabPanelLoading, setCollabPanelLoading] = useState(false);
+  // Auto-load accompagnants + tenant users when entering collab edit mode (so the
+  // admin panel section can render them without each call site wiring its own load)
+  useEffect(() => {
+    if (collabPanelMode !== "edit" || !collabPanelData.id) {
+      setCollabAccompagnants([]);
+      return;
+    }
+    import('./api/endpoints').then(async m => {
+      try { const list = await m.getCollabAccompagnants(collabPanelData.id!); setCollabAccompagnants(list || []); } catch { setCollabAccompagnants([]); }
+      if (tenantUsersList.length === 0) {
+        try { const users = await m.getUsers(); setTenantUsersList(users || []); } catch {}
+      }
+    });
+  }, [collabPanelMode, collabPanelData.id]);
   // Collaborateur profile view
   const [collabProfileId, setCollabProfileId] = useState<number | null>(null);
   const [collabProfileTab, setCollabProfileTab] = useState<"apercu" | "infos" | "documents" | "actions" | "equipe" | "messages" | "dossier">("apercu");
@@ -395,7 +522,7 @@ export default function OnboardingModule() {
   const [groupePanelData, setGroupePanelData] = useState<{
     id?: number; nom: string; description: string; couleur: string;
     critereType: string; critereValeur: string; membres: string[];
-  }>({ nom: "", description: "", couleur: "#C2185B", critereType: "", critereValeur: "", membres: [] });
+  }>({ nom: "", description: "", couleur: "#E41076", critereType: "", critereValeur: "", membres: [] });
   const [groupePanelLoading, setGroupePanelLoading] = useState(false);
   // Integration config panel
   const [integrationPanelId, setIntegrationPanelId] = useState<number | null>(null);
@@ -413,6 +540,9 @@ export default function OnboardingModule() {
   const [suiviFilter, setSuiviFilter] = useState<"all" | "en_cours" | "en_retard" | "termine">("all");
   const [suiviSearch, setSuiviSearch] = useState("");
   const [suiviParcoursFilter, setSuiviParcoursFilter] = useState<string | null>(null);
+  const [suiviScope, setSuiviScope] = useState<"actifs" | "tous">("actifs");
+  const [suiviSiteFilter, setSuiviSiteFilter] = useState("");
+  const [suiviDeptFilter, setSuiviDeptFilter] = useState("");
   const [collabMenuId, setCollabMenuId] = useState<number | null>(null);
   useEffect(() => {
     if (collabMenuId === null) return;
@@ -474,16 +604,24 @@ export default function OnboardingModule() {
   const [visibleRoleIds, setVisibleRoleIds] = useState<number[]>([]);
   const [rolesDropdownOpen, setRolesDropdownOpen] = useState(false);
   const [effectivePermUserId, setEffectivePermUserId] = useState<number | null>(null);
-  const [securitySubTab, setSecuritySubTab] = useState<"2fa" | "password">("2fa");
+  const [securitySubTab, setSecuritySubTab] = useState<"2fa" | "password" | "ip_whitelist">("2fa");
+  const [ipWhitelist, setIpWhitelist] = useState<{ enabled: boolean; entries: any[]; current_ip: string } | null>(null);
+  const [secSessions, setSecSessions] = useState<any[] | null>(null);
+  const [secLoginHistory, setSecLoginHistory] = useState<any[] | null>(null);
+  const [secSettings, setSecSettings] = useState<any>(null);
   const [pwdPolicy, setPwdPolicy] = useState<Record<string, any> | null>(null);
   const [permissionLogs, setPermissionLogs] = useState<any[]>([]);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [calendarEvents, setCalendarEvents] = useState<any[] | null>(null);
+  const [calendarEventsKey, setCalendarEventsKey] = useState("");
   const [calendarView, setCalendarView] = useState<"month" | "week" | "list">("month");
   const [calendarListFilter, setCalendarListFilter] = useState("all");
   const [orgView, setOrgView] = useState<"tree" | "list" | "dept">("tree");
   const [orgSearch, setOrgSearch] = useState("");
   const [auditFilter, setAuditFilter] = useState("all");
   const [auditSearch, setAuditSearch] = useState("");
+  const [auditEntries, setAuditEntries] = useState<any[]>([]);
+  const [auditLoaded, setAuditLoaded] = useState(false);
   const [buddyPairs, setBuddyPairs] = useState<any[]>([]);
   const [selectedBuddyPair, setSelectedBuddyPair] = useState<number | null>(null);
   // Org chart states
@@ -515,8 +653,23 @@ export default function OnboardingModule() {
   const [emailConfig, setEmailConfig] = useState({ single_recipient: "", from_address: "no-reply@illizeo.com", from_name: "Illizeo", mailer: "log" });
   const [tplCatFilter, setTplCatFilter] = useState<string>("all");
   const [tplPreview, setTplPreview] = useState(false);
+  // Live tick for countdowns (updates every second)
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Apparence & settings
-  const [themeColor, setThemeColor] = useState(() => localStorage.getItem("illizeo_theme_color") || "#C2185B");
+  const [themeColor, setThemeColor] = useState(() => {
+    const saved = localStorage.getItem("illizeo_theme_color");
+    // Migrate old default color to new Illizeo brand color
+    if (!saved || saved === "#C2185B") {
+      localStorage.setItem("illizeo_theme_color", "#E41076");
+      return "#E41076";
+    }
+    return saved;
+  });
   const [region, setRegion] = useState(() => localStorage.getItem("illizeo_region") || "CH");
   const [dateFormat, setDateFormat] = useState(() => localStorage.getItem("illizeo_date_format") || "DD/MM/YYYY");
   const [timeFormat, setTimeFormat] = useState(() => localStorage.getItem("illizeo_time_format") || "24h");
@@ -575,7 +728,7 @@ export default function OnboardingModule() {
   const [suspendedParcours, setSuspendedParcours] = useState<Set<number>>(new Set());
   const [docPieces, setDocPieces] = useState<{ nom: string; obligatoire: boolean; type: "upload" | "formulaire" }[]>([]);
   const [parcoursStatut, setParcoursStatut] = useState<"Actif" | "Brouillon" | "Archivé">("Actif");
-  const [groupeColor, setGroupeColor] = useState("#C2185B");
+  const [groupeColor, setGroupeColor] = useState("#E41076");
   const [groupeMembres, setGroupeMembres] = useState<string[]>([]);
   const _mockContrats = [
     { id: 1, nom: "CDI — Droit Suisse", type: "CDI", juridiction: "Suisse", variables: 18, derniereMaj: "15/02/2026", actif: true, fichier: "CDI_Suisse_v3.docx" },
@@ -606,7 +759,7 @@ export default function OnboardingModule() {
   ]);
   const [gradientColor, setGradientColor] = useState("#2D1B3D");
   const [loginGradientStart, setLoginGradientStart] = useState(() => localStorage.getItem("illizeo_login_gradient_start") || "#1a1a2e");
-  const [loginGradientEnd, setLoginGradientEnd] = useState(() => localStorage.getItem("illizeo_login_gradient_end") || "#C2185B");
+  const [loginGradientEnd, setLoginGradientEnd] = useState(() => localStorage.getItem("illizeo_login_gradient_end") || "#E41076");
   const [bannerUploaded, setBannerUploaded] = useState(false);
   const [employeeBannerColor, setEmployeeBannerColor] = useState(() => localStorage.getItem("illizeo_banner_color") || "#2D1B3D");
   const [employeeBannerCustom, setEmployeeBannerCustom] = useState(false);
@@ -625,6 +778,8 @@ export default function OnboardingModule() {
   const [modalFormFields, setModalFormFields] = useState<{ label: string; type: string }[]>([]);
   const [modalQuestions, setModalQuestions] = useState<{ question: string; type: string; options?: string[] }[]>([]);
   const [modalSubtasks, setModalSubtasks] = useState<string[]>([]);
+  // Per-action subtask checkbox state (UI-only, keyed by action template id → index → checked)
+  const [subtaskChecks, setSubtaskChecks] = useState<Record<string | number, Record<number, boolean>>>({});
   const [phases, setPhases] = useState(() => _MOCK_PHASE_DEFAULTS.map(p => ({ ...p })));
   useEffect(() => { if (PHASE_DEFAULTS !== _MOCK_PHASE_DEFAULTS) setPhases(PHASE_DEFAULTS.map(p => ({ ...p }))); }, [PHASE_DEFAULTS]);
   const [selectedPhaseId, setSelectedPhaseId] = useState<number | null>(null);
@@ -640,6 +795,17 @@ export default function OnboardingModule() {
   const [sigContratData, setSigContratData] = useState<any>(null);
   const [actionTab, setActionTab] = useState<DashboardTab>("toutes");
   const [showProfile, setShowProfile] = useState(false);
+  const [expandedFormId, setExpandedFormId] = useState<number | string | null>(null);
+  const [formFieldValues, setFormFieldValues] = useState<Record<string, any>>({});
+  const [aiChatMessages, setAiChatMessages] = useState<{ role: "user" | "assistant"; content: string; timestamp: string }[]>([]);
+  const [aiChatInput, setAiChatInput] = useState("");
+  const [aiChatLoading, setAiChatLoading] = useState(false);
+  const aiChatEndRef = useRef<HTMLDivElement>(null);
+  const [aiParcoursModal, setAiParcoursModal] = useState(false);
+  const [aiParcoursPrompt, setAiParcoursPrompt] = useState("");
+  const [aiParcoursLoading, setAiParcoursLoading] = useState(false);
+  const [aiParcoursResult, setAiParcoursResult] = useState<any>(null);
+  const [aiParcoursError, setAiParcoursError] = useState("");
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [selectedTeamMember, setSelectedTeamMember] = useState<any>(null);
   const [ocrModal, setOcrModal] = useState<any>(null);
@@ -653,6 +819,10 @@ export default function OnboardingModule() {
   const [saAiConfig, setSaAiConfig] = useState<any>(null);
   const [saAiTenantUsage, setSaAiTenantUsage] = useState<any[]>([]);
   const [aiUsageData, setAiUsageData] = useState<any>(null);
+  const [aiInsights, setAiInsights] = useState<any>(null);
+  const [aiInsightsModalOpen, setAiInsightsModalOpen] = useState(false);
+  const [editingInfoSection, setEditingInfoSection] = useState<string | null>(null);
+  const [editInfoData, setEditInfoData] = useState<Record<string, string>>({});
   const [protectionOpenSection, setProtectionOpenSection] = useState<string | null>(null);
   const [generateContrat, setGenerateContrat] = useState<any>(null);
   const [generateCollabId, setGenerateCollabId] = useState<number | null>(null);
@@ -673,11 +843,34 @@ export default function OnboardingModule() {
   useEffect(() => { if (subTab === "consommation") loadConsumption(); }, [consoMonth.year, consoMonth.month, subTab]);
   const [profileTab, setProfileTab] = useState("infos");
   const [formData, setFormData] = useState({
-    prenom: "Nadia", nom: "Ferreira", dateNaissance: "15/09/1990", genre: "Femme",
-    nationalite: "Marocaine", metier: "Chef de Projet", site: "Genève",
-    departement: "B030-Switzerland", fuseau: "Europe/Paris (UTC +01:00)", dateDebut: "01/06/2026",
-    email: "nadia.ferreira@gmail.com", password: "", confirmPassword: "", photoUploaded: false,
+    prenom: "", nom: "", dateNaissance: "", genre: "",
+    nationalite: "", metier: "", site: "",
+    departement: "", fuseau: "Europe/Paris (UTC +01:00)", dateDebut: "",
+    email: "", password: "", confirmPassword: "", photoUploaded: false,
   });
+  // Hydrate formData from authenticated user + collaborateur profile
+  useEffect(() => {
+    if (!auth.isAuthenticated) return;
+    const u: any = auth.user || {};
+    const c: any = myCollabProfile || {};
+    const fullName = u.name || `${c.prenom || ""} ${c.nom || ""}`.trim();
+    const parts = fullName.split(" ");
+    const prenom = c.prenom || parts[0] || "";
+    const nom = c.nom || parts.slice(1).join(" ") || "";
+    setFormData(prev => ({
+      ...prev,
+      prenom, nom,
+      email: u.email || c.email || prev.email,
+      metier: c.poste || u.poste || prev.metier,
+      site: c.site || prev.site,
+      departement: c.departement || prev.departement,
+      dateDebut: c.dateDebut || c.date_debut || prev.dateDebut,
+      dateNaissance: c.date_naissance || c.dateNaissance || prev.dateNaissance,
+      genre: c.genre || prev.genre,
+      nationalite: c.nationalite || prev.nationalite,
+      fuseau: c.fuseau || c.timezone || prev.fuseau,
+    }));
+  }, [auth.isAuthenticated, auth.user, myCollabProfile]);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [acceptCGU, setAcceptCGU] = useState(false);
 
@@ -755,25 +948,38 @@ export default function OnboardingModule() {
       addToast(`${formData.prenom} a complété : ${action.title.substring(0, 40)}...`, "info", "rh");
     }
     // Call API — use assignment ID if available, otherwise use action ID
+    const refreshLb = () => import('./api/endpoints').then(async m => {
+      try { const lb = await (m as any).getMyLeaderboard?.(); if (lb) setLeaderboardData(lb); } catch {}
+    });
     if (assignmentId) {
-      apiCompleteMyAction(assignmentId).catch(() => {});
+      apiCompleteMyAction(assignmentId).then(refreshLb).catch(() => {});
     } else {
-      apiCompleteByAction(actionId).catch(() => {});
+      apiCompleteByAction(actionId).then(refreshLb).catch(() => {});
     }
   }, [formData.prenom, addTimelineEntry, addToast]);
 
   // Employee reactivates an action
-  const handleReactivateAction = useCallback((actionId: number, assignmentId?: number) => {
+  const handleReactivateAction = useCallback(async (actionId: number, assignmentId?: number) => {
     setCompletedActions(prev => { const s = new Set(prev); s.delete(actionId); return s; });
     const action = ACTIONS.find(a => a.id === actionId);
     if (action) {
       addToast(`Action "${action.title.substring(0, 40)}..." réactivée`, "info");
     }
-    // Call API — use assignment ID if available, otherwise use action ID
-    if (assignmentId) {
-      apiReactivateMyAction(assignmentId).catch(() => {});
-    } else {
-      apiReactivateByAction(actionId).catch(() => {});
+    try {
+      if (assignmentId) {
+        await apiReactivateMyAction(assignmentId);
+      } else {
+        await apiReactivateByAction(actionId);
+      }
+      // Refetch profile so EMPLOYEE_ACTIONS sees the fresh assignment_status="a_faire".
+      // Without this, the inline _synced re-sync would re-add the action to completedActions
+      // because the cached myCollabProfile.parcours_actions still has assignment_status="termine".
+      const fresh = await getMyCollaborateur();
+      if (fresh) setMyCollabProfile(fresh);
+    } catch {
+      // API failed — revert the optimistic update
+      setCompletedActions(prev => { const s = new Set(prev); s.add(actionId); return s; });
+      addToast("Impossible de réactiver l'action", "error");
     }
   }, [addToast]);
 
@@ -818,13 +1024,13 @@ export default function OnboardingModule() {
     // API data
     COLLABORATEURS, refetchCollaborateurs, PARCOURS_TEMPLATES, refetchParcours,
     ACTION_TEMPLATES, refetchActions, GROUPES, refetchGroupes,
-    PHASE_DEFAULTS, refetchPhases, WORKFLOW_RULES, EMAIL_TEMPLATES,
+    PHASE_DEFAULTS, refetchPhases, WORKFLOW_RULES, refetchWorkflows, EMAIL_TEMPLATES, refetchEmailTemplates,
     ADMIN_DOC_CATEGORIES, NOTIFICATIONS_LIST, integrations, refetchIntegrations,
     apiContrats, authRole,
     // Helpers
     addToast_admin, showConfirm, showPrompt, switchLang, toggleDarkMode,
     resetTr, setTr, buildTranslationsPayload,
-    addToast, addTimelineEntry, handleEmployeeSubmitDoc, handleRHValidateDoc,
+    addToast, addTimelineEntry, nowTick, handleEmployeeSubmitDoc, handleRHValidateDoc,
     handleRHRefuseDoc, handleCompleteAction, handleReactivateAction, handleRelance,
     // Computed
     docsSubmitted, docsValidated, docsTotal, docsMissing, employeeProgression,
@@ -856,6 +1062,15 @@ export default function OnboardingModule() {
     subEmployeeCount, setSubEmployeeCount,
     billingInfo, setBillingInfo,
     paymentMethod, setPaymentMethod,
+    stripeModalOpen, setStripeModalOpen,
+    stripeMethods, setStripeMethods,
+    invoiceConfigOpen, setInvoiceConfigOpen,
+    invoiceConfig, setInvoiceConfig,
+    billingContactEdit, setBillingContactEdit,
+    billingModalOpen, setBillingModalOpen, billingModalCallback, invoicesList, setInvoicesList, supportAccesses, setSupportAccesses, supportAccessForm, setSupportAccessForm,
+    billingInfoEdit, setBillingInfoEdit,
+    stripePromise, setStripePromise,
+    subStep, setSubStep,
     storageUsage, setStorageUsage,
     signatureUsage, setSignatureUsage,
     showPricing, setShowPricing,
@@ -921,7 +1136,6 @@ export default function OnboardingModule() {
     showPreboard, setShowPreboard,
     dashPage, setDashPage,
     adminPage, setAdminPage,
-    sidebarCollapsed, setSidebarCollapsed,
     adminModal, setAdminModal,
     parcoursFilter, setParcoursFilter,
     actionFilter, setActionFilter,
@@ -966,6 +1180,9 @@ export default function OnboardingModule() {
     suiviFilter, setSuiviFilter,
     suiviSearch, setSuiviSearch,
     suiviParcoursFilter, setSuiviParcoursFilter,
+    suiviScope, setSuiviScope,
+    suiviSiteFilter, setSuiviSiteFilter,
+    suiviDeptFilter, setSuiviDeptFilter,
     collabMenuId, setCollabMenuId,
     adMappings, setAdMappings,
     adGroups, setAdGroups,
@@ -989,12 +1206,12 @@ export default function OnboardingModule() {
     translateEN, setTranslateEN,
     adminUsers, setAdminUsers,
     adminRoles, setAdminRoles, rolePanelMode, setRolePanelMode, rolePanelData, setRolePanelData,
-    hasPermission, isSuperAdmin, userPermissions, userRoleSlugs, myCollabProfile,
+    hasPermission, isSuperAdmin, userPermissions, userRoleSlugs, myCollabProfile, dailyQuote, avatarMenuOpen, setAvatarMenuOpen, sidebarCollapsed, setSidebarCollapsed,
     roleTab, setRoleTab, selectedRoleId, setSelectedRoleId, permMatrixFilter, setPermMatrixFilter,
     visibleRoleIds, setVisibleRoleIds, rolesDropdownOpen, setRolesDropdownOpen, effectivePermUserId, setEffectivePermUserId,
-    permissionLogs, setPermissionLogs, securitySubTab, setSecuritySubTab, pwdPolicy, setPwdPolicy,
-    calendarMonth, setCalendarMonth, calendarView, setCalendarView, calendarListFilter, setCalendarListFilter,
-    orgView, setOrgView, orgSearch, setOrgSearch, auditFilter, setAuditFilter, auditSearch, setAuditSearch, buddyPairs, setBuddyPairs, selectedBuddyPair, setSelectedBuddyPair,
+    permissionLogs, setPermissionLogs, securitySubTab, setSecuritySubTab, pwdPolicy, setPwdPolicy, ipWhitelist, setIpWhitelist, secSessions, setSecSessions, secLoginHistory, setSecLoginHistory, secSettings, setSecSettings,
+    calendarMonth, setCalendarMonth, calendarView, setCalendarView, calendarListFilter, setCalendarListFilter, calendarEvents, setCalendarEvents, calendarEventsKey, setCalendarEventsKey,
+    orgView, setOrgView, orgSearch, setOrgSearch, auditFilter, setAuditFilter, auditSearch, setAuditSearch, auditEntries, setAuditEntries, auditLoaded, setAuditLoaded, buddyPairs, setBuddyPairs, selectedBuddyPair, setSelectedBuddyPair,
     orgExpandedNodes, setOrgExpandedNodes, orgSortCol, setOrgSortCol, orgSortDir, setOrgSortDir,
     buddyTab, setBuddyTab, buddyNoteInput, setBuddyNoteInput, buddyFeedbackRating, setBuddyFeedbackRating, buddyFeedbackComment, setBuddyFeedbackComment,
     auditExpandedEntry, setAuditExpandedEntry, auditVisibleCount, setAuditVisibleCount,
@@ -1036,6 +1253,16 @@ export default function OnboardingModule() {
     campaignPanelMode, setCampaignPanelMode,
     campaignPanelData, setCampaignPanelData,
     companyBlocks, setCompanyBlocks,
+    cultureQuizState, setCultureQuizState,
+    leaderboardData, setLeaderboardData,
+    dashboardActionsView, setDashboardActionsView,
+    calendarWeekOffset, setCalendarWeekOffset,
+    dashboardFocusActionId, setDashboardFocusActionId,
+    collabAccompagnants, setCollabAccompagnants,
+    tenantUsersList, setTenantUsersList,
+    accompagnantDraft, setAccompagnantDraft,
+    mesActionsView, setMesActionsView,
+    isMobile, viewportWidth,
     editingBlockId, setEditingBlockId,
     userNotifs, setUserNotifs,
     notifUnread, setNotifUnread,
@@ -1079,6 +1306,7 @@ export default function OnboardingModule() {
     modalFormFields, setModalFormFields,
     modalQuestions, setModalQuestions,
     modalSubtasks, setModalSubtasks,
+    subtaskChecks, setSubtaskChecks,
     phases, setPhases,
     selectedPhaseId, setSelectedPhaseId,
     messageCanal, setMessageCanal,
@@ -1088,10 +1316,12 @@ export default function OnboardingModule() {
     showDocCategory, setShowDocCategory,
     showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading, sigContratData, setSigContratData,
     actionTab, setActionTab,
-    showProfile, setShowProfile,
+    showProfile, setShowProfile, expandedFormId, setExpandedFormId, formFieldValues, setFormFieldValues,
+    aiChatMessages, setAiChatMessages, aiChatInput, setAiChatInput, aiChatLoading, setAiChatLoading, aiChatEndRef,
+    aiParcoursModal, setAiParcoursModal, aiParcoursPrompt, setAiParcoursPrompt, aiParcoursLoading, setAiParcoursLoading, aiParcoursResult, setAiParcoursResult, aiParcoursError, setAiParcoursError,
     showTeamModal, setShowTeamModal, selectedTeamMember, setSelectedTeamMember,
     ocrModal, setOcrModal, ocrFile, setOcrFile, ocrPreview, setOcrPreview, ocrLoading, setOcrLoading, ocrResult, setOcrResult, ocrError, setOcrError, ocrWarning, setOcrWarning, ocrUsage, setOcrUsage,
-    saAiConfig, setSaAiConfig, saAiTenantUsage, setSaAiTenantUsage, aiUsageData, setAiUsageData, protectionOpenSection, setProtectionOpenSection,
+    saAiConfig, setSaAiConfig, saAiTenantUsage, setSaAiTenantUsage, aiUsageData, setAiUsageData, aiInsights, setAiInsights, aiInsightsModalOpen, setAiInsightsModalOpen, editingInfoSection, setEditingInfoSection, editInfoData, setEditInfoData, protectionOpenSection, setProtectionOpenSection,
     generateContrat, setGenerateContrat, generateCollabId, setGenerateCollabId, generateData, setGenerateData, generateLoading, setGenerateLoading,
     consoData, setConsoData, consoMonth, setConsoMonth, consoLoading, setConsoLoading, consoFilter, setConsoFilter, consoSearch, setConsoSearch, loadConsumption,
     profileTab, setProfileTab,
@@ -1112,16 +1342,48 @@ export default function OnboardingModule() {
     }
   }, [step]);
 
-  // Dynamic doc category missing counts
+  // Returns one category per action of the *current employee's parcours* that
+  // exposes `piecesRequises` — any action type (document, formulaire, signature, …).
+  // Strict: no mock fallback, no cross-parcours preview. If the user has no
+  // parcours, or the parcours has no action with pieces, returns []. The panel
+  // is responsible for rendering an empty state in that case.
   const getLiveDocCategories = useCallback(() => {
-    return DOC_CATEGORIES.map(cat => {
-      const missingCount = cat.docs.filter(docName => {
-        const status = employeeDocs[docName];
-        return !status || status === "manquant" || status === "refuse";
-      }).length;
-      return { ...cat, missing: missingCount };
-    });
-  }, [employeeDocs]);
+    const myCollab: any = myCollabProfile || COLLABORATEURS.find((c: any) => c.email === auth.user?.email);
+    const profileActions = myCollab?.parcours_actions || [];
+
+    let candidateActions: any[] = [];
+    if (profileActions.length > 0) {
+      candidateActions = profileActions;
+    } else if (myCollab?.parcours_id || myCollab?.parcours_nom) {
+      const parcoursName = myCollab?.parcours_nom
+        || PARCOURS_TEMPLATES.find((p: any) => p.id === myCollab?.parcours_id)?.nom
+        || "";
+      candidateActions = ACTION_TEMPLATES.filter((a: any) =>
+        (myCollab?.parcours_id && a.parcours_id === myCollab.parcours_id)
+        || (parcoursName && a.parcours === parcoursName)
+      );
+    }
+
+    return candidateActions
+      .map((a: any) => {
+        const pieces: string[] = a.piecesRequises || a.pieces_requises || [];
+        return { action: a, pieces };
+      })
+      .filter(({ pieces }: any) => Array.isArray(pieces) && pieces.length > 0)
+      .map(({ action, pieces }: any) => {
+        const missing = pieces.filter((p: string) => {
+          const status = employeeDocs[p];
+          return !status || status === "manquant" || status === "refuse";
+        }).length;
+        return {
+          id: `action_${action.id}`,
+          title: action.titre,
+          docs: pieces,
+          missing,
+          type: action.type || "document",
+        };
+      });
+  }, [employeeDocs, myCollabProfile, COLLABORATEURS, PARCOURS_TEMPLATES, ACTION_TEMPLATES, auth.user]);
 
   // ─── AD provisioning effects ────────────────────────────────
   useEffect(() => {
@@ -1152,11 +1414,29 @@ export default function OnboardingModule() {
     }
   }, [auth.isAuthenticated, adminPage]);
 
+  // ─── Load tenant branding before auth (for login page gradient) ──
+  useEffect(() => {
+    if (tenantResolved && !auth.isAuthenticated) {
+      getTenantBranding().then(s => {
+        if (s.login_gradient_start) { setLoginGradientStart(s.login_gradient_start); localStorage.setItem("illizeo_login_gradient_start", s.login_gradient_start); }
+        if (s.login_gradient_end) { setLoginGradientEnd(s.login_gradient_end); localStorage.setItem("illizeo_login_gradient_end", s.login_gradient_end); }
+        if (s.login_bg_image) { setLoginBgImage(s.login_bg_image); localStorage.setItem("illizeo_login_bg_image", s.login_bg_image); }
+        if (s.custom_logo) { setCustomLogo(s.custom_logo); localStorage.setItem("illizeo_custom_logo", s.custom_logo); }
+        if (s.custom_logo_full) { setCustomLogoFull(s.custom_logo_full); localStorage.setItem("illizeo_custom_logo_full", s.custom_logo_full); }
+      }).catch(() => {});
+    }
+  }, [tenantResolved, auth.isAuthenticated]);
+
   // ─── Company settings effects ──────────────────────────────
   useEffect(() => {
     if (auth.isAuthenticated) {
       getCompanySettings().then(s => {
-        if (s.theme_color) { setThemeColor(s.theme_color); localStorage.setItem("illizeo_theme_color", s.theme_color); }
+        if (s.theme_color) {
+          // Migrate legacy burgundy color from DB to new Illizeo brand color
+          const themeColor = s.theme_color === "#C2185B" ? "#E41076" : s.theme_color;
+          setThemeColor(themeColor);
+          localStorage.setItem("illizeo_theme_color", themeColor);
+        }
         if (s.custom_logo) { setCustomLogo(s.custom_logo); localStorage.setItem("illizeo_custom_logo", s.custom_logo); }
         if (s.custom_logo_full) { setCustomLogoFull(s.custom_logo_full); localStorage.setItem("illizeo_custom_logo_full", s.custom_logo_full); }
         if (s.custom_favicon) { setCustomFavicon(s.custom_favicon); localStorage.setItem("illizeo_custom_favicon", s.custom_favicon); }
@@ -1249,6 +1529,12 @@ export default function OnboardingModule() {
         setSigActionAck(null); setSigContratData(null);
         getMyAcknowledgement(sigDocId).then(setSigActionAck).catch(() => {});
       }
+    } else if (actionType === "lecture") {
+      const sigDocId = actionOptions?.signature_document_id;
+      if (sigDocId) {
+        setSigActionAck(null); setSigContratData(null);
+        getMyAcknowledgement(sigDocId).then(setSigActionAck).catch(() => {});
+      }
     }
   }, [showActionDetail]);
   // Close notification dropdown on outside click
@@ -1280,7 +1566,7 @@ export default function OnboardingModule() {
       getMyBadges().then(setMyBadges).catch(() => {});
     }
     if (auth.isAuthenticated && dashPage === "satisfaction") {
-      getNpsSurveys().then(setEmpSurveys).catch(() => {});
+      getMyNpsSurveys().then(setEmpSurveys).catch(() => getNpsSurveys().then(s => setEmpSurveys(s.map(sv => ({ survey: sv, token: null, completed: false, completed_at: null })))).catch(() => {}));
     }
   }, [auth.isAuthenticated, dashPage]);
 
@@ -1438,28 +1724,44 @@ export default function OnboardingModule() {
   ctx.hasTrackedOnboard = hasTrackedOnboard;
 
   // SIDEBAR_ITEMS must be built before factories since EmployeePages destructures it
+  // Compute employee-side counters
+  const myActionsTotal = ACTIONS.length;
+  const myActionsCompleted = completedActions.size;
+  const checklistBadge = myActionsTotal > 0 ? `${myActionsCompleted}/${myActionsTotal}` : undefined;
+  const docsRemaining = docsTotal - docsValidated;
+  const docsBadge = docsRemaining > 0 ? docsRemaining : undefined;
+
+  const tenantId = (typeof localStorage !== "undefined" ? localStorage.getItem("illizeo_tenant_id") : "") || "";
+  const isDemoTenant = tenantId === "illizeo" || tenantId === "illizeo2";
+  const hasOfficeTour = isDemoTenant || (companyBlocks || []).some((b: any) => b.type === "office_tour" && b.actif && (b.data?.rooms || []).length > 0);
   const SIDEBAR_ITEMS = [
     { section: t('sidebar.my_workspace'), items: [
-      { id: "tableau_de_bord" as const, label: t('sidebar.dashboard'), icon: LayoutDashboard },
-      { id: "mes_actions" as const, label: t('sidebar.my_actions'), icon: Zap, badge: 7 },
-      { id: "suivi" as const, label: t('sidebar.my_tracking'), icon: Target },
-      { id: "messagerie" as const, label: t('sidebar.messaging'), icon: MessageCircle },
-      { id: "notifications" as const, label: t('sidebar.notifications'), icon: Bell, badge: notifUnread > 0 ? notifUnread : undefined },
+      { id: "tableau_de_bord" as const, label: "Mon onboarding", icon: LayoutDashboard, emoji: "🏠" },
+      { id: "mes_actions" as const, label: "Checklist J1", icon: ListChecks, badge: checklistBadge },
+      { id: "suivi" as const, label: "Parcours 100j", icon: Target },
+      { id: "organigramme" as const, label: "Mon équipe", icon: Users },
+      { id: "mes_rdv" as const, label: "Mes RDV", icon: Calendar },
+      { id: "mes_signatures" as const, label: "Mes signatures", icon: FileSignature, badge: docsBadge },
+      ...(hasOfficeTour ? [{ id: "bureaux" as const, label: "Bureaux", icon: MapPin }] : []),
+      { id: "satisfaction" as const, label: "Feedback", icon: MessageSquare },
     ]},
-    { section: t('sidebar.illizeo'), items: [
+    { section: "Plus", items: [
+      { id: "messagerie" as const, label: t('sidebar.messaging'), icon: MessageCircle },
       { id: "entreprise" as const, label: t('sidebar.company'), icon: Building2 },
+      { id: "mon_profil" as const, label: "Mon profil", icon: UserCheck },
+      { id: "assistant_ia" as const, label: "Assistant IA", icon: Sparkles },
       { id: "cooptation" as const, label: t('admin.cooptation'), icon: Handshake },
-      { id: "satisfaction" as const, label: t('admin.nps'), icon: Star },
+      { id: "notifications" as const, label: t('sidebar.notifications'), icon: Bell, badge: notifUnread > 0 ? notifUnread : undefined },
     ]},
   ];
   ctx.SIDEBAR_ITEMS = SIDEBAR_ITEMS;
 
   const empRenders = createEmployeeRenders(ctx);
   const {
-    renderSidebar, renderActionCard, renderDashboard, renderMesActions,
+    renderSidebar, renderEmployeeTopbar, renderActionCard, renderDashboard, renderMesActions, renderMonEquipe,
     renderMessagerie, renderCompanyBlock, renderEntreprise, renderRapports,
     renderWelcomeModal, renderDocPanel, renderActionDetail, renderProfileModal,
-    handleBannerFileUpload, handleSendMessage,
+    renderMonProfil, renderAssistantIA, handleBannerFileUpload, handleSendMessage,
   } = empRenders;
 
   ctx.renderActionCard = renderActionCard;
@@ -1506,7 +1808,7 @@ export default function OnboardingModule() {
         <PreboardSidebar />
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           {/* Hero banner — full width */}
-          <div className="iz-fade-in" style={{ height: 280, background: "linear-gradient(135deg, #2D1B3D 0%, #4A1942 30%, #C2185B 70%, #E91E8C 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", position: "relative", flexShrink: 0 }}>
+          <div className="iz-fade-in" style={{ height: 280, background: "linear-gradient(135deg, #2D1B3D 0%, #4A1942 30%, #E41076 70%, #E91E8C 100%)", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", position: "relative", flexShrink: 0 }}>
             <div style={{ position: "absolute", top: 20, left: 24 }}><IllizeoLogo size={36} /></div>
             <h1 className="iz-fade-up" style={{ fontSize: 32, fontWeight: 700, color: "#fff", textShadow: "0 2px 12px rgba(0,0,0,.2)", textAlign: "center", lineHeight: 1.3 }}>
               {lang === "fr" ? "Bonjour" : "Hello"} {auth.user?.name?.split(" ")[0] || ""} !<br /><span style={{ fontWeight: 400, fontSize: 20, opacity: .9 }}>{lang === "fr" ? "Bienvenue au sein de nos équipes" : "Welcome to the team"}</span>
@@ -1681,7 +1983,7 @@ export default function OnboardingModule() {
                 <p style={{ fontSize: 14, color: C.textLight, marginBottom: 28 }}>Cette photo sera visible par tes collègues. Tu peux aussi passer cette étape et l'ajouter plus tard.</p>
                 <div style={{ display: "flex", alignItems: "center", gap: 32, justifyContent: "center", marginBottom: 32 }}>
                   {/* Avatar preview */}
-                  <div style={{ width: 160, height: 160, borderRadius: "50%", background: formData.photoUploaded ? "linear-gradient(135deg, #E91E8C, #C2185B)" : C.bg, display: "flex", alignItems: "center", justifyContent: "center", border: `4px solid ${formData.photoUploaded ? C.pink : C.border}`, transition: "all .3s" }}>
+                  <div style={{ width: 160, height: 160, borderRadius: "50%", background: formData.photoUploaded ? "linear-gradient(135deg, #E91E8C, #E41076)" : C.bg, display: "flex", alignItems: "center", justifyContent: "center", border: `4px solid ${formData.photoUploaded ? C.pink : C.border}`, transition: "all .3s" }}>
                     {formData.photoUploaded ? (
                       <span style={{ fontSize: 48, fontWeight: 700, color: C.white }}>NF</span>
                     ) : (
@@ -1738,12 +2040,12 @@ export default function OnboardingModule() {
   // ─── DASHBOARD (MAIN APP) ────────────────────────────────
   if (role === "rh") {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text }}>
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" /><style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
+      <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: font, background: C.white, color: C.text }}>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" /><style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
         {/* Setup Wizard overlay */}
         {showSetupWizard && renderSetupWizard()}
         {renderSidebar_admin()}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", minWidth: 0 }}>
         {/* Top bar with notification bell */}
         <div style={{ height: 48, minHeight: 48, background: C.white, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", zIndex: 40, flexShrink: 0 }}>
           {/* Search bar */}
@@ -1913,6 +2215,264 @@ export default function OnboardingModule() {
         {adminPage === "admin_notifications" && renderNotifications_admin()}
         {adminPage === "admin_entreprise" && renderEntreprise_admin()}
         {adminPage === "admin_nps" && renderNPS()}
+        {adminPage === "admin_feedback_hub" && (() => {
+          // Lazy-load tab data on first view
+          const fetchTab = async () => {
+            const m = await import('./api/endpoints');
+            try {
+              if (adminFeedbackTab === "mood" && !adminMoods) {
+                const d = await (m as any).adminGetMoods?.(); if (d) setAdminMoods(d);
+              } else if (adminFeedbackTab === "suggestion" && adminSuggestions === null) {
+                const d = await (m as any).adminGetSuggestions?.(adminSuggStatusFilter || undefined); if (d) setAdminSuggestions(d);
+              } else if (adminFeedbackTab === "buddy" && !adminBuddyRatings) {
+                const d = await (m as any).adminGetBuddyRatings?.(); if (d) setAdminBuddyRatings(d);
+              } else if (adminFeedbackTab === "excited" && !adminExcited) {
+                const d = await (m as any).adminGetExcited?.(); if (d) setAdminExcited(d);
+              }
+            } catch {}
+          };
+          // Trigger fetch via setTimeout to avoid setState-during-render warning
+          setTimeout(fetchTab, 0);
+
+          const moodEmoji = (n: number) => ["", "😞", "😟", "😐", "🙂", "😄"][n] || "•";
+          const statusBadge: Record<string, { bg: string; fg: string; label: string }> = {
+            open: { bg: C.amberLight, fg: C.amber, label: "Ouvert" },
+            reviewing: { bg: C.blueLight, fg: C.blue, label: "En revue" },
+            done: { bg: C.greenLight, fg: C.green, label: "Traité" },
+            dismissed: { bg: C.bg, fg: C.textMuted, label: "Rejeté" },
+          };
+          const catMeta: Record<string, { label: string; icon: any }> = {
+            suggestion: { label: "Suggestion", icon: Lightbulb },
+            improvement: { label: "Amélioration", icon: Sparkles },
+            bug: { label: "Bug", icon: Bug },
+            other: { label: "Autre", icon: MessageCircle },
+          };
+
+          return (
+            <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
+              <h1 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 6px" }}>Feedback collaborateurs</h1>
+              <p style={{ fontSize: 12, color: C.textMuted, margin: "0 0 20px" }}>Mood pulses, suggestions/bugs et évaluations buddy/manager remontés par les collaborateurs.</p>
+
+              {/* Sub-tabs */}
+              <div style={{ display: "flex", gap: 4, padding: 4, background: C.bg, borderRadius: 10, marginBottom: 20, width: "fit-content" }}>
+                {([
+                  { id: "mood", label: "Mood pulses", icon: Smile },
+                  { id: "suggestion", label: "Suggestions / bugs", icon: Lightbulb },
+                  { id: "buddy", label: "Buddy / manager", icon: Star },
+                  { id: "excited", label: "J'ai hâte", icon: Heart },
+                ] as const).map(tab => {
+                  const Icon = tab.icon;
+                  return (
+                    <button key={tab.id} onClick={() => setAdminFeedbackTab(tab.id)} style={{
+                      padding: "8px 16px", borderRadius: 6, fontSize: 12, fontWeight: adminFeedbackTab === tab.id ? 600 : 400,
+                      border: "none", cursor: "pointer", fontFamily: font,
+                      background: adminFeedbackTab === tab.id ? C.white : "transparent",
+                      color: adminFeedbackTab === tab.id ? C.pink : C.textMuted,
+                      boxShadow: adminFeedbackTab === tab.id ? "0 1px 3px rgba(0,0,0,.06)" : "none",
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                    }}><Icon size={14} /> {tab.label}</button>
+                  );
+                })}
+              </div>
+
+              {adminFeedbackTab === "mood" && (
+                <div>
+                  {adminMoods?.stats && (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+                      <div className="iz-card" style={{ ...sCard, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>MOY. 30J</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: C.pink }}>{adminMoods.stats.avg_30d ?? "—"}<span style={{ fontSize: 14, color: C.textMuted }}>/5</span></div>
+                      </div>
+                      <div className="iz-card" style={{ ...sCard, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>CHECK-INS 30J</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: C.text }}>{adminMoods.stats.count_30d}</div>
+                      </div>
+                      <div className="iz-card" style={{ ...sCard, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>NOTES BASSES (≤2)</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: C.red }}>{adminMoods.stats.low_mood_count_30d}</div>
+                      </div>
+                      <div className="iz-card" style={{ ...sCard }}>
+                        <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, marginBottom: 6 }}>DISTRIBUTION 30J</div>
+                        <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 36 }}>
+                          {[1, 2, 3, 4, 5].map(n => {
+                            const v = adminMoods.stats.distribution_30d?.[n] ?? 0;
+                            const max = Math.max(1, ...Object.values(adminMoods.stats.distribution_30d || {}) as number[]);
+                            return (
+                              <div key={n} style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{ height: `${(v / max) * 100}%`, minHeight: 2, background: n <= 2 ? C.red : n === 3 ? C.amber : C.green, borderRadius: 2 }} title={`${v}`} />
+                                <div style={{ fontSize: 14 }}>{moodEmoji(n)}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="iz-card" style={{ ...sCard, padding: 0 }}>
+                    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 600 }}>Derniers check-ins</div>
+                    {(adminMoods?.entries || []).map((e: any) => {
+                      const c = e.collaborateur;
+                      const name = c ? `${c.prenom} ${c.nom}` : `User #${e.user_id}`;
+                      return (
+                        <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderBottom: `1px solid ${C.border}` }}>
+                          <div style={{ fontSize: 24 }}>{moodEmoji(e.mood)}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{name}</div>
+                            <div style={{ fontSize: 11, color: C.textLight }}>{e.comment || <span style={{ fontStyle: "italic", color: C.textMuted }}>(sans commentaire)</span>}</div>
+                          </div>
+                          <div style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>{new Date(e.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      );
+                    })}
+                    {(!adminMoods || adminMoods.entries.length === 0) && (
+                      <div style={{ padding: "32px 16px", textAlign: "center", color: C.textMuted, fontSize: 12 }}>Aucun mood check-in pour le moment.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {adminFeedbackTab === "suggestion" && (
+                <div>
+                  <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>FILTRE :</span>
+                    {(["", "open", "reviewing", "done", "dismissed"] as const).map(s => (
+                      <button key={s} onClick={() => { setAdminSuggStatusFilter(s); setAdminSuggestions(null); }} style={{
+                        padding: "5px 12px", borderRadius: 14, fontSize: 11, border: "none", cursor: "pointer", fontFamily: font,
+                        background: adminSuggStatusFilter === s ? C.pink : C.bg,
+                        color: adminSuggStatusFilter === s ? "#fff" : C.textLight,
+                      }}>{s === "" ? "Tous" : statusBadge[s]?.label}</button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {(adminSuggestions || []).map((s: any) => {
+                      const c = s.collaborateur;
+                      const name = s.anonymous ? "Anonyme" : (c ? `${c.prenom} ${c.nom}` : `User #${s.user_id}`);
+                      const sb = statusBadge[s.status] || statusBadge.open;
+                      return (
+                        <div key={s.id} className="iz-card" style={{ ...sCard }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                            <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: C.pinkBg, color: C.pink, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              {(() => { const Icon = catMeta[s.category]?.icon || MessageCircle; return <Icon size={11} />; })()}
+                              {catMeta[s.category]?.label || s.category}
+                            </span>
+                            <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: sb.bg, color: sb.fg }}>{sb.label}</span>
+                            <div style={{ flex: 1 }} />
+                            <div style={{ fontSize: 11, color: C.textMuted, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                              {s.anonymous && <EyeOff size={11} />}
+                              {name} · {new Date(s.created_at).toLocaleDateString('fr-FR')}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5, marginBottom: 10, whiteSpace: "pre-wrap" }}>{s.content}</div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {(["open", "reviewing", "done", "dismissed"] as const).filter(st => st !== s.status).map(st => (
+                              <button key={st} onClick={async () => {
+                                try {
+                                  const m = await import('./api/endpoints');
+                                  await (m as any).adminUpdateSuggestionStatus?.(s.id, st);
+                                  setAdminSuggestions(prev => (prev || []).map((x: any) => x.id === s.id ? { ...x, status: st } : x));
+                                  addToast_admin("Statut mis à jour");
+                                } catch { addToast_admin("Erreur"); }
+                              }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "4px 10px" }}>→ {statusBadge[st].label}</button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {adminSuggestions !== null && adminSuggestions.length === 0 && (
+                      <div className="iz-card" style={{ ...sCard, textAlign: "center", color: C.textMuted, fontSize: 12, padding: 32 }}>Aucune suggestion {adminSuggStatusFilter ? `avec le statut "${statusBadge[adminSuggStatusFilter]?.label}"` : ""}.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {adminFeedbackTab === "buddy" && (
+                <div>
+                  {adminBuddyRatings?.stats && (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+                      <div className="iz-card" style={{ ...sCard, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>MOY. BUDDY</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: C.amber }}>{adminBuddyRatings.stats.avg_buddy ?? "—"}<span style={{ fontSize: 14, color: C.textMuted }}>/5</span></div>
+                      </div>
+                      <div className="iz-card" style={{ ...sCard, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>MOY. MANAGER</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: C.amber }}>{adminBuddyRatings.stats.avg_manager ?? "—"}<span style={{ fontSize: 14, color: C.textMuted }}>/5</span></div>
+                      </div>
+                      <div className="iz-card" style={{ ...sCard, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>NOTES BASSES (≤2)</div>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: C.red }}>{adminBuddyRatings.stats.low_count}</div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="iz-card" style={{ ...sCard, padding: 0 }}>
+                    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 600 }}>Toutes les évaluations</div>
+                    {(adminBuddyRatings?.entries || []).map((r: any) => {
+                      const c = r.collaborateur;
+                      const name = c ? `${c.prenom} ${c.nom}` : `User #${r.user_id}`;
+                      return (
+                        <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderBottom: `1px solid ${C.border}` }}>
+                          <div style={{ width: 80, fontSize: 11, fontWeight: 600, color: C.text, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            {r.target_type === "buddy" ? <Star size={12} /> : <Briefcase size={12} />}
+                            {r.target_type === "buddy" ? "Buddy" : "Manager"}
+                          </div>
+                          <div style={{ display: "flex", gap: 2 }}>{[1,2,3,4,5].map(n => <span key={n} style={{ color: n <= r.rating ? C.amber : C.border, fontSize: 16 }}>★</span>)}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{name}</div>
+                            <div style={{ fontSize: 11, color: C.textLight }}>{r.comment || <span style={{ fontStyle: "italic", color: C.textMuted }}>(sans commentaire)</span>}</div>
+                          </div>
+                          <div style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>{new Date(r.created_at).toLocaleDateString('fr-FR')}</div>
+                        </div>
+                      );
+                    })}
+                    {(!adminBuddyRatings || adminBuddyRatings.entries.length === 0) && (
+                      <div style={{ padding: "32px 16px", textAlign: "center", color: C.textMuted, fontSize: 12 }}>Aucune évaluation pour le moment.</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {adminFeedbackTab === "excited" && (
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 20 }}>
+                    <div className="iz-card" style={{ ...sCard, textAlign: "center" }}>
+                      <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>TOTAL "J'AI HÂTE"</div>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: C.pink }}>{adminExcited?.total ?? 0}</div>
+                    </div>
+                    <div className="iz-card" style={{ ...sCard, textAlign: "center" }}>
+                      <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>DERNIER 30J</div>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: C.text }}>
+                        {(adminExcited?.entries || []).filter((e: any) => new Date(e.created_at).getTime() > Date.now() - 30 * 86400000).length}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="iz-card" style={{ ...sCard, padding: 0 }}>
+                    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, fontSize: 12, fontWeight: 600 }}>
+                      Collaborateurs ayant manifesté leur enthousiasme avant l'arrivée
+                    </div>
+                    {(adminExcited?.entries || []).map((e: any) => (
+                      <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderBottom: `1px solid ${C.border}` }}>
+                        <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Heart size={16} color={C.pink} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{e.employee_name}</div>
+                          <div style={{ fontSize: 11, color: C.textLight }}>
+                            {e.date_debut ? `Arrivée prévue le ${new Date(e.date_debut).toLocaleDateString('fr-FR')}` : "Date d'arrivée non renseignée"}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap" }}>{new Date(e.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                      </div>
+                    ))}
+                    {(!adminExcited || adminExcited.entries.length === 0) && (
+                      <div style={{ padding: "32px 16px", textAlign: "center", color: C.textMuted, fontSize: 12 }}>
+                        Aucun collaborateur n'a encore cliqué sur "J'ai hâte".
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {adminPage === "admin_contrats" && renderContrats()}
         {adminPage === "admin_integrations" && renderIntegrations()}
         {adminPage === "admin_cooptation" && renderCooptation()}
@@ -1931,6 +2491,182 @@ export default function OnboardingModule() {
         {adminPage === "admin_orgchart" && adminInline.renderAdminOrgChart()}
         {adminPage === "admin_buddy" && adminInline.renderAdminBuddy()}
         {adminPage === "admin_audit" && adminInline.renderAdminAuditLog()}
+        {adminPage === "admin_assistant_ia" && adminInline.renderAdminAssistantIA()}
+
+        {/* VUE MANAGER */}
+        {adminPage === "admin_manager_view" && (() => {
+          const myUserId = (auth.user as any)?.id;
+          const myName = (auth.user as any)?.name || "Manager";
+          const PALETTE = ["#E91E8C", "#1A73E8", "#9C27B0", "#00897B", "#F9A825", "#E53935", "#1A1A2E"];
+          const now = Date.now();
+          const sevenDaysMs = 7 * 86400000;
+
+          const parseDate = (s: any): Date => {
+            if (!s) return new Date();
+            const str = String(s);
+            const m1 = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+            if (m1) return new Date(+m1[1], +m1[2] - 1, +m1[3]);
+            const m2 = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (m2) return new Date(+m2[3], +m2[2] - 1, +m2[1]);
+            return new Date(str);
+          };
+
+          const isManagerInvolved = (action: any): boolean => {
+            const opts = action.options || {};
+            const roles = opts.participants_roles || [];
+            if (Array.isArray(roles) && roles.includes("manager")) return true;
+            const parts = String(opts.participants || "").toLowerCase();
+            return parts.includes("manager") || parts.includes("n+1");
+          };
+
+          const realArrivants = COLLABORATEURS
+            .filter((c: any) => c.status !== "termine")
+            .filter((c: any) => {
+              if (!myUserId) return false;
+              return c.manager?.user_id === myUserId
+                || (c.accompagnants || []).some((a: any) => a.role === "manager" && a.user_id === myUserId)
+                || (c.accompagnants || []).some((a: any) => a.role === "manager" && (a.id === myUserId || a.user?.id === myUserId));
+            })
+            .map((c: any, i: number) => {
+              const startDate = parseDate(c.dateDebut || c.date_debut);
+              const j = Math.max(1, Math.floor((now - startDate.getTime()) / 86400000) + 1);
+              const buddy = (c.accompagnants || []).find((a: any) => a.role === "buddy")?.name || "—";
+              const actions = c.parcours_actions || [];
+
+              const todo = actions
+                .filter((a: any) => (a.type === "rdv" || a.type === "entretien") && a.assignment_status !== "termine" && isManagerInvolved(a))
+                .map((a: any) => {
+                  const m = (a.delaiRelatif || a.delai_relatif || "J+0").match(/J([+-]?\d+)/);
+                  const offset = m ? parseInt(m[1], 10) : 0;
+                  const dueAt = new Date(startDate); dueAt.setDate(dueAt.getDate() + offset);
+                  const daysToDue = Math.round((dueAt.getTime() - now) / 86400000);
+                  return { titre: a.titre, dueAt, daysToDue };
+                })
+                .filter((x: any) => x.daysToDue >= -1 && x.daysToDue <= 14)
+                .sort((a: any, b: any) => a.dueAt.getTime() - b.dueAt.getTime())
+                .slice(0, 3)
+                .map((x: any) => x.daysToDue <= 0 ? `${x.titre} (aujourd'hui)` : x.daysToDue === 1 ? `${x.titre} (demain)` : `${x.titre} (dans ${x.daysToDue}j)`);
+
+              const done = actions
+                .filter((a: any) => a.assignment_status === "termine")
+                .map((a: any) => {
+                  const completedAt = a.assignment_completed_at ? new Date(a.assignment_completed_at) : null;
+                  return { titre: a.titre, completedAt };
+                })
+                .filter((x: any) => x.completedAt && (now - x.completedAt.getTime()) <= sevenDaysMs)
+                .sort((a: any, b: any) => (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0))
+                .slice(0, 3)
+                .map((x: any) => x.titre);
+
+              return {
+                id: c.id,
+                initials: c.initials, color: c.color || PALETTE[i % PALETTE.length],
+                name: `${c.prenom} ${c.nom}`, role: c.poste, j, buddy, pct: c.progression,
+                todo, done,
+              };
+            });
+
+          const ARRIVANTS = realArrivants;
+          const totalTodo = ARRIVANTS.reduce((acc: number, a: any) => acc + a.todo.length, 0);
+          const totalDoneRecent = ARRIVANTS.reduce((acc: number, a: any) => acc + a.done.length, 0);
+          const avgPct = ARRIVANTS.length > 0 ? Math.round(ARRIVANTS.reduce((acc: number, a: any) => acc + a.pct, 0) / ARRIVANTS.length) : 0;
+          if (ARRIVANTS.length === 0) {
+            return (
+              <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{myName} · 0 personne en intégration</div>
+                  <h1 style={{ fontSize: 24, fontWeight: 700, color: C.pink, margin: 0 }}>Mes nouveaux arrivants</h1>
+                </div>
+                <div className="iz-card" style={{ ...sCard, padding: 40, textAlign: "center", color: C.textMuted }}>
+                  <Users size={36} color={C.border} style={{ marginBottom: 12 }} />
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>Aucun arrivant assigné</div>
+                  <div style={{ fontSize: 12, lineHeight: 1.5, maxWidth: 480, margin: "0 auto" }}>
+                    Cette page liste les collaborateurs en cours d'intégration <b>dont vous êtes le manager direct</b>.
+                    Si vous attendez un arrivant, demandez à votre RH de vous assigner comme manager dans la fiche collaborateur (champ "Manager").
+                  </div>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{myName} · {ARRIVANTS.length} personne{ARRIVANTS.length > 1 ? "s" : ""} en intégration</div>
+                  <h1 style={{ fontSize: 24, fontWeight: 700, color: C.pink, margin: 0 }}>Mes nouveaux arrivants</h1>
+                </div>
+                <button className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "10px 22px", fontSize: 13 }}>+ Préparer un arrivant</button>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+                {[
+                  { label: "EN COURS", value: ARRIVANTS.length, color: C.pink },
+                  { label: "ACTIONS À FAIRE", value: totalTodo, sub: `${totalDoneRecent} validé${totalDoneRecent > 1 ? "s" : ""} 7j`, color: C.amber },
+                  { label: "SCORE MOYEN", value: `${avgPct}%`, color: C.green },
+                  { label: "DÉLAI ONBOARDING", value: "100j", color: "#9C27B0" },
+                ].map(k => (
+                  <div key={k.label} className="iz-card" style={{ ...sCard, padding: "16px 18px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1 }}>{k.label}</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: k.color, marginTop: 4 }}>{k.value}</div>
+                    {k.sub && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{k.sub}</div>}
+                  </div>
+                ))}
+              </div>
+              {ARRIVANTS.map(a => (
+                <div key={a.name} className="iz-card" style={{ ...sCard, marginBottom: 14, padding: 0, overflow: "hidden" }}>
+                  <div style={{ padding: "16px 22px", display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 48, height: 48, borderRadius: "50%", background: a.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700 }}>{a.initials}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{a.name}</div>
+                      <div style={{ fontSize: 12, color: C.textMuted }}>{a.role} · J+{a.j} sur 100 · Buddy : {a.buddy}</div>
+                    </div>
+                    <div style={{ minWidth: 220 }}>
+                      <div style={{ height: 6, background: C.bg, borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${a.pct}%`, background: `linear-gradient(90deg, ${C.pink}, #9C27B0)` }} />
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4, textAlign: "right" }}>{a.pct}% complété</div>
+                    </div>
+                    <button onClick={() => { setAdminPage("admin_suivi"); if (a.id) setCollabProfileId(a.id); }} style={{ ...sBtn("outline"), padding: "8px 16px", fontSize: 12 }}>Fiche</button>
+                    <button onClick={() => { setAdminPage("admin_messagerie"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 16px", fontSize: 12 }}>1:1</button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "0 22px 18px", gap: 24 }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.amber, letterSpacing: .5, marginBottom: 8 }}>⚠ VOS ACTIONS À FAIRE</div>
+                      {a.todo.length === 0 ? (
+                        <div style={{ fontSize: 12, color: C.textMuted, fontStyle: "italic", padding: "6px 0" }}>Aucune action en attente</div>
+                      ) : a.todo.map((tt: string, i: number) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+                          <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${C.amber}` }} />
+                          <span style={{ fontSize: 13, color: C.text }}>{tt}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.green, letterSpacing: .5, marginBottom: 8 }}>✓ RÉCEMMENT VALIDÉ (7j)</div>
+                      {a.done.length === 0 ? (
+                        <div style={{ fontSize: 12, color: C.textMuted, fontStyle: "italic", padding: "6px 0" }}>Aucune validation cette semaine</div>
+                      ) : a.done.map((d: string, i: number) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+                          <div style={{ width: 16, height: 16, borderRadius: 4, background: C.green, display: "flex", alignItems: "center", justifyContent: "center" }}><Check size={11} color="#fff" /></div>
+                          <span style={{ fontSize: 13, color: C.textLight }}>{d}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* CITATIONS DU JOUR — référentiel admin */}
+        {adminPage === "admin_quotes" && (
+          <AdminQuotesPage C={C} sCard={sCard} sBtn={sBtn} sInput={sInput} font={font} addToast={addToast_admin} />
+        )}
+
+        {/* RDV RÉCURRENTS — admin CRUD */}
+        {adminPage === "admin_recurring_meetings" && (
+          <AdminRecurringMeetingsPage C={C} sCard={sCard} sBtn={sBtn} sInput={sInput} font={font} addToast={addToast_admin} parcours={PARCOURS_TEMPLATES} collaborateurs={COLLABORATEURS} />
+        )}
           </>);
         })()}
 
@@ -2002,7 +2738,7 @@ export default function OnboardingModule() {
   if (!isEditorTenant && !hasActiveSub && !isInTrial) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text, padding: "60px 40px", textAlign: "center" }}>
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
         <div style={{ marginBottom: 24 }}><IllizeoLogoBrand style={{ height: 32 }} /></div>
         <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#FFF3E0", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
           <Lock size={28} color="#E65100" />
@@ -2016,11 +2752,16 @@ export default function OnboardingModule() {
   }
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" /><style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
+      <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" /><style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
       {renderSidebar()}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      {renderEmployeeTopbar()}
       {dashPage === "tableau_de_bord" && renderDashboard()}
       {dashPage === "mes_actions" && renderMesActions()}
       {dashPage === "messagerie" && renderMessagerie()}
+      {dashPage === "mon_profil" && renderMonProfil()}
+      {dashPage === "organigramme" && renderMonEquipe()}
+      {dashPage === "assistant_ia" && renderAssistantIA()}
       {dashPage === "entreprise" && renderEntreprise()}
       {dashPage === "cooptation" && (() => {
         const activeCampaigns = empCampaigns.filter(c => c.statut === "active");
@@ -2080,7 +2821,13 @@ export default function OnboardingModule() {
                     <span style={{ color: C.textMuted }}> {t('emp.reward_label')}</span>
                   </div>
                   <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/cooptation/${camp.share_token}`); addToast_admin(t('emp.link_copied')); }} title={t('emp.share')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Link size={11} /> {t('emp.share')}</button>
+                    <button onClick={() => {
+                      const shareUrl = `${window.location.origin}/cooptation/${camp.share_token}`;
+                      navigator.clipboard.writeText(shareUrl).then(() => addToast_admin(t('emp.link_copied'))).catch(() => {
+                        // Fallback for clipboard API failure
+                        prompt(lang === "fr" ? "Copiez ce lien :" : "Copy this link:", shareUrl);
+                      });
+                    }} title={t('emp.share')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Link size={11} /> {t('emp.share')}</button>
                     <button onClick={() => setEmpCooptForm({ open: true, campaign_id: camp.id, candidate_name: "", candidate_email: "", candidate_poste: camp.titre, telephone: "", linkedin_url: "", message: "" })} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "5px 14px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><UserPlus size={11} /> {t('emp.recommend')}</button>
                   </div>
                 </div>
@@ -2161,18 +2908,37 @@ export default function OnboardingModule() {
                     <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('emp.candidate_name')} *</label><input value={empCooptForm.candidate_name} onChange={e => setEmpCooptForm(f => ({ ...f, candidate_name: e.target.value }))} style={sInput} placeholder={t('label.firstname') + " " + t('label.lastname')} /></div>
                     <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('label.email')} *</label><input type="email" value={empCooptForm.candidate_email} onChange={e => setEmpCooptForm(f => ({ ...f, candidate_email: e.target.value }))} style={sInput} placeholder="email@exemple.com" /></div>
                   </div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('emp.recommended_position')}</label><input value={empCooptForm.candidate_poste} onChange={e => setEmpCooptForm(f => ({ ...f, candidate_poste: e.target.value }))} style={sInput} /></div>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('emp.recommended_position')}</label><div style={{ ...sInput, background: C.bg, color: C.text, cursor: "default" }}>{empCooptForm.candidate_poste || "—"}</div></div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div><label style={{ fontSize: 11, color: C.textLight, display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}><Phone size={10} /> {t('label.phone')}</label><input value={empCooptForm.telephone || ""} onChange={e => setEmpCooptForm(f => ({ ...f, telephone: e.target.value }))} style={sInput} placeholder="+41 79 123 45 67" /></div>
                     <div><label style={{ fontSize: 11, color: C.textLight, display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}><Linkedin size={10} /> LinkedIn</label><input value={empCooptForm.linkedin_url || ""} onChange={e => setEmpCooptForm(f => ({ ...f, linkedin_url: e.target.value }))} style={sInput} placeholder="https://linkedin.com/in/..." /></div>
                   </div>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('emp.message_optional')}</label><textarea value={empCooptForm.message} onChange={e => setEmpCooptForm(f => ({ ...f, message: e.target.value }))} style={{ ...sInput, minHeight: 60, resize: "vertical" }} placeholder={t('emp.message_placeholder')} /></div>
+                  {/* CV Upload */}
+                  <div>
+                    <label style={{ fontSize: 11, color: C.textLight, display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}><Paperclip size={10} /> CV / Pièce jointe</label>
+                    {(empCooptForm as any)._cvFile ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: C.greenLight, fontSize: 12 }}>
+                        <FileText size={14} color={C.green} />
+                        <span style={{ flex: 1, color: C.text, fontWeight: 500 }}>{((empCooptForm as any)._cvFile as File).name}</span>
+                        <button type="button" onClick={() => setEmpCooptForm(f => { const copy = { ...f }; delete (copy as any)._cvFile; return copy; })} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><X size={12} color={C.red} /></button>
+                      </div>
+                    ) : (
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 8, border: `1px dashed ${C.border}`, cursor: "pointer", fontSize: 12, color: C.textLight }}>
+                        <Upload size={14} /> Glisser ou cliquer pour ajouter un CV (PDF, DOC, max 5 Mo)
+                        <input type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) setEmpCooptForm(f => ({ ...f, _cvFile: file } as any));
+                        }} />
+                      </label>
+                    )}
+                  </div>
                 </div>
                 <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
                   <button onClick={() => setEmpCooptForm(f => ({ ...f, open: false }))} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
                   <button disabled={!empCooptForm.candidate_name.trim() || !empCooptForm.candidate_email.trim()} onClick={async () => {
                     try {
-                      await apiCreateCooptation({
+                      const created = await apiCreateCooptation({
                         referrer_name: auth.user?.name || "",
                         referrer_email: auth.user?.email || "",
                         candidate_name: empCooptForm.candidate_name,
@@ -2186,6 +2952,10 @@ export default function OnboardingModule() {
                         type_recompense: "prime",
                         mois_requis: 6,
                       });
+                      // Upload CV if attached
+                      if ((empCooptForm as any)._cvFile && created?.id) {
+                        try { await uploadCooptationCv(created.id, (empCooptForm as any)._cvFile); } catch {}
+                      }
                       setEmpCooptForm({ open: false, campaign_id: null, candidate_name: "", candidate_email: "", candidate_poste: "", telephone: "", linkedin_url: "", message: "" });
                       reloadEmpCoopt();
                       addToast_admin(t('emp.recommendation_sent'));
@@ -2200,11 +2970,239 @@ export default function OnboardingModule() {
       })()}
       {dashPage === "satisfaction" && (
         <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
-          <h1 style={{ fontSize: 24, fontWeight: 600, margin: "0 0 8px" }}>{t('emp.nps_title')}</h1>
-          <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 24px" }}>{t('emp.nps_subtitle')}</p>
+          <h1 style={{ fontSize: 24, fontWeight: 600, margin: "0 0 8px" }}>Feedback</h1>
+          <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 24px" }}>
+            Plusieurs canaux pour partager votre ressenti, vos idées ou signaler une situation.
+          </p>
 
-          {empSurveys.filter(s => s.actif).map(survey => {
-            const answered = empNpsAnswers[survey.id]?.submitted;
+          {/* Feedback hub tabs */}
+          <div style={{ display: "flex", gap: 4, padding: 4, background: C.bg, borderRadius: 10, marginBottom: 20, width: "fit-content", flexWrap: "wrap" }}>
+            {([
+              { id: "surveys", label: "Mes sondages", icon: BarChart3 },
+              { id: "mood", label: "Mood check-in", icon: Smile },
+              { id: "suggestion", label: "Suggestion / bug", icon: Lightbulb },
+              { id: "buddy", label: "Évaluer buddy / manager", icon: Star },
+            ] as const).map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button key={tab.id} onClick={() => setFeedbackTab(tab.id)} style={{
+                  padding: "8px 14px", borderRadius: 6, fontSize: 12, fontWeight: feedbackTab === tab.id ? 600 : 400,
+                  border: "none", cursor: "pointer", fontFamily: font,
+                  background: feedbackTab === tab.id ? C.white : "transparent",
+                  color: feedbackTab === tab.id ? C.pink : C.textMuted,
+                  boxShadow: feedbackTab === tab.id ? "0 1px 3px rgba(0,0,0,.06)" : "none",
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                }}><Icon size={14} /> {tab.label}</button>
+              );
+            })}
+          </div>
+
+          {feedbackTab === "mood" && (
+            <div className="iz-card" style={{ ...sCard, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 6px" }}>Comment vous sentez-vous aujourd'hui ?</h3>
+              <p style={{ fontSize: 12, color: C.textMuted, margin: "0 0 16px" }}>Pulse rapide pour suivre votre ressenti dans le temps. Une note ≤ 2 alerte automatiquement les RH.</p>
+              <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                {[
+                  { v: 1, e: "😞", l: "Très mauvais" },
+                  { v: 2, e: "😟", l: "Mauvais" },
+                  { v: 3, e: "😐", l: "Neutre" },
+                  { v: 4, e: "🙂", l: "Bon" },
+                  { v: 5, e: "😄", l: "Excellent" },
+                ].map(m => {
+                  const sel = moodDraft.mood === m.v;
+                  return (
+                    <button key={m.v} onClick={() => setMoodDraft(d => ({ ...d, mood: m.v }))} style={{
+                      flex: 1, padding: "16px 8px", borderRadius: 12,
+                      border: sel ? `2px solid ${C.pink}` : `1px solid ${C.border}`,
+                      background: sel ? C.pinkBg : C.white, cursor: "pointer", fontFamily: font,
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                    }}>
+                      <div style={{ fontSize: 28 }}>{m.e}</div>
+                      <div style={{ fontSize: 10, color: sel ? C.pink : C.textLight, fontWeight: sel ? 600 : 400 }}>{m.l}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <textarea value={moodDraft.comment} onChange={e => setMoodDraft(d => ({ ...d, comment: e.target.value }))} placeholder="Un commentaire (optionnel)…" style={{ ...sInput, minHeight: 70, marginBottom: 12, resize: "vertical" }} />
+              <button disabled={!moodDraft.mood} onClick={async () => {
+                try {
+                  const m = await import('./api/endpoints');
+                  await m.postMood(moodDraft.mood!, moodDraft.comment || undefined);
+                  addToast("Merci, votre ressenti a bien été enregistré 💙", "success");
+                  setMoodDraft({ mood: null, comment: "" });
+                  const list = await m.getMyMoods(); setMoodHistory(list || []);
+                } catch { addToast("Impossible d'enregistrer pour le moment", "warning"); }
+              }} className="iz-btn-pink" style={{ ...sBtn("pink"), opacity: moodDraft.mood ? 1 : 0.4 }}>Envoyer</button>
+
+              {moodHistory.length > 0 && (
+                <div style={{ marginTop: 24, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 10 }}>VOS DERNIERS CHECK-INS</div>
+                  {moodHistory.slice(0, 7).map((m: any) => {
+                    const emoji = ["", "😞", "😟", "😐", "🙂", "😄"][m.mood] || "•";
+                    return (
+                      <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+                        <div style={{ fontSize: 22 }}>{emoji}</div>
+                        <div style={{ flex: 1, fontSize: 12, color: C.text }}>{m.comment || <span style={{ color: C.textMuted, fontStyle: "italic" }}>(sans commentaire)</span>}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted }}>{new Date(m.created_at).toLocaleDateString('fr-FR')}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {feedbackTab === "suggestion" && (
+            <div className="iz-card" style={{ ...sCard, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 6px" }}>Boîte à suggestions</h3>
+              <p style={{ fontSize: 12, color: C.textMuted, margin: "0 0 16px" }}>Une idée d'amélioration, un bug à signaler ou un retour libre ? Envoyez-le aux RH.</p>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                {([
+                  { v: "suggestion", l: "Suggestion", icon: Lightbulb },
+                  { v: "improvement", l: "Amélioration", icon: Sparkles },
+                  { v: "bug", l: "Bug", icon: Bug },
+                  { v: "other", l: "Autre", icon: MessageCircle },
+                ] as const).map(c => {
+                  const Icon = c.icon;
+                  return (
+                    <button key={c.v} onClick={() => setSuggestionDraft(d => ({ ...d, category: c.v }))} style={{
+                      padding: "6px 14px", borderRadius: 16, fontSize: 12,
+                      border: suggestionDraft.category === c.v ? `1.5px solid ${C.pink}` : `1px solid ${C.border}`,
+                      background: suggestionDraft.category === c.v ? C.pinkBg : C.white,
+                      color: suggestionDraft.category === c.v ? C.pink : C.text,
+                      cursor: "pointer", fontFamily: font, fontWeight: suggestionDraft.category === c.v ? 600 : 400,
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                    }}><Icon size={13} /> {c.l}</button>
+                  );
+                })}
+              </div>
+              <textarea value={suggestionDraft.content} onChange={e => setSuggestionDraft(d => ({ ...d, content: e.target.value }))} placeholder="Décrivez votre suggestion, bug ou retour…" style={{ ...sInput, minHeight: 120, marginBottom: 12, resize: "vertical" }} />
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: C.text, marginBottom: 12, cursor: "pointer" }}>
+                <input type="checkbox" checked={suggestionDraft.anonymous} onChange={e => setSuggestionDraft(d => ({ ...d, anonymous: e.target.checked }))} />
+                Envoyer anonymement (les RH ne verront pas votre identité)
+              </label>
+              <button disabled={!suggestionDraft.content.trim()} onClick={async () => {
+                try {
+                  const m = await import('./api/endpoints');
+                  await m.postSuggestion({ category: suggestionDraft.category, content: suggestionDraft.content, anonymous: suggestionDraft.anonymous });
+                  addToast("Merci, votre message a été transmis aux RH 🙏", "success");
+                  setSuggestionDraft({ category: "suggestion", content: "", anonymous: false });
+                } catch { addToast("Impossible d'envoyer pour le moment", "warning"); }
+              }} className="iz-btn-pink" style={{ ...sBtn("pink"), opacity: suggestionDraft.content.trim() ? 1 : 0.4 }}>Envoyer</button>
+            </div>
+          )}
+
+          {feedbackTab === "buddy" && (
+            <div className="iz-card" style={{ ...sCard, marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 6px" }}>Évaluez votre buddy ou manager</h3>
+              <p style={{ fontSize: 12, color: C.textMuted, margin: "0 0 16px" }}>Votre retour est confidentiel — utilisé pour suivre la qualité de l'accompagnement.</p>
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                {([
+                  { v: "buddy" as const, l: "Mon buddy", icon: Star },
+                  { v: "manager" as const, l: "Mon manager", icon: Briefcase },
+                ]).map(t => {
+                  const Icon = t.icon;
+                  return (
+                    <button key={t.v} onClick={() => setBuddyRatingDraft(d => ({ ...d, target_type: t.v }))} style={{
+                      padding: "8px 18px", borderRadius: 8, fontSize: 13,
+                      border: buddyRatingDraft.target_type === t.v ? `1.5px solid ${C.pink}` : `1px solid ${C.border}`,
+                      background: buddyRatingDraft.target_type === t.v ? C.pinkBg : C.white,
+                      color: buddyRatingDraft.target_type === t.v ? C.pink : C.text, cursor: "pointer", fontFamily: font,
+                      fontWeight: buddyRatingDraft.target_type === t.v ? 600 : 400,
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                    }}><Icon size={14} /> {t.l}</button>
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+                {[1, 2, 3, 4, 5].map(n => {
+                  const filled = n <= buddyRatingDraft.rating;
+                  return (
+                    <button key={n} onClick={() => setBuddyRatingDraft(d => ({ ...d, rating: n }))} style={{
+                      width: 44, height: 44, borderRadius: 8,
+                      border: filled ? `2px solid ${C.amber}` : `1px solid ${C.border}`,
+                      background: filled ? C.amber + "20" : C.white, cursor: "pointer", fontSize: 22,
+                    }}>{filled ? "★" : "☆"}</button>
+                  );
+                })}
+              </div>
+              <textarea value={buddyRatingDraft.comment} onChange={e => setBuddyRatingDraft(d => ({ ...d, comment: e.target.value }))} placeholder="Un commentaire (optionnel)…" style={{ ...sInput, minHeight: 80, marginBottom: 12, resize: "vertical" }} />
+              <button disabled={!buddyRatingDraft.rating} onClick={async () => {
+                try {
+                  const m = await import('./api/endpoints');
+                  await m.postBuddyRating({ target_type: buddyRatingDraft.target_type, rating: buddyRatingDraft.rating, comment: buddyRatingDraft.comment || undefined });
+                  addToast("Merci, votre évaluation a été enregistrée 🙏", "success");
+                  setBuddyRatingDraft({ target_type: "buddy", rating: 0, comment: "" });
+                } catch { addToast("Impossible d'enregistrer pour le moment", "warning"); }
+              }} className="iz-btn-pink" style={{ ...sBtn("pink"), opacity: buddyRatingDraft.rating ? 1 : 0.4 }}>Envoyer</button>
+            </div>
+          )}
+
+          {feedbackTab === "surveys" && (<>
+          <h2 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 6px" }}>{t('emp.nps_title')}</h2>
+          <p style={{ fontSize: 12, color: C.textMuted, margin: "0 0 16px" }}>{t('emp.nps_subtitle')}</p>
+
+          {/* Tile grid view — shown when no survey is open */}
+          {!openSurveyId && (() => {
+            const list = empSurveys.filter((s: any) => s.survey?.actif ?? s.actif);
+            if (list.length === 0) return (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('emp.nps_no_surveys')}</div>
+            );
+            const typeMeta: Record<string, { icon: any; color: string }> = {
+              nps: { icon: TrendingUp, color: C.pink },
+              satisfaction: { icon: Smile, color: C.green },
+              custom: { icon: ClipboardList, color: C.blue },
+            };
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 16 }}>
+                {list.map((entry: any) => {
+                  const survey = entry.survey || entry;
+                  const answered = entry.completed || empNpsAnswers[survey.id]?.submitted;
+                  const meta = typeMeta[survey.type] || typeMeta.custom;
+                  const Icon = meta.icon;
+                  return (
+                    <div key={survey.id} className="iz-card" onClick={() => { if (!answered) setOpenSurveyId(survey.id); }}
+                      style={{ ...sCard, padding: "20px 22px", cursor: answered ? "default" : "pointer", border: `1px solid ${answered ? C.green : C.border}`, transition: "all .15s", opacity: answered ? 0.75 : 1 }}
+                      onMouseEnter={e => { if (!answered) { e.currentTarget.style.borderColor = meta.color; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,.06)"; } }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = answered ? C.green : C.border; e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 10, background: meta.color + "1A", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <Icon size={18} color={meta.color} />
+                        </div>
+                        {answered
+                          ? <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: C.greenLight, color: C.green }}>{t('emp.nps_answered')}</span>
+                          : <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: C.amberLight, color: C.amber }}>{t('emp.nps_pending')}</span>}
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 6 }}>{survey.titre}</div>
+                      <div style={{ fontSize: 12, color: C.textLight, lineHeight: 1.5, marginBottom: 12, minHeight: 36 }}>{survey.description || ""}</div>
+                      {!answered && (
+                        <div style={{ fontSize: 12, fontWeight: 600, color: meta.color, display: "flex", alignItems: "center", gap: 4 }}>
+                          Répondre <ArrowRight size={13} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Detail view — only the selected survey, with a back button */}
+          {openSurveyId && (
+            <div>
+              <button onClick={() => setOpenSurveyId(null)} className="iz-btn-outline" style={{ ...sBtn("outline"), marginBottom: 16, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <ChevronLeft size={14} /> Retour aux sondages
+              </button>
+            </div>
+          )}
+
+          {openSurveyId && empSurveys.filter((s: any) => {
+            const sv = s.survey || s;
+            return (sv.actif ?? true) && sv.id === openSurveyId;
+          }).map((entry: any) => {
+            const survey = entry.survey || entry;
+            const token = entry.token;
+            const answered = entry.completed || empNpsAnswers[survey.id]?.submitted;
             return (
             <div key={survey.id} className="iz-card" style={{ ...sCard, marginBottom: 16, padding: 0, overflow: "hidden" }}>
               <div style={{ padding: "20px 24px", borderBottom: answered ? "none" : `1px solid ${C.border}` }}>
@@ -2262,6 +3260,68 @@ export default function OnboardingModule() {
                           placeholder={t('emp.nps_placeholder')} style={{ ...sInput, minHeight: 80, resize: "vertical" }} />
                       )}
 
+                      {q.type === "mood" && (() => {
+                        const MOODS = [
+                          { v: 1, emoji: "😣", label: "Mal", color: "#E53935" },
+                          { v: 2, emoji: "😐", label: "Mitigé", color: "#FB8C00" },
+                          { v: 3, emoji: "🙂", label: "Bien", color: "#43A047" },
+                          { v: 4, emoji: "😊", label: "Très bien", color: "#E91E8C" },
+                          { v: 5, emoji: "🤩", label: "Super", color: "#9C27B0" },
+                        ];
+                        const moodKey = `mood_${qi}`;
+                        const cur = empNpsAnswers[survey.id]?.[moodKey];
+                        return (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+                            {MOODS.map(m => {
+                              const selected = cur === m.v;
+                              return (
+                                <button key={m.v} onClick={() => setEmpNpsAnswers(prev => ({ ...prev, [survey.id]: { ...prev[survey.id], [moodKey]: m.v } }))}
+                                  style={{ padding: "16px 8px", borderRadius: 10, border: `2px solid ${selected ? m.color : C.border}`, background: selected ? m.color + "12" : C.white, cursor: "pointer", transition: "all .15s", fontFamily: font, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                                  <span style={{ fontSize: 32 }}>{m.emoji}</span>
+                                  <span style={{ fontSize: 12, fontWeight: selected ? 700 : 500, color: selected ? m.color : C.textLight }}>{m.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+
+                      {q.type === "multi_slider" && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                          {(q.dimensions || []).map((dim: string, di: number) => {
+                            const sliderKey = `slider_${qi}_${di}`;
+                            const v = empNpsAnswers[survey.id]?.[sliderKey] ?? 50;
+                            return (
+                              <div key={di} style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                                <div style={{ width: 200, fontSize: 13, color: C.text }}>{dim}</div>
+                                <input type="range" min={0} max={100} value={v}
+                                  onChange={e => setEmpNpsAnswers(prev => ({ ...prev, [survey.id]: { ...prev[survey.id], [sliderKey]: parseInt((e.target as HTMLInputElement).value, 10) } }))}
+                                  style={{ flex: 1, accentColor: C.pink, cursor: "pointer" }} />
+                                <div style={{ minWidth: 44, textAlign: "center", padding: "3px 10px", borderRadius: 6, background: C.pink, color: "#fff", fontSize: 12, fontWeight: 700 }}>{v}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {q.type === "tags" && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {(q.tags || []).map((tag: string, ti: number) => {
+                            const tagsKey = `tags_${qi}`;
+                            const cur: string[] = empNpsAnswers[survey.id]?.[tagsKey] || [];
+                            const selected = cur.includes(tag);
+                            return (
+                              <button key={ti} onClick={() => {
+                                const next = selected ? cur.filter(x => x !== tag) : [...cur, tag];
+                                setEmpNpsAnswers(prev => ({ ...prev, [survey.id]: { ...prev[survey.id], [tagsKey]: next } }));
+                              }} style={{ padding: "7px 16px", borderRadius: 16, fontSize: 13, fontWeight: selected ? 600 : 400, border: `1px solid ${selected ? C.pink : C.border}`, background: selected ? C.pinkBg : C.white, color: selected ? C.pink : C.textLight, cursor: "pointer", fontFamily: font, transition: "all .15s" }}>
+                                {tag}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
                       {q.type === "choice" && (q.options || []).map((opt: string, oi: number) => {
                         const selected = empNpsAnswers[survey.id]?.[`choice_${qi}`] === oi;
                         return (
@@ -2277,11 +3337,25 @@ export default function OnboardingModule() {
                   <button onClick={async () => {
                     const answers = empNpsAnswers[survey.id] || {};
                     try {
-                      // Find or create a response for this survey
-                      await apiFetch(`/nps-surveys/${survey.id}/send`, { method: "POST", body: JSON.stringify({ collaborateur_id: 0 }) }).catch(() => {});
-                      // Submit the response (simplified — in prod would use the token flow)
+                      // Build payload from collected answers
+                      const npsScore = answers.nps ?? null;
+                      const ratingVal = Object.entries(answers).find(([k]) => k.startsWith("rating_"))?.[1] as number | undefined;
+                      const comment = Object.entries(answers).find(([k]) => k.startsWith("text_"))?.[1] as string | undefined;
+                      const allAnswers: Record<string, any> = {};
+                      Object.entries(answers).forEach(([k, v]) => { if (k !== "nps" && k !== "submitted") allAnswers[k] = v; });
+
+                      if (token) {
+                        // Real submission via token endpoint
+                        await submitNpsResponse(token, { score: npsScore, rating: ratingVal ?? null, answers: allAnswers, comment: comment || "" });
+                      } else {
+                        // Fallback: no token available
+                        await apiFetch(`/nps-surveys/${survey.id}/send`, { method: "POST", body: JSON.stringify({ collaborateur_id: 0 }) }).catch(() => {});
+                      }
                       addToast_admin(t('emp.nps_thanks_toast'));
                       setEmpNpsAnswers(prev => ({ ...prev, [survey.id]: { ...answers, submitted: true } }));
+                      // Reload surveys to reflect completed status, then return to the tile grid
+                      getMyNpsSurveys().then(setEmpSurveys).catch(() => {});
+                      setOpenSurveyId(null);
                     } catch { addToast_admin(t('emp.send_error')); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "12px 32px", fontSize: 14 }}>
                     {t('emp.nps_submit')}
@@ -2299,11 +3373,8 @@ export default function OnboardingModule() {
             );
           })}
 
-          {empSurveys.filter(s => s.actif).length === 0 && (
-            <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>
-              {t('emp.nps_no_surveys')}
-            </div>
-          )}
+          </>)}
+
         </div>
       )}
       {dashPage === "suivi" && (() => {
@@ -2342,7 +3413,251 @@ export default function OnboardingModule() {
             </div>
           </div>
 
+          {/* View toggle: Chronologique vs Phases */}
+          <div style={{ display: "flex", gap: 0, background: C.bg, borderRadius: 10, padding: 3, marginBottom: 20, maxWidth: 460 }}>
+            {[
+              { key: "chrono" as const, label: "Chronologique 100j", icon: CalendarClock },
+              { key: "phases" as const, label: "Par phases", icon: Target },
+            ].map(v => {
+              const active = suiviView === v.key;
+              const Icon = v.icon;
+              return (
+                <button key={v.key} onClick={() => setSuiviView(v.key)} style={{
+                  flex: 1, padding: "10px 16px", borderRadius: 8, fontSize: 13, fontWeight: active ? 600 : 400,
+                  background: active ? C.white : "transparent", color: active ? C.pink : C.textMuted,
+                  border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  boxShadow: active ? "0 1px 4px rgba(0,0,0,.06)" : "none", fontFamily: font, transition: "all .15s",
+                }}>
+                  <Icon size={14} /> {v.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* CHRONOLOGIQUE 100J VIEW */}
+          {suiviView === "chrono" && (() => {
+            const dateDebutStr = (_myCollab as any)?.dateDebut || (_myCollab as any)?.date_debut || "";
+            const startDate = dateDebutStr ? (() => {
+              const parts = dateDebutStr.includes("/") ? dateDebutStr.split("/") : dateDebutStr.split("-");
+              if (parts.length === 3) {
+                const [a, b, c] = parts.map((p: string) => parseInt(p, 10));
+                return dateDebutStr.includes("/") ? new Date(c, b - 1, a) : new Date(a, b - 1, c);
+              }
+              return new Date();
+            })() : new Date();
+            const today = new Date();
+            const dayJ = journeyData?.day_j || Math.max(1, Math.min(120, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1));
+            const completedRatio = _myActions.length > 0 ? (completedActions.size / _myActions.length) : 0;
+            // Read milestones from API only — no hardcoded fallback
+            const ICON_MAP: Record<string, any> = { rocket: Rocket, sparkles: Sparkles, award: Award, star: Star, trophy: Trophy, heart: Heart, gem: Gem, crown: Crown, mail: Mail, "arrow-right": ArrowRight };
+            const apiMilestones = journeyData?.milestones && journeyData.milestones.length > 0 ? journeyData.milestones : [];
+            const milestones = apiMilestones.map((m: any) => ({
+              day: m.day,
+              label: `J+${m.day}`,
+              title: m.label,
+              icon: ICON_MAP[m.icon] || Trophy,
+              badge: m.badge_name,
+              badgeColor: m.badge_color || "#E91E8C",
+              desc: m.description || "",
+            }));
+            return (
+              <>
+                {/* Vertical chrono timeline — hidden when no milestones configured */}
+                {milestones.length > 0 && (
+                <div className="iz-card iz-fade-up iz-stagger-1" style={{ ...sCard, marginBottom: 20, padding: "24px 28px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: C.text }}>Votre voyage des 100 jours</h3>
+                      <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>Vous êtes au <b style={{ color: C.pink }}>jour {dayJ}</b> de votre intégration</div>
+                    </div>
+                    <div style={{ padding: "6px 14px", borderRadius: 14, background: C.pinkBg, color: C.pink, fontSize: 12, fontWeight: 700 }}>
+                      {milestones.filter(m => dayJ >= m.day).length} / {milestones.length} étapes franchies
+                    </div>
+                  </div>
+                  <div style={{ position: "relative", paddingLeft: 60 }}>
+                    <div style={{ position: "absolute", left: 50, top: 18, bottom: 18, width: 3, background: `linear-gradient(180deg, ${C.green} 0%, ${C.pink} ${Math.min(100, dayJ)}%, ${C.border} ${Math.min(100, dayJ)}%)`, borderRadius: 2 }} />
+                    {milestones.map((m, mi) => {
+                      const reached = dayJ >= m.day;
+                      const current = mi === milestones.findIndex(x => dayJ < x.day) - 1 || (mi === milestones.length - 1 && dayJ >= 100);
+                      const Icon = m.icon;
+                      return (
+                        <div key={m.day} style={{ display: "flex", alignItems: "flex-start", marginBottom: mi < milestones.length - 1 ? 22 : 0, position: "relative" }}>
+                          <div style={{ position: "absolute", left: -60, top: 0, width: 50, textAlign: "center" }}>
+                            <div style={{ width: 44, height: 44, borderRadius: "50%", background: reached ? m.badgeColor : C.white, border: `3px solid ${reached ? m.badgeColor : C.border}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto", boxShadow: current ? `0 0 0 6px ${m.badgeColor}33` : "none", transition: "all .3s" }}>
+                              <Icon size={18} color={reached ? "#fff" : C.textMuted} />
+                            </div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: reached ? m.badgeColor : C.textMuted, marginTop: 4, letterSpacing: .5 }}>{m.label}</div>
+                          </div>
+                          <div style={{ flex: 1, paddingLeft: 18, paddingTop: 2 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                              <h4 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: reached ? C.text : C.textMuted }}>{m.title}</h4>
+                              <span style={{ padding: "2px 10px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: reached ? m.badgeColor + "1F" : C.bg, color: reached ? m.badgeColor : C.textMuted, letterSpacing: .3 }}>
+                                🏆 {m.badge}
+                              </span>
+                              {current && <span style={{ padding: "2px 8px", borderRadius: 8, fontSize: 9, fontWeight: 700, background: C.pink, color: "#fff", letterSpacing: .5 }}>EN COURS</span>}
+                              {reached && !current && <CheckCircle size={14} color={C.green} />}
+                            </div>
+                            <div style={{ fontSize: 12, color: C.textLight, lineHeight: 1.5 }}>{m.desc}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                )}
+
+                {/* Quiz culture card */}
+                {(() => {
+                  const _quizState = cultureQuizState;
+                  const setQuizState = (s: any) => setCultureQuizState(s);
+                  const quizBlock = (companyBlocks || []).find((b: any) => b.type === "culture_quiz" && b.actif);
+                  const QUIZ_FALLBACK = [
+                    { q: "Notre raison d'être tient en une phrase. Laquelle ?", options: ["Maximiser le profit", "Faire grandir les hommes pour faire grandir l'industrie", "Dominer notre marché", "Innover à tout prix"], correct: 1, explain: "C'est exactement notre boussole. Cette phrase guide chaque décision stratégique." },
+                    { q: "Quelle valeur place-t-on en premier dans nos prises de décision ?", options: ["Vitesse", "Bienveillance", "Qualité", "Profit"], correct: 1, explain: "La bienveillance est notre socle relationnel et opérationnel." },
+                    { q: "Quel rituel d'équipe est sacré chez nous ?", options: ["Le café du lundi 9h", "Le all-hands mensuel", "Le retro vendredi", "Tout cela"], correct: 3, explain: "Tous nos rituels comptent — ils tissent la culture au quotidien." },
+                    { q: "Que signifie être 'Illizéen' au quotidien ?", options: ["Suivre les process à la lettre", "Oser, partager, transmettre", "Travailler seul efficacement", "Maximiser ses KPIs"], correct: 1, explain: "Trois verbes simples qui résument notre ADN." },
+                    { q: "Combien de jours dure votre parcours d'intégration ?", options: ["30 jours", "60 jours", "100 jours", "Une année"], correct: 2, explain: "100 jours pour vous accompagner pas à pas, jusqu'à votre pleine autonomie." },
+                  ];
+                  const QUIZ = (quizBlock?.data?.questions && quizBlock.data.questions.length > 0) ? quizBlock.data.questions : QUIZ_FALLBACK;
+                  const QUIZ_XP = quizBlock?.data?.xp_per_correct ?? 10;
+                  const QUIZ_CATEGORY = quizBlock?.data?.category || "Notre raison d'être";
+                  const QUIZ_TITLE = quizBlock?.titre || "Quiz découverte du groupe";
+                  if (QUIZ.length === 0) return null;
+                  const correctCount = Object.entries(_quizState.answers).filter(([qi, ans]) => QUIZ[parseInt(qi, 10)]?.correct === ans).length;
+                  // XP awarded only on a perfect score
+                  const PERFECT_BONUS_XP = QUIZ_XP * QUIZ.length;
+                  const totalXP = correctCount === QUIZ.length ? PERFECT_BONUS_XP : 0;
+                  if (_quizState.finished) {
+                    const isPerfect = correctCount === QUIZ.length;
+                    const CONFETTI_COLORS = ["#E91E8C", "#1A73E8", "#4CAF50", "#F9A825", "#9C27B0", "#FF5722", "#00BCD4"];
+                    return (
+                      <div className="iz-card iz-fade-up iz-stagger-2" style={{ ...sCard, marginBottom: 20, padding: "32px 28px", background: `linear-gradient(135deg, ${C.pinkBg} 0%, #F3E5F5 100%)`, textAlign: "center", position: "relative", overflow: "hidden" }}>
+                        {isPerfect && (
+                          <>
+                            <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+                              {Array.from({ length: 70 }).map((_, ci) => {
+                                const left = Math.random() * 100;
+                                const delay = Math.random() * 2.5;
+                                const duration = 2.8 + Math.random() * 2.5;
+                                const color = CONFETTI_COLORS[ci % CONFETTI_COLORS.length];
+                                const size = 6 + Math.random() * 7;
+                                const rot = Math.random() * 360;
+                                return (
+                                  <span key={ci} className="iz-confetti-piece" style={{
+                                    position: "absolute", top: "-24px", left: `${left}%`,
+                                    width: size, height: size * 1.6, background: color, borderRadius: 2,
+                                    animation: `iz-confetti-fall ${duration}s linear ${delay}s forwards`,
+                                    transform: `rotate(${rot}deg)`,
+                                  }} />
+                                );
+                              })}
+                            </div>
+                            <style>{`@keyframes iz-confetti-fall { 0% { transform: translateY(-30px) rotate(0deg); opacity: 1; } 100% { transform: translateY(420px) rotate(720deg); opacity: 0.3; } }`}</style>
+                          </>
+                        )}
+                        <Trophy size={48} color={isPerfect ? "#F9A825" : C.pink} style={{ marginBottom: 12, position: "relative" }} />
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: "0 0 6px", position: "relative" }}>
+                          {isPerfect ? "Sans-faute, bravo ! 🎉" : "Quiz culture terminé !"}
+                        </h3>
+                        <p style={{ fontSize: 13, color: C.textLight, margin: "0 0 16px", position: "relative" }}>
+                          {isPerfect ? (
+                            <>Score parfait : <b style={{ color: C.pink }}>{correctCount}/{QUIZ.length}</b> · <b style={{ color: C.pink }}>+{totalXP} XP</b></>
+                          ) : (
+                            <>{correctCount}/{QUIZ.length} bonnes réponses — visez le sans-faute pour gagner <b style={{ color: C.pink }}>+{PERFECT_BONUS_XP} XP</b></>
+                          )}
+                        </p>
+                        {!isPerfect && (
+                          <button onClick={() => setQuizState({ idx: 0, answers: {}, finished: false })} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "10px 24px", fontSize: 13, position: "relative" }}>Recommencer</button>
+                        )}
+                      </div>
+                    );
+                  }
+                  const cur = QUIZ[_quizState.idx];
+                  const userAns = _quizState.answers[_quizState.idx];
+                  const answered = userAns !== undefined;
+                  return (
+                    <div className="iz-card iz-fade-up iz-stagger-2" style={{ ...sCard, marginBottom: 20, padding: "24px 28px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <span style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 700, background: C.pinkBg, color: C.pink, letterSpacing: .5 }}>{QUIZ_CATEGORY.toUpperCase()}</span>
+                          <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: C.text }}>{QUIZ_TITLE}</h3>
+                        </div>
+                        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600 }}>Question {_quizState.idx + 1} / {QUIZ.length}</div>
+                      </div>
+                      <div style={{ height: 4, background: C.bg, borderRadius: 2, overflow: "hidden", marginBottom: 18 }}>
+                        <div style={{ height: "100%", width: `${((_quizState.idx + (answered ? 1 : 0)) / QUIZ.length) * 100}%`, background: `linear-gradient(90deg, ${C.pink}, #9C27B0)`, transition: "width .3s" }} />
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 600, color: C.text, marginBottom: 16 }}>{cur.q}</div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                        {cur.options.map((opt, oi) => {
+                          const selected = userAns === oi;
+                          const isCorrect = answered && oi === cur.correct;
+                          const isWrongSelected = answered && selected && oi !== cur.correct;
+                          const letter = String.fromCharCode(65 + oi);
+                          return (
+                            <button key={oi} onClick={() => { if (!answered) setQuizState({ ..._quizState, answers: { ..._quizState.answers, [_quizState.idx]: oi } }); }}
+                              disabled={answered}
+                              style={{
+                                display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", borderRadius: 10,
+                                border: `2px solid ${isCorrect ? C.green : isWrongSelected ? C.red : selected ? C.pink : C.border}`,
+                                background: isCorrect ? C.greenLight : isWrongSelected ? C.redLight : selected ? C.pinkBg : C.white,
+                                cursor: answered ? "default" : "pointer", textAlign: "left", fontFamily: font, fontSize: 14, color: C.text,
+                                transition: "all .15s",
+                              }}>
+                              <div style={{ width: 28, height: 28, borderRadius: "50%", background: isCorrect ? C.green : isWrongSelected ? C.red : C.bg, color: isCorrect || isWrongSelected ? "#fff" : C.textMuted, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+                                {letter}
+                              </div>
+                              <span style={{ flex: 1 }}>{opt}</span>
+                              {isCorrect && <Check size={18} color={C.green} />}
+                              {isWrongSelected && <X size={18} color={C.red} />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {answered && (
+                        <div style={{ padding: "12px 16px", borderRadius: 10, background: userAns === cur.correct ? C.greenLight : C.amberLight, marginBottom: 16 }}>
+                          <div style={{ fontSize: 13, color: C.text }}>
+                            <b style={{ color: userAns === cur.correct ? C.green : C.amber }}>{userAns === cur.correct ? "Bravo !" : "Pas tout à fait..."}</b> {cur.explain}
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <button onClick={() => { if (_quizState.idx > 0) setQuizState({ ..._quizState, idx: _quizState.idx - 1 }); }}
+                          disabled={_quizState.idx === 0}
+                          style={{ ...sBtn("outline"), padding: "8px 18px", fontSize: 12, opacity: _quizState.idx === 0 ? 0.4 : 1 }}>← Précédent</button>
+                        <div style={{ fontSize: 12, color: C.textMuted }}>+{PERFECT_BONUS_XP} XP au sans-faute · {correctCount}/{QUIZ.length} bonnes réponses</div>
+                        <button onClick={() => {
+                          if (_quizState.idx === QUIZ.length - 1) {
+                            setQuizState({ ..._quizState, finished: true });
+                            // Persist quiz completion — only award XP on a perfect score
+                            const isPerfect = correctCount === QUIZ.length;
+                            import('./api/endpoints').then(async m => {
+                              try {
+                                await (m as any).submitQuizCompletion?.({
+                                  block_id: quizBlock?.id ?? null,
+                                  correct: correctCount,
+                                  total: QUIZ.length,
+                                  xp_per_correct: isPerfect ? QUIZ_XP : 0,
+                                  answers: _quizState.answers,
+                                });
+                                const lb = await (m as any).getMyLeaderboard?.();
+                                if (lb) setLeaderboardData(lb);
+                              } catch {}
+                            });
+                          } else setQuizState({ ..._quizState, idx: _quizState.idx + 1 });
+                        }} disabled={!answered} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 22px", fontSize: 13, opacity: answered ? 1 : 0.4 }}>
+                          {_quizState.idx === QUIZ.length - 1 ? "Terminer →" : "Question suivante →"}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            );
+          })()}
+
           {/* Phases with actions inside */}
+          {((ctx as any)._suiviView || "chrono") === "phases" && (
           <div className="iz-card iz-fade-up iz-stagger-1" style={{ ...sCard, marginBottom: 20 }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px" }}>{t('emp.detailed_path')}</h3>
             {((_myCollab as any)?.parcours_phases?.length > 0
@@ -2413,48 +3728,61 @@ export default function OnboardingModule() {
               );
             })}
           </div>
-
-          {/* Documents status — only show for onboarding parcours */}
-          {((_myCollab as any)?.parcours_categorie === "onboarding" || (!(_myCollab as any)?.parcours_categorie && Object.keys(employeeDocs).length > 0)) && (
-          <div className="iz-card iz-fade-up iz-stagger-2" style={{ ...sCard, marginBottom: 20 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{t('emp.my_documents')}</h3>
-              <button onClick={() => setShowDocPanel("admin")} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><FileText size={14} /> {t('emp.see_all')}</button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
-              {Object.entries(employeeDocs).slice(0, 6).map(([nom, status], i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, background: status === "valide" ? C.greenLight : status === "en_attente" ? C.amberLight : status === "refuse" ? C.redLight : C.bg }}>
-                  <div style={{ width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: status === "valide" ? C.green : status === "en_attente" ? C.amber : status === "refuse" ? C.red : C.border }}>
-                    {status === "valide" && <CheckCircle size={12} color={C.white} />}
-                    {status === "en_attente" && <Clock size={12} color={C.white} />}
-                    {status === "refuse" && <XCircle size={12} color={C.white} />}
-                    {status === "manquant" && <FileUp size={12} color={C.white} />}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: C.text }}>{nom.replace(" *", "")}</div>
-                    <div style={{ fontSize: 10, color: status === "valide" ? C.green : status === "en_attente" ? C.amber : status === "refuse" ? C.red : C.textMuted }}>
-                      {status === "valide" ? t('emp.doc_validated') : status === "en_attente" ? t('emp.doc_pending') : status === "refuse" ? t('emp.doc_refused') : t('emp.doc_missing')}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
           )}
 
-          {/* Équipe & contacts */}
+          {/* Documents status — only show actual pieces required by parcours actions */}
+          {(() => {
+            // Build the real list of pieces required by the user's parcours
+            const requiredPieces: string[] = [];
+            const seen = new Set<string>();
+            for (const cat of getLiveDocCategories()) {
+              for (const p of cat.docs as string[]) {
+                if (!seen.has(p)) { seen.add(p); requiredPieces.push(p); }
+              }
+            }
+            if (requiredPieces.length === 0) return null;
+            return (
+              <div className="iz-card iz-fade-up iz-stagger-2" style={{ ...sCard, marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{t('emp.my_documents')}</h3>
+                  <button onClick={() => setShowDocPanel("admin")} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><FileText size={14} /> {t('emp.see_all')}</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+                  {requiredPieces.slice(0, 6).map((nom, i) => {
+                    const status = (employeeDocs[nom] || employeeDocs[`${nom} *`] || "manquant") as DocStatus;
+                    return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, background: status === "valide" ? C.greenLight : status === "en_attente" ? C.amberLight : status === "refuse" ? C.redLight : C.bg }}>
+                      <div style={{ width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: status === "valide" ? C.green : status === "en_attente" ? C.amber : status === "refuse" ? C.red : C.border }}>
+                        {status === "valide" && <CheckCircle size={12} color={C.white} />}
+                        {status === "en_attente" && <Clock size={12} color={C.white} />}
+                        {status === "refuse" && <XCircle size={12} color={C.white} />}
+                        {status === "manquant" && <FileUp size={12} color={C.white} />}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, color: C.text }}>{nom.replace(" *", "")}</div>
+                        <div style={{ fontSize: 10, color: status === "valide" ? C.green : status === "en_attente" ? C.amber : status === "refuse" ? C.red : C.textMuted }}>
+                          {status === "valide" ? t('emp.doc_validated') : status === "en_attente" ? t('emp.doc_pending') : status === "refuse" ? t('emp.doc_refused') : t('emp.doc_missing')}
+                        </div>
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Équipe & contacts — only render with real accompagnants */}
+          {(_myCollab as any)?.accompagnants?.length > 0 && (
           <div className="iz-card iz-fade-up iz-stagger-3" style={{ ...sCard, marginBottom: 20 }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 12px" }}>{t('emp.my_team')}</h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {((_myCollab as any)?.accompagnants?.length > 0
-                ? (_myCollab as any).accompagnants.map((a: any) => {
-                    const ROLE_LABELS: Record<string, string> = { hrbp: "HRBP", manager: "Manager", buddy: "Buddy / Parrain", it: "IT Support", admin_rh: "Admin RH" };
-                    const ROLE_COLORS: Record<string, string> = { hrbp: "#7B5EA7", manager: "#1A73E8", buddy: "#4CAF50", it: "#F9A825", admin_rh: "#C2185B" };
-                    const initials = (a.name || "").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
-                    return { name: a.name, role: ROLE_LABELS[a.role] || a.role, initials, color: ROLE_COLORS[a.role] || "#888" };
-                  })
-                : TEAM_MEMBERS.slice(0, 6)
-              ).map((m: any, i: number) => (
+              {(_myCollab as any).accompagnants.map((a: any) => {
+                const ROLE_LABELS: Record<string, string> = { hrbp: "HRBP", manager: "Manager", buddy: "Buddy / Parrain", it: "IT Support", admin_rh: "Admin RH" };
+                const ROLE_COLORS: Record<string, string> = { hrbp: "#7B5EA7", manager: "#1A73E8", buddy: "#4CAF50", it: "#F9A825", admin_rh: "#E41076" };
+                const initials = (a.name || "").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+                return { name: a.name, role: ROLE_LABELS[a.role] || a.role, initials, color: ROLE_COLORS[a.role] || "#888" };
+              }).map((m: any, i: number) => (
                 <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: C.bg, borderRadius: 8 }}>
                   <div style={{ width: 32, height: 32, borderRadius: "50%", background: m.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: C.white }}>{m.initials}</div>
                   <div>
@@ -2465,6 +3793,7 @@ export default function OnboardingModule() {
               ))}
             </div>
           </div>
+          )}
 
           {/* Activité récente — only show if there's data */}
           {sharedTimeline.length > 0 && (
@@ -2491,6 +3820,420 @@ export default function OnboardingModule() {
         </div>
         );
       })()}
+      {/* MES RDV PAGE */}
+      {dashPage === "mes_rdv" && (
+        <EmployeeMyRdvPage
+          C={C}
+          sCard={sCard}
+          sBtn={sBtn}
+          font={font}
+          myCollab={myCollabProfile || COLLABORATEURS.find((c: any) => c.email === auth.user?.email)}
+          actionTemplates={ACTION_TEMPLATES}
+        />
+      )}
+
+      {/* MES SIGNATURES (formerly Documents) — pending + history merged */}
+      {(dashPage === "mes_signatures" || dashPage === "documents") && (() => {
+        // History endpoint returns ALL completed acks across all versions (audit trail).
+        const completed = (employeeSignatureHistory || [])
+          .slice()
+          .sort((a: any, b: any) => {
+            const da = a.signed_at ? new Date(a.signed_at).getTime() : 0;
+            const db = b.signed_at ? new Date(b.signed_at).getTime() : 0;
+            return db - da;
+          });
+        const pending = (employeeSignatureDocs || []).filter((d: any) => d.status === "à signer" || d.status === "à lire" || d.status === "à compléter");
+        const allDocs = employeeSignatureDocs || [];
+        const kpiUrgents = allDocs.filter((d: any) => d.urgent).length;
+        const kpiASigner = allDocs.filter((d: any) => d.status === "à signer").length;
+        const kpiACompleter = allDocs.filter((d: any) => d.status === "à compléter").length;
+        const kpiValides = allDocs.filter((d: any) => d.status === "signé" || d.status === "lu").length;
+        const openSignedDoc = async (docId: number, inline: boolean) => {
+          const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+          const tenantId = localStorage.getItem('illizeo_tenant_id') || (import.meta as any).env?.VITE_TENANT_ID || 'illizeo';
+          const token = localStorage.getItem('illizeo_token') || '';
+          try {
+            const res = await fetch(`${apiBase}/signature-documents/${docId}/file${inline ? '?inline=1' : ''}`, {
+              headers: { Authorization: `Bearer ${token}`, 'X-Tenant': tenantId },
+            });
+            if (!res.ok) {
+              addToast(res.status === 404 ? "Le PDF n'est plus disponible" : `Erreur ${res.status}`, 'error');
+              return;
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            if (inline) {
+              window.open(url, '_blank', 'noopener,noreferrer');
+            } else {
+              const a = document.createElement('a');
+              a.href = url; a.download = `document-${docId}.pdf`;
+              document.body.appendChild(a); a.click(); a.remove();
+            }
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+          } catch {
+            addToast("Impossible d'ouvrir le document", 'error');
+          }
+        };
+        return (
+          <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{kpiASigner} à signer · {kpiACompleter} à compléter · {kpiValides} signés</div>
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: C.pink, margin: 0 }}>Mes signatures</h1>
+                <p style={{ fontSize: 13, color: C.textLight, marginTop: 8, maxWidth: 720, lineHeight: 1.5 }}>
+                  Historique chronologique de tous les documents que vous avez signés ou lus. Chaque enregistrement comporte la date et l'horodatage à valeur de preuve (RGPD, conformité interne).
+                </p>
+              </div>
+              {pending.length > 0 && <button className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "10px 20px", fontSize: 13 }}>Tout signer (signature électronique)</button>}
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+              {[
+                { label: "URGENTS", value: kpiUrgents, color: C.red },
+                { label: "À SIGNER", value: kpiASigner, color: C.pink },
+                { label: "À COMPLÉTER", value: kpiACompleter, color: C.amber },
+                { label: "VALIDÉS", value: kpiValides, color: C.green },
+              ].map(k => (
+                <div key={k.label} className="iz-card" style={{ ...sCard, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1 }}>{k.label}</div>
+                  <div style={{ fontSize: 32, fontWeight: 700, color: k.color, marginTop: 4 }}>{k.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {pending.length > 0 && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <Clock size={16} color={C.amber} />
+                  <h2 style={{ fontSize: 14, fontWeight: 700, color: C.text, margin: 0, textTransform: "uppercase", letterSpacing: 1 }}>En attente de votre action ({pending.length})</h2>
+                </div>
+                <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden", marginBottom: 24, border: `1px solid ${C.amber}` }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 110px 240px", padding: "12px 20px", borderBottom: `1px solid ${C.border}`, fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1, background: C.amberLight }}>
+                    <div>DOCUMENT</div>
+                    <div>TYPE</div>
+                    <div>STATUT</div>
+                    <div></div>
+                  </div>
+                  {pending.map((d: any, i: number) => {
+                    const isLecture = d.type === "lecture" || d.status === "à lire";
+                    const statusLabel = d.status === "à signer" ? "À signer" : d.status === "à lire" ? "À lire" : "À compléter";
+                    return (
+                      <div key={d.id || i} style={{ display: "grid", gridTemplateColumns: "1fr 110px 110px 240px", padding: "14px 20px", alignItems: "center", borderBottom: i < pending.length - 1 ? `1px solid ${C.border}` : "none", background: i % 2 === 0 ? C.white : C.bg }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 6, background: isLecture ? C.blueLight : C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {isLecture ? <BookOpen size={16} color={C.blue} /> : <PenTool size={16} color={C.pink} />}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{d.name}</div>
+                            {d.urgent && <div style={{ fontSize: 10, fontWeight: 700, color: C.red, marginTop: 2 }}>⚠ URGENT</div>}
+                            {d.description && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{d.description.length > 80 ? d.description.substring(0, 80) + "…" : d.description}</div>}
+                          </div>
+                        </div>
+                        <div>
+                          <span style={{ padding: "3px 10px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: isLecture ? C.blueLight : C.pinkBg, color: isLecture ? C.blue : C.pink }}>
+                            {isLecture ? "Lecture" : "Signature"}
+                          </span>
+                        </div>
+                        <div>
+                          <span style={{ padding: "3px 10px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: C.amberLight, color: C.amber }}>{statusLabel}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+                          <button onClick={() => openSignedDoc(d.id, true)} title="Lire le document" style={{ ...sBtn("outline"), padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+                            <BookOpen size={12} /> Lire
+                          </button>
+                          <button onClick={() => openSignedDoc(d.id, false)} title="Télécharger le document" style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: 5, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Download size={12} color={C.textMuted} />
+                          </button>
+                          <button onClick={() => setDashPage("mes_actions")} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "6px 14px", fontSize: 11 }}>{isLecture ? "Confirmer" : "Signer"}</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <CheckCircle size={16} color={C.green} />
+                  <h2 style={{ fontSize: 14, fontWeight: 700, color: C.text, margin: 0, textTransform: "uppercase", letterSpacing: 1 }}>Historique ({completed.length})</h2>
+                </div>
+              </>
+            )}
+
+            <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 200px 160px", padding: "12px 20px", borderBottom: `1px solid ${C.border}`, fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1 }}>
+                <div>DOCUMENT</div>
+                <div>TYPE</div>
+                <div>SIGNÉ LE</div>
+                <div></div>
+              </div>
+              {completed.length === 0 ? (
+                <div style={{ padding: "60px 20px", textAlign: "center", color: C.textMuted }}>
+                  <FileSignature size={32} color={C.textMuted} style={{ marginBottom: 12, opacity: .5 }} />
+                  <div style={{ fontSize: 14, fontWeight: 500, color: C.text, marginBottom: 4 }}>Aucune signature pour le moment</div>
+                  <div style={{ fontSize: 12 }}>Vos documents signés apparaîtront ici dès que vous aurez complété une action de signature ou de lecture.</div>
+                </div>
+              ) : completed.map((d: any, i: number) => {
+                const isLecture = d.statut === "lu" || d.document_type === "lecture";
+                const dateStr = d.signed_at ? new Date(d.signed_at).toLocaleString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : "—";
+                const ver = d.signed_version || 1;
+                const isOutdated = !!d.is_outdated;
+                return (
+                  <div key={d.ack_id || i} style={{ display: "grid", gridTemplateColumns: "1fr 140px 200px 160px", padding: "14px 20px", alignItems: "center", borderBottom: i < completed.length - 1 ? `1px solid ${C.border}` : "none", background: i % 2 === 0 ? C.white : C.bg, opacity: isOutdated ? 0.75 : 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 6, background: isOutdated ? C.bg : C.greenLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <CheckCircle size={16} color={isOutdated ? C.textMuted : C.green} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>
+                          {d.document_title}
+                          <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: C.bg, color: C.textMuted, border: `1px solid ${C.border}` }}>v{ver}</span>
+                          {isOutdated && <span style={{ padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.amberLight, color: C.amber }}>Version remplacée</span>}
+                        </div>
+                        {d.document_description && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{d.document_description.length > 80 ? d.document_description.substring(0, 80) + "…" : d.document_description}</div>}
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ padding: "3px 10px", borderRadius: 10, fontSize: 11, fontWeight: 600, background: isLecture ? C.blueLight : C.greenLight, color: isLecture ? C.blue : C.green }}>
+                        {isLecture ? "Lecture confirmée" : "Signé"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: C.text }}>{dateStr}</div>
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+                      <button onClick={() => openSignedDoc(d.document_id, true)} title="Ouvrir le document" style={{ ...sBtn("outline"), padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+                        <BookOpen size={12} /> Voir
+                      </button>
+                      <button onClick={() => openSignedDoc(d.document_id, false)} title="Télécharger le document" style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+                        <Download size={14} color={C.textMuted} />
+                      </button>
+                      <span title={d.ip_address ? `Signé depuis ${d.ip_address}` : "Preuve horodatée disponible auprès de votre RH"} style={{ fontSize: 11, color: C.textMuted }}>✓</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* FORMATIONS PAGE */}
+      {dashPage === "formations" && (() => {
+        const FORMATIONS = [
+          { id: "sst", code: "SST", title: "Sécurité au travail (SST init.)", duration: "2h", deadline: "Avant J+15", color: C.red, status: "todo", obligatoire: true },
+          { id: "inc", code: "INC", title: "Évacuation incendie", duration: "30 min", deadline: "Avant J+5", color: C.amber, status: "in_progress", obligatoire: true },
+          { id: "rgpd", code: "RGPD", title: "RGPD essentiels", duration: "1h", deadline: "Avant J+30", color: C.blue, status: "todo", obligatoire: true },
+          { id: "cyb", code: "CYB", title: "Cybersécurité — bonnes pratiques", duration: "45 min", deadline: "Avant J+30", color: "#9C27B0", status: "todo", obligatoire: true },
+          { id: "eth", code: "ETH", title: "Éthique & anti-corruption", duration: "30 min", deadline: "Avant J+45", color: C.green, status: "todo", obligatoire: true },
+          { id: "qse", code: "QSE", title: "Qualité Sécurité Environnement", duration: "1h30", deadline: "Avant J+60", color: C.pink, status: "todo", obligatoire: true },
+        ];
+        const validated = FORMATIONS.filter(f => f.status === "done").length;
+        const totalH = FORMATIONS.reduce((acc, f) => acc + (f.duration.includes("h") ? parseFloat(f.duration) : parseFloat(f.duration) / 60), 0);
+        const pct = Math.round((validated / FORMATIONS.length) * 100);
+        const radius = 50, circ = 2 * Math.PI * radius;
+        return (
+          <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{FORMATIONS.length} modules · {totalH.toFixed(1)}h au total</div>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: C.pink, margin: 0 }}>Mon parcours formation d'intégration</h1>
+            </div>
+            <div className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 20, padding: "24px 32px", background: `linear-gradient(135deg, ${C.pinkBg} 0%, #F3E5F5 100%)`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: 1, marginBottom: 6 }}>FORMATIONS OBLIGATOIRES</div>
+                <h3 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: "0 0 6px" }}>{validated} module{validated > 1 ? 's' : ''} validé{validated > 1 ? 's' : ''} · {FORMATIONS.length - validated} à venir</h3>
+                <div style={{ fontSize: 13, color: C.textLight }}>Toutes vos échéances sont respectées 👍 · Prochaine deadline : J+5 (Évacuation incendie)</div>
+              </div>
+              <div style={{ position: "relative", width: 110, height: 110 }}>
+                <svg width={110} height={110} style={{ transform: "rotate(-90deg)" }}>
+                  <circle cx={55} cy={55} r={radius} stroke={C.white} strokeWidth={8} fill="none" />
+                  <circle cx={55} cy={55} r={radius} stroke={C.pink} strokeWidth={8} fill="none" strokeDasharray={circ} strokeDashoffset={circ - (pct / 100) * circ} strokeLinecap="round" />
+                </svg>
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 700, color: C.pink }}>{pct}%</div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
+              {FORMATIONS.map(f => (
+                <div key={f.id} className="iz-card" style={{ ...sCard, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 10, background: f.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>{f.code}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{f.title}</div>
+                      {f.obligatoire && <span style={{ padding: "2px 8px", borderRadius: 8, fontSize: 9, fontWeight: 700, background: C.pinkBg, color: C.pink }}>Obligatoire</span>}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textMuted }}>⏱ {f.duration} · 📅 {f.deadline}</div>
+                  </div>
+                  <button className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 18px", fontSize: 12 }}>{f.status === "in_progress" ? "Reprendre" : "Démarrer"}</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* BUREAUX PAGE */}
+      {dashPage === "bureaux" && (() => {
+        const tourBlock = (companyBlocks || []).find((b: any) => b.type === "office_tour" && b.actif);
+        const data = tourBlock?.data || {};
+        const ROOMS_FALLBACK = [
+          { id: "openspace", title: "Open-space RSE", subtitle: "✓ Votre poste · 4.12", span: 1 },
+          { id: "atrium", title: "Salle Atrium", subtitle: "✓ Petit-déj équipe", span: 1 },
+          { id: "cafet", title: "Cafét' du 4e", subtitle: "● Prochain stop", span: 1 },
+          { id: "vision", title: "Salle Vision", subtitle: "RDV avec DG (J+13)", span: 1 },
+          { id: "phone", title: "Phone box", subtitle: "×4", span: 1 },
+          { id: "babyfoot", title: "Détente", subtitle: "Babyfoot 🎮", span: 1 },
+          { id: "directionrh", title: "Direction & RH", subtitle: "Marie · Hélène", span: 2 },
+          { id: "brainstorm", title: "Salle Brainstorm", subtitle: "16 places", span: 1 },
+        ];
+        const ROOMS = ((data.rooms && data.rooms.length > 0) ? data.rooms : ROOMS_FALLBACK).map((r: any, i: number) => ({
+          id: r.id || `room_${i}`, title: r.title, subtitle: r.subtitle || "", span: r.span || 1,
+        }));
+        const SITE = data.site || "Siège Paris";
+        const ETAGE = data.etage || "Étage 4";
+        const TREASURE_TITLE = data.treasure_title || "Trouvez la mascotte !";
+        const TREASURE_DESC = data.treasure_desc || "Une peluche cachée à chaque étage. Photo + #welcome = mug collector.";
+
+        const STORAGE_KEY = `illizeo_office_tour_${tourBlock?.id || "default"}`;
+        const _tour = officeTourState || (() => {
+          try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) return JSON.parse(raw);
+          } catch {}
+          return { visited: [] as string[], current: ROOMS[0]?.id, treasure: false };
+        })();
+        const persist = (s: any) => {
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+          setOfficeTourState(s);
+        };
+        const visit = (id: string) => {
+          const v = _tour.visited.includes(id) ? _tour.visited : [..._tour.visited, id];
+          persist({ ..._tour, visited: v, current: id });
+          if (v.length === ROOMS.length && !_tour.allDone) {
+            persist({ ..._tour, visited: v, current: id, allDone: true });
+            addToast(`🎉 Tour terminé ! ${ROOMS.length} lieux découverts.`, "success");
+          }
+        };
+        const reset = () => persist({ visited: [], current: ROOMS[0]?.id, treasure: false });
+        const toggleTreasure = () => persist({ ..._tour, treasure: !_tour.treasure });
+        const colorFor = (rid: string) => {
+          if (_tour.visited.includes(rid)) return { bg: C.greenLight, border: C.green };
+          if (_tour.current === rid) return { bg: C.pinkBg, border: C.pink };
+          return { bg: C.white, border: C.border };
+        };
+        if (ROOMS.length === 0) return (
+          <div style={{ flex: 1, padding: "32px 40px" }}>
+            <h1 style={{ fontSize: 24, fontWeight: 700, color: C.pink, margin: "0 0 12px" }}>Tour des bureaux</h1>
+            <div className="iz-card" style={{ ...sCard, padding: 32, textAlign: "center", color: C.textMuted }}>Aucun lieu configuré. Demandez à votre admin RH d'activer un bloc "Tour des bureaux" depuis la page Entreprise.</div>
+          </div>
+        );
+        // Hidden mascot location: stable hash of tourBlock id → one of the rooms
+        const mascotIdx = (() => {
+          const seed = String(tourBlock?.id || "default").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+          return seed % ROOMS.length;
+        })();
+        const mascotRoomId = ROOMS[mascotIdx]?.id;
+        const mascotFound = _tour.foundMascot;
+        return (
+          <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{SITE} · {ETAGE}</div>
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: C.pink, margin: 0 }}>{tourBlock?.titre || "Tour des bureaux"}</h1>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {_tour.visited.length > 0 && <button onClick={reset} style={{ ...sBtn("outline"), padding: "10px 16px", fontSize: 12 }}>↻ Réinitialiser</button>}
+                <button onClick={toggleTreasure} className={_tour.treasure ? "" : "iz-btn-pink"} style={{ ...(_tour.treasure ? sBtn("outline") : sBtn("pink")), padding: "10px 20px", fontSize: 13, ...(_tour.treasure ? { borderColor: C.pink, color: C.pink, background: C.pinkBg } : {}) }}>
+                  {_tour.treasure ? "✓ Mode chasse activé" : "Mode chasse au trésor 🐾"}
+                </button>
+              </div>
+            </div>
+            {_tour.treasure && (
+              <div style={{ marginBottom: 16, padding: "14px 18px", background: `linear-gradient(135deg, ${C.pinkBg}, #FFF7CC)`, borderRadius: 12, border: `2px dashed ${C.pink}`, display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ fontSize: 28 }}>🐾</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.pink }}>Mode chasse au trésor activé</div>
+                  <div style={{ fontSize: 11, color: C.text, marginTop: 2 }}>
+                    {mascotFound
+                      ? `🎉 Bravo ! Vous avez trouvé la mascotte dans ${ROOMS.find((r:any) => r.id === mascotRoomId)?.title} !`
+                      : "Une peluche est cachée dans l'un des lieux. Cliquez sur les salles pour la trouver !"}
+                  </div>
+                </div>
+                {!mascotFound && <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, padding: "4px 10px", background: C.white, borderRadius: 10 }}>{_tour.visited.length} / {ROOMS.length} explorés</div>}
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 20 }}>
+              <div className="iz-card" style={{ ...sCard, padding: 20, background: "linear-gradient(180deg, #F8F9FB, #EEF2F7)" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 1, marginBottom: 12 }}>PLAN {ETAGE.toUpperCase()}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                  {ROOMS.map((r: any) => {
+                    const c = colorFor(r.id);
+                    const isVisited = _tour.visited.includes(r.id);
+                    const isCurrent = _tour.current === r.id;
+                    const hasMascot = _tour.treasure && r.id === mascotRoomId && isVisited;
+                    return (
+                      <button key={r.id} onClick={() => {
+                        visit(r.id);
+                        if (_tour.treasure && r.id === mascotRoomId && !mascotFound) {
+                          setTimeout(() => {
+                            const v = _tour.visited.includes(r.id) ? _tour.visited : [..._tour.visited, r.id];
+                            persist({ ..._tour, visited: v, current: r.id, foundMascot: true });
+                            addToast(`🎉 Mascotte trouvée dans ${r.title} !`, "success");
+                          }, 250);
+                        }
+                      }} style={{
+                        background: c.bg, border: `2px solid ${c.border}`, borderRadius: 10, padding: "16px 14px", textAlign: "left", cursor: "pointer", fontFamily: font, transition: "all .15s",
+                        gridColumn: `span ${Math.min(3, r.span || 1)}`,
+                        minHeight: 90, position: "relative",
+                      }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: isVisited ? C.green : isCurrent ? C.pink : C.text }}>{r.title}</div>
+                        <div style={{ fontSize: 11, color: isVisited ? C.green : isCurrent ? C.pink : C.textMuted, marginTop: 4 }}>{r.subtitle}</div>
+                        {hasMascot && <div style={{ position: "absolute", top: 6, right: 8, fontSize: 18 }}>🐾</div>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div className="iz-card" style={{ ...sCard, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 1, marginBottom: 8 }}>ÉTAPES DU TOUR</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 10 }}>{_tour.visited.length} / {ROOMS.length} lieux découverts</div>
+                  <div style={{ height: 4, background: C.bg, borderRadius: 2, marginBottom: 14 }}>
+                    <div style={{ height: "100%", width: `${(_tour.visited.length / ROOMS.length) * 100}%`, background: `linear-gradient(90deg, ${C.green}, ${C.pink})`, borderRadius: 2, transition: "width .3s" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {ROOMS.map((s: any) => {
+                      const v = _tour.visited.includes(s.id);
+                      const cur = _tour.current === s.id;
+                      return (
+                        <button key={s.id} onClick={() => visit(s.id)} style={{
+                          display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 6,
+                          border: "none", background: cur && !v ? C.pinkBg : "transparent", cursor: "pointer", fontFamily: font, textAlign: "left", width: "100%",
+                          transition: "background .15s",
+                        }}
+                        onMouseEnter={e => { if (!v) e.currentTarget.style.background = C.bg; }}
+                        onMouseLeave={e => { if (!v) e.currentTarget.style.background = cur ? C.pinkBg : "transparent"; }}>
+                          {v ? (
+                            <div style={{ width: 20, height: 20, borderRadius: "50%", background: C.green, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Check size={11} color="#fff" /></div>
+                          ) : cur ? (
+                            <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${C.pink}`, flexShrink: 0 }} />
+                          ) : (
+                            <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${C.border}`, flexShrink: 0 }} />
+                          )}
+                          <span style={{ fontSize: 13, fontWeight: cur ? 600 : 400, color: v ? C.green : cur ? C.pink : C.textLight }}>{s.title}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="iz-card" style={{ ...sCard, padding: "16px 18px", background: C.pinkBg }}>
+                  <div style={{ fontSize: 32, marginBottom: 6 }}>🎁</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>{TREASURE_TITLE}</div>
+                  <div style={{ fontSize: 11, color: C.textLight, lineHeight: 1.5 }}>{TREASURE_DESC}</div>
+                  {!_tour.treasure && (
+                    <button onClick={toggleTreasure} className="iz-btn-pink" style={{ ...sBtn("pink"), marginTop: 10, padding: "6px 12px", fontSize: 11, width: "100%" }}>Activer le mode chasse 🐾</button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {dashPage === "notifications" && (
         <div style={{ flex: 1, padding: "32px 40px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -2534,6 +4277,7 @@ export default function OnboardingModule() {
           )}
         </div>
       )}
+      </div>
       {/* Overlays */}
       {showWelcomeModal && renderWelcomeModal()}
       {renderDocPanel()}
@@ -2627,7 +4371,7 @@ export default function OnboardingModule() {
           </div>
           {/* Preview */}
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
-            <div style={{ width: 120, height: 120, borderRadius: "50%", background: avatarImage ? "none" : "linear-gradient(135deg, #E91E8C, #C2185B)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, fontWeight: 600, color: C.white, overflow: "hidden", border: `4px solid ${C.border}` }}>
+            <div style={{ width: 120, height: 120, borderRadius: "50%", background: avatarImage ? "none" : "linear-gradient(135deg, #E91E8C, #E41076)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, fontWeight: 600, color: C.white, overflow: "hidden", border: `4px solid ${C.border}` }}>
               {avatarImage ? (
                 <img src={avatarImage} alt="" style={{
                   width: `${avatarZoom}%`, height: `${avatarZoom}%`,
@@ -2648,17 +4392,21 @@ export default function OnboardingModule() {
                 </label>
                 <input type="range" min={100} max={250} value={avatarZoom} onChange={e => setAvatarZoom(Number(e.target.value))} style={{ width: "100%", accentColor: C.pink }} />
               </div>
-              {/* Position */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 500, color: C.textLight, display: "block", marginBottom: 4 }}>Position horizontale</label>
-                  <input type="range" min={0} max={100} value={avatarPos.x} onChange={e => setAvatarPos(p => ({ ...p, x: Number(e.target.value) }))} style={{ width: "100%", accentColor: C.pink }} />
+              {/* Position — only effective when zoomed in */}
+              {avatarZoom > 100 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 500, color: C.textLight, display: "block", marginBottom: 4 }}>Position horizontale</label>
+                    <input type="range" min={0} max={100} value={avatarPos.x} onChange={e => setAvatarPos(p => ({ ...p, x: Number(e.target.value) }))} style={{ width: "100%", accentColor: C.pink }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 500, color: C.textLight, display: "block", marginBottom: 4 }}>Position verticale</label>
+                    <input type="range" min={0} max={100} value={avatarPos.y} onChange={e => setAvatarPos(p => ({ ...p, y: Number(e.target.value) }))} style={{ width: "100%", accentColor: C.pink }} />
+                  </div>
                 </div>
-                <div>
-                  <label style={{ fontSize: 11, fontWeight: 500, color: C.textLight, display: "block", marginBottom: 4 }}>Position verticale</label>
-                  <input type="range" min={0} max={100} value={avatarPos.y} onChange={e => setAvatarPos(p => ({ ...p, y: Number(e.target.value) }))} style={{ width: "100%", accentColor: C.pink }} />
-                </div>
-              </div>
+              ) : (
+                <div style={{ fontSize: 11, color: C.textMuted, textAlign: "center", marginBottom: 16 }}>Zoomez pour ajuster la position</div>
+              )}
               {/* Actions */}
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => { setShowAvatarEditor(false); localStorage.setItem("illizeo_avatar_zoom", String(avatarZoom)); localStorage.setItem("illizeo_avatar_pos", JSON.stringify(avatarPos)); addToast("Photo mise à jour", "success"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), flex: 1, fontSize: 13 }}>Valider</button>

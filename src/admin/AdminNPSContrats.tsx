@@ -247,7 +247,29 @@ export function createAdminNPSContrats(ctx: any) {
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.nps')}</h1>
-          <button onClick={() => { setNpsPanelData({ titre: "", description: "", type: "nps", declencheur: "fin_parcours", questions: [{ text: "", type: "nps" }], actif: true }); resetTr(); setNpsPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('nps.new_survey')}</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => {
+                setNpsPanelData({
+                  titre: "Mon ressenti d'intégration",
+                  description: "Comment s'est passée votre première semaine ? Vos réponses sont anonymisées avant d'être partagées avec votre manager.",
+                  type: "checkin_emo",
+                  declencheur: "j_plus_7",
+                  actif: true,
+                  questions: [
+                    { text: "Globalement, vous diriez que votre intégration se passe…", type: "mood" },
+                    { text: "Sur ces dimensions, comment vous sentez-vous ?", type: "multi_slider", dimensions: ["Accueil de l'équipe", "Clarté de mes missions", "Outils & accès", "Charge de travail", "Disponibilité de mon manager", "Disponibilité de mon buddy"] },
+                    { text: "Un mot pour décrire votre semaine", type: "tags", tags: ["Stimulante", "Dense", "Sereine", "Bienveillante", "Confuse", "Excitante", "Fatigante", "Inspirante", "Surprenante", "Chaleureuse"] },
+                    { text: "Si vous deviez améliorer une chose dans votre onboarding…", type: "text" },
+                  ],
+                });
+                resetTr();
+                setNpsPanelMode("create");
+              }}
+              style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}
+            >💙 Pré-remplir Check-in J+7</button>
+            <button onClick={() => { setNpsPanelData({ titre: "", description: "", type: "nps", declencheur: "fin_parcours", questions: [{ text: "", type: "nps" }], actif: true }); resetTr(); setNpsPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('nps.new_survey')}</button>
+          </div>
         </div>
 
         {/* Explanation */}
@@ -338,7 +360,7 @@ export function createAdminNPSContrats(ctx: any) {
                   </div>
                 </div>
                 <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 6, alignItems: "center" }} onClick={e => e.stopPropagation()}>
-                  <button onClick={() => { setNpsPanelData({ id: s.id, titre: s.titre, description: s.description || "", type: s.type, declencheur: s.declencheur, questions: s.questions || [], actif: s.actif }); setContentTranslations((s as any).translations || {}); setNpsPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11 }}>{t('common.edit')}</button>
+                  <button onClick={() => { setNpsPanelData({ id: s.id, titre: s.titre, description: s.description || "", type: s.type, declencheur: s.declencheur, delai_jours: (s as any).delai_jours ?? null, phase_id: (s as any).phase_id ?? null, date_envoi: (s as any).date_envoi ?? null, questions: s.questions || [], actif: s.actif }); setContentTranslations((s as any).translations || {}); setNpsPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11 }}>{t('common.edit')}</button>
                   <button onClick={async () => { try { await apiSendNpsAll(s.id); addToast_admin(t('toast.saved')); } catch { addToast_admin(t('toast.error')); } }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 12px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Send size={11} /> {t('nps.send_all')}</button>
                   <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center" }}>
                     <div onClick={async () => { try { await apiUpdateNps(s.id, { actif: !s.actif }); reloadNps(); addToast_admin(s.actif ? t('nps.deactivated') : t('nps.activated')); } catch { addToast_admin(t('toast.error')); } }}
@@ -397,13 +419,68 @@ export function createAdminNPSContrats(ctx: any) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Type</label>
                     <select value={npsPanelData.type} onChange={e => setNpsPanelData((p: any) => ({ ...p, type: e.target.value }))} style={sInput}>
-                      <option value="nps">{t('nps.q_type_nps')}</option><option value="satisfaction">{t('nps.type_satisfaction')}</option><option value="custom">{t('nps.type_custom')}</option>
+                      <option value="nps">{t('nps.q_type_nps')}</option>
+                      <option value="satisfaction">{t('nps.type_satisfaction')}</option>
+                      <option value="checkin_emo">💙 Check-in émotionnel</option>
+                      <option value="custom">{t('nps.type_custom')}</option>
                     </select>
                   </div>
                   <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.trigger')}</label>
-                    <select value={npsPanelData.declencheur} onChange={e => setNpsPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={sInput}>
-                      <option value="fin_parcours">{t('nps.trigger_end_path')}</option><option value="fin_phase">{t('nps.trigger_end_phase')}</option><option value="manuel">{t('nps.trigger_manual')}</option><option value="date_specifique">{t('nps.trigger_date')}</option>
+                    <select
+                      value={(() => {
+                        const d = npsPanelData.declencheur;
+                        // Legacy presets map to a hidden delai_relatif underneath
+                        if (d === "delai_relatif") {
+                          const j = npsPanelData.delai_jours;
+                          if (j === 7 || j === 30 || j === 60 || j === 90) return `j_plus_${j}`;
+                          return "delai_relatif";
+                        }
+                        return d;
+                      })()}
+                      onChange={e => {
+                        const v = e.target.value;
+                        const m = v.match(/^j_plus_(\d+)$/);
+                        if (m) setNpsPanelData((p: any) => ({ ...p, declencheur: "delai_relatif", delai_jours: parseInt(m[1], 10) }));
+                        else if (v === "delai_relatif") setNpsPanelData((p: any) => ({ ...p, declencheur: "delai_relatif", delai_jours: p.delai_jours ?? 14 }));
+                        else setNpsPanelData((p: any) => ({ ...p, declencheur: v }));
+                      }}
+                      style={sInput}
+                    >
+                      <option value="fin_parcours">{t('nps.trigger_end_path')}</option>
+                      <option value="fin_phase">{t('nps.trigger_end_phase')}</option>
+                      <option value="j_plus_7">J+7 (1 semaine)</option>
+                      <option value="j_plus_30">J+30 (1 mois)</option>
+                      <option value="j_plus_60">J+60 (2 mois)</option>
+                      <option value="j_plus_90">J+90 (3 mois)</option>
+                      <option value="delai_relatif">J+X · délai personnalisé</option>
+                      <option value="manuel">{t('nps.trigger_manual')}</option>
+                      <option value="date_specifique">{t('nps.trigger_date')}</option>
                     </select>
+                    {/* Conditional fields based on the selected trigger */}
+                    {npsPanelData.declencheur === "delai_relatif" && ![7, 30, 60, 90].includes(npsPanelData.delai_jours) && (
+                      <div style={{ marginTop: 8 }}>
+                        <label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Nombre de jours après l'arrivée du collaborateur</label>
+                        <input type="number" min={0} max={3650} value={npsPanelData.delai_jours ?? 14} onChange={e => setNpsPanelData((p: any) => ({ ...p, delai_jours: parseInt(e.target.value, 10) || 0 }))} style={{ ...sInput, width: 120 }} />
+                        <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 8 }}>jours après date_debut</span>
+                      </div>
+                    )}
+                    {npsPanelData.declencheur === "fin_phase" && (
+                      <div style={{ marginTop: 8 }}>
+                        <label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Phase à compléter</label>
+                        <select value={npsPanelData.phase_id ?? ""} onChange={e => setNpsPanelData((p: any) => ({ ...p, phase_id: e.target.value ? parseInt(e.target.value, 10) : null }))} style={sInput}>
+                          <option value="">— Choisir une phase —</option>
+                          {(PHASE_DEFAULTS || []).map((ph: any) => (
+                            <option key={ph.id} value={ph.id}>{ph.nom}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {npsPanelData.declencheur === "date_specifique" && (
+                      <div style={{ marginTop: 8 }}>
+                        <label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Date d'envoi</label>
+                        <input type="date" value={npsPanelData.date_envoi || ""} onChange={e => setNpsPanelData((p: any) => ({ ...p, date_envoi: e.target.value }))} style={{ ...sInput, width: 200 }} />
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.pink, marginTop: 8 }}>{t('nps.questions')}</div>
@@ -412,8 +489,53 @@ export function createAdminNPSContrats(ctx: any) {
                     <div style={{ flex: 1 }}>
                       <TranslatableField value={q.text} onChange={v => { const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], text: v }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations[`question_${i}`]} onTranslationsChange={tr => setTr(`question_${i}`, tr)} style={{ ...sInput, marginBottom: 6 }} placeholder={t('nps.question_text')} />
                       <select value={q.type} onChange={e => { const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], type: e.target.value }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} style={{ ...sInput, fontSize: 11 }}>
-                        <option value="nps">{t('nps.q_type_nps')}</option><option value="rating">{t('nps.q_type_rating')}</option><option value="text">{t('nps.q_type_text')}</option><option value="choice">{t('nps.q_type_choice')}</option>
+                        <option value="nps">{t('nps.q_type_nps')}</option>
+                        <option value="rating">{t('nps.q_type_rating')}</option>
+                        <option value="text">{t('nps.q_type_text')}</option>
+                        <option value="choice">{t('nps.q_type_choice')}</option>
+                        <option value="mood">😊 Mood (5 emojis)</option>
+                        <option value="multi_slider">🎚 Sliders multi-dimensions</option>
+                        <option value="tags">🏷 Tags cliquables</option>
                       </select>
+                      {/* Configuration spécifique par type */}
+                      {q.type === "multi_slider" && (
+                        <div style={{ marginTop: 8 }}>
+                          <label style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, display: "block", marginBottom: 4 }}>Dimensions (une par ligne)</label>
+                          <textarea
+                            value={(q.dimensions || []).join("\n")}
+                            onChange={e => { const dims = (e.target as HTMLTextAreaElement).value.split("\n").map(s => s.trim()).filter(Boolean); const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], dimensions: dims }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }}
+                            placeholder="Accueil de l'équipe&#10;Clarté de mes missions&#10;Outils & accès&#10;Charge de travail&#10;Disponibilité de mon manager&#10;Disponibilité de mon buddy"
+                            style={{ ...sInput, fontSize: 11, minHeight: 100, resize: "vertical" }}
+                          />
+                        </div>
+                      )}
+                      {q.type === "tags" && (
+                        <div style={{ marginTop: 8 }}>
+                          <label style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, display: "block", marginBottom: 4 }}>Tags proposés (une par ligne)</label>
+                          <textarea
+                            value={(q.tags || []).join("\n")}
+                            onChange={e => { const tags = (e.target as HTMLTextAreaElement).value.split("\n").map(s => s.trim()).filter(Boolean); const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], tags }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }}
+                            placeholder="Stimulante&#10;Dense&#10;Sereine&#10;Bienveillante&#10;Confuse&#10;Excitante&#10;Fatigante&#10;Inspirante"
+                            style={{ ...sInput, fontSize: 11, minHeight: 100, resize: "vertical" }}
+                          />
+                        </div>
+                      )}
+                      {q.type === "mood" && (
+                        <div style={{ marginTop: 8, padding: "8px 10px", background: C.pinkBg, borderRadius: 6, fontSize: 10, color: C.textMuted }}>
+                          😣 Mal · 😐 Mitigé · 🙂 Bien · 😊 Très bien · 🤩 Super (preset)
+                        </div>
+                      )}
+                      {q.type === "choice" && (
+                        <div style={{ marginTop: 8 }}>
+                          <label style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, display: "block", marginBottom: 4 }}>Options (une par ligne)</label>
+                          <textarea
+                            value={(q.options || []).join("\n")}
+                            onChange={e => { const options = (e.target as HTMLTextAreaElement).value.split("\n").map(s => s.trim()).filter(Boolean); const qs = [...npsPanelData.questions]; qs[i] = { ...qs[i], options }; setNpsPanelData((p: any) => ({ ...p, questions: qs })); }}
+                            placeholder="Option 1&#10;Option 2&#10;Option 3"
+                            style={{ ...sInput, fontSize: 11, minHeight: 80, resize: "vertical" }}
+                          />
+                        </div>
+                      )}
                     </div>
                     <button onClick={() => { const qs = npsPanelData.questions.filter((_: any, j: number) => j !== i); setNpsPanelData((p: any) => ({ ...p, questions: qs })); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={14} color={C.red} /></button>
                   </div>
@@ -426,7 +548,7 @@ export function createAdminNPSContrats(ctx: any) {
                   <button onClick={() => setNpsPanelMode("closed")} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
                   <button onClick={async () => {
                     try {
-                      const payload = { titre: npsPanelData.titre, description: npsPanelData.description, type: npsPanelData.type, declencheur: npsPanelData.declencheur, questions: npsPanelData.questions, actif: npsPanelData.actif, translations: buildTranslationsPayload() };
+                      const payload: any = { titre: npsPanelData.titre, description: npsPanelData.description, type: npsPanelData.type, declencheur: npsPanelData.declencheur, delai_jours: npsPanelData.delai_jours ?? null, phase_id: npsPanelData.phase_id ?? null, date_envoi: npsPanelData.date_envoi ?? null, questions: npsPanelData.questions, actif: npsPanelData.actif, translations: buildTranslationsPayload() };
                       if (npsPanelMode === "edit" && npsPanelData.id) await apiUpdateNps(npsPanelData.id, payload);
                       else await apiCreateNps(payload);
                       reloadNps(); setNpsPanelMode("closed"); addToast_admin(npsPanelMode === "create" ? "Questionnaire créé" : "Questionnaire modifié");
@@ -484,6 +606,7 @@ export function createAdminNPSContrats(ctx: any) {
                   <span style={{ color: C.text }}><strong>{doc.total_signes || 0}</strong>/{doc.total_envois || 0} {t('sign.signed')}</span>
                 </div>
                 <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={async () => { try { const acks = await getDocAcknowledgements(doc.id); setSignAcks(acks); setSignSelectedDoc(doc.id); } catch { addToast_admin(t('toast.error')); } }} title="Voir le détail des confirmations" className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 10px", fontSize: 10, display: "flex", alignItems: "center", gap: 4 }}><Eye size={10} /> Détail</button>
                   <button onClick={async () => { try { await sendSignatureDocToAll(doc.id); reloadSign(); addToast_admin("Document envoyé à tous"); } catch { addToast_admin(t('toast.error')); } }} title={t('sign.send_all')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 10px", fontSize: 10, display: "flex", alignItems: "center", gap: 4 }}><Send size={10} /> {t('sign.send_all')}</button>
                   <button onClick={() => { setContentTranslations((doc as any).translations || {}); setSignPanel({ mode: "edit", data: { ...doc } }); }} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
                   <button onClick={() => showConfirm(`Supprimer "${doc.titre}" ?`, async () => { try { await apiDeleteSignDoc(doc.id); reloadSign(); addToast_admin(t('toast.deleted')); } catch {} })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={12} color={C.red} /></button>
@@ -564,6 +687,87 @@ export function createAdminNPSContrats(ctx: any) {
             </div>
           </div>
         </>)}
+
+        {/* Acknowledgements detail panel */}
+        {signSelectedDoc !== null && (() => {
+          const selectedDoc: any = signDocs.find((d: any) => d.id === signSelectedDoc);
+          const close = () => { setSignSelectedDoc(null); setSignAcks([]); };
+          const isLecture = selectedDoc?.type === "lecture";
+          const sortedAcks = [...signAcks].sort((a: any, b: any) => {
+            const order: Record<string, number> = { en_attente: 0, refuse: 1, lu: 2, signe: 2 };
+            return (order[a.statut] ?? 99) - (order[b.statut] ?? 99);
+          });
+          const counts = signAcks.reduce((acc: any, a: any) => { acc[a.statut] = (acc[a.statut] || 0) + 1; return acc; }, {});
+          const doneCount = (counts.signe || 0) + (counts.lu || 0);
+          return (<>
+            <div onClick={close} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
+            <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 560, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
+              <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    {isLecture ? <BookOpen size={16} color={C.blue} /> : <PenLine size={16} color={C.pink} />}
+                    <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedDoc?.titre || "Document"}</h2>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.textLight }}>{isLecture ? "Confirmations de lecture" : "Statut des signatures"}</div>
+                </div>
+                <button onClick={close} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={18} /></button>
+              </div>
+
+              {/* Stats summary */}
+              <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                <div style={{ padding: "10px", borderRadius: 8, background: C.bg, textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{signAcks.length}</div>
+                  <div style={{ fontSize: 10, color: C.textMuted }}>Total envoyé</div>
+                </div>
+                <div style={{ padding: "10px", borderRadius: 8, background: C.greenLight, textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: C.green }}>{doneCount}</div>
+                  <div style={{ fontSize: 10, color: C.green }}>{isLecture ? "Lus" : "Signés"}</div>
+                </div>
+                <div style={{ padding: "10px", borderRadius: 8, background: C.amberLight, textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: C.amber }}>{counts.en_attente || 0}</div>
+                  <div style={{ fontSize: 10, color: C.amber }}>En attente</div>
+                </div>
+                <div style={{ padding: "10px", borderRadius: 8, background: C.redLight, textAlign: "center" }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: C.red }}>{counts.refuse || 0}</div>
+                  <div style={{ fontSize: 10, color: C.red }}>Refusés</div>
+                </div>
+              </div>
+
+              {/* List */}
+              <div style={{ flex: 1, padding: "8px 24px 24px", overflow: "auto" }}>
+                {sortedAcks.length === 0 ? (
+                  <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun envoi pour ce document.</div>
+                ) : sortedAcks.map((ack: any) => {
+                  const collab = ack.collaborateur || {};
+                  const statutMeta: Record<string, { label: string; bg: string; color: string; Icon: any }> = {
+                    en_attente: { label: "En attente", bg: C.amberLight, color: C.amber, Icon: Clock as any },
+                    lu: { label: "Lu et confirmé", bg: C.greenLight, color: C.green, Icon: CheckCircle as any },
+                    signe: { label: "Signé", bg: C.greenLight, color: C.green, Icon: CheckCircle as any },
+                    refuse: { label: "Refusé", bg: C.redLight, color: C.red, Icon: X as any },
+                  };
+                  const meta = statutMeta[ack.statut] || statutMeta.en_attente;
+                  const fullName = collab.prenom || collab.nom ? `${collab.prenom || ""} ${collab.nom || ""}`.trim() : (collab.email || `Collab #${ack.collaborateur_id}`);
+                  return (
+                    <div key={ack.id} style={{ padding: "12px 14px", marginTop: 8, border: `1px solid ${C.border}`, borderRadius: 10, display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 13, fontWeight: 600, color: C.textLight }}>
+                        {(collab.prenom?.[0] || collab.nom?.[0] || "?").toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fullName}</div>
+                        {collab.email && <div style={{ fontSize: 11, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{collab.email}</div>}
+                        {ack.signed_at && <div style={{ fontSize: 10, color: C.textLight, marginTop: 2 }}>{fmtDateTimeShort(ack.signed_at)}{ack.ip_address ? ` · IP ${ack.ip_address}` : ""}</div>}
+                        {ack.commentaire && <div style={{ fontSize: 11, color: C.red, marginTop: 4, fontStyle: "italic" }}>« {ack.commentaire} »</div>}
+                      </div>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 12, fontSize: 11, fontWeight: 600, background: meta.bg, color: meta.color, flexShrink: 0 }}>
+                        <meta.Icon size={11} /> {meta.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>);
+        })()}
       </>);
     };
 
@@ -640,24 +844,39 @@ export function createAdminNPSContrats(ctx: any) {
           ))}
         </div>
 
-        <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead><tr style={{ background: C.bg }}>{[t('contrat.name'), t('contrat.type'), t('contrat.jurisdiction'), t('contrat.status'), ""].map(h => <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, fontSize: 11, color: C.textLight, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
-            <tbody>
-              {contrats.map((c: any) => (
-                <tr key={c.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }} onClick={() => { setContratPanelData({ id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction, actif: c.actif, fichier: c.fichier || "" }); setContentTranslations((c as any).translations || {}); setContratPanelMode("edit"); }}>
-                  <td style={{ padding: "10px 14px", fontWeight: 500 }}>{c.nom}</td>
-                  <td style={{ padding: "10px 14px" }}>{c.type}</td>
-                  <td style={{ padding: "10px 14px" }}>{c.juridiction}</td>
-                  <td style={{ padding: "10px 14px" }}><span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: c.actif ? C.greenLight : C.bg, color: c.actif ? C.green : C.textMuted }}>{c.actif ? t('nps.active') : t('nps.inactive')}</span></td>
-                  <td style={{ padding: "10px 14px", display: "flex", gap: 6 }}>
-                    {c.fichier && <button onClick={e => { e.stopPropagation(); setGenerateContrat(c); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "3px 10px", fontSize: 11 }}>Générer</button>}
-                    <button onClick={e => { e.stopPropagation(); setContratPanelData({ id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction, actif: c.actif, fichier: c.fichier || "" }); setContratPanelMode("edit"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "3px 10px", fontSize: 11 }}>{t('common.edit')}</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Card grid layout — same look & feel as the Documents à signer tab */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {contrats.map((c: any) => (
+            <div key={c.id} className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden", opacity: c.actif ? 1 : 0.5 }}>
+              <div style={{ padding: "16px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <FileSignature size={16} color={C.pink} />
+                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nom}</h3>
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.pinkBg, color: C.pink }}>{c.type}</span>
+                    <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.blueLight, color: C.blue }}>{c.juridiction}</span>
+                  </div>
+                </div>
+                <p style={{ fontSize: 12, color: C.textLight, margin: "0 0 8px", lineHeight: 1.5 }}>
+                  Modèle de contrat avec variables personnalisées par collaborateur ({c.type} · {c.juridiction}).
+                </p>
+                {c.fichier && <div style={{ fontSize: 11, color: C.textMuted, display: "flex", alignItems: "center", gap: 4 }}><Paperclip size={11} /> {c.fichier}</div>}
+                {!c.fichier && <div style={{ fontSize: 11, color: C.amber, display: "flex", alignItems: "center", gap: 4 }}><AlertTriangle size={11} /> Aucun template uploadé</div>}
+              </div>
+              <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", background: C.bg }}>
+                <div style={{ fontSize: 12 }}>
+                  <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: c.actif ? C.greenLight : C.bg, color: c.actif ? C.green : C.textMuted }}>{c.actif ? t('nps.active') : t('nps.inactive')}</span>
+                </div>
+                <div style={{ display: "flex", gap: 4 }}>
+                  {c.fichier && <button onClick={() => setGenerateContrat(c)} title="Prévisualiser" style={{ ...sBtn("outline"), padding: "4px 10px", fontSize: 10, display: "flex", alignItems: "center", gap: 4 }}><Eye size={10} /> Prévisualiser</button>}
+                  <button onClick={() => { setContratPanelData({ id: c.id, nom: c.nom, type: c.type, juridiction: c.juridiction, actif: c.actif, fichier: c.fichier || "" }); setContentTranslations((c as any).translations || {}); setContratPanelMode("edit"); }} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {contrats.length === 0 && <div style={{ gridColumn: "1/-1", padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun modèle de contrat. Cliquez sur "Nouveau contrat" pour en créer un.</div>}
         </div>
         {/* Contrat panel */}
         {contratPanelMode !== "closed" && (
@@ -696,10 +915,28 @@ export function createAdminNPSContrats(ctx: any) {
                         <>
                           <Upload size={24} color={C.textMuted} style={{ marginBottom: 8 }} />
                           <div style={{ fontSize: 13, color: C.text }}>{t('contrat.drag_drop')} <span style={{ color: C.pink, fontWeight: 600 }}>{t('contrat.browse')}</span></div>
-                          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Word (.docx), PDF, OpenDocument (.odt)</div>
+                          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Word (.docx) — recommandé · PDF, OpenDocument (.odt)</div>
                         </>
                       )}
                     </div>
+                    {contratPanelData.fichier && /\.pdf$/i.test(contratPanelData.fichier) && (
+                      <div style={{ marginTop: 10, padding: "10px 14px", background: C.amberLight, border: `1px solid ${C.amber}`, borderRadius: 8, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <AlertTriangle size={16} color={C.amber} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <div style={{ fontSize: 11, color: C.text, lineHeight: 1.5 }}>
+                          <div style={{ fontWeight: 700, color: C.amber, marginBottom: 2 }}>Pas de fusion possible avec un PDF</div>
+                          Les variables <code style={{ background: C.white, padding: "1px 4px", borderRadius: 3 }}>{`{first_name}`}</code>, <code style={{ background: C.white, padding: "1px 4px", borderRadius: 3 }}>{`{position}`}</code>, etc. ne seront pas remplacées : le PDF est livré tel quel à l'employé. Pour une personnalisation auto avec les infos du collaborateur, uploadez un fichier <b>.docx</b>.
+                        </div>
+                      </div>
+                    )}
+                    {contratPanelData.fichier && /\.(docx|doc|odt)$/i.test(contratPanelData.fichier) && (
+                      <div style={{ marginTop: 10, padding: "10px 14px", background: C.greenLight, border: `1px solid ${C.green}`, borderRadius: 8, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <CheckCircle size={16} color={C.green} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <div style={{ fontSize: 11, color: C.text, lineHeight: 1.5 }}>
+                          <div style={{ fontWeight: 700, color: C.green, marginBottom: 2 }}>Fusion automatique activée</div>
+                          Les placeholders <code style={{ background: C.white, padding: "1px 4px", borderRadius: 3 }}>{`{first_name}`}</code>, <code style={{ background: C.white, padding: "1px 4px", borderRadius: 3 }}>{`{position}`}</code>, <code style={{ background: C.white, padding: "1px 4px", borderRadius: 3 }}>{`\${hire_date}`}</code> et tous les champs custom seront remplacés par les données du collaborateur lors de la signature.
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", background: C.bg, borderRadius: 10, cursor: "pointer", marginBottom: 16 }} onClick={() => setContratPanelData((p: any) => ({ ...p, actif: !p.actif }))}>
                     <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${contratPanelData.actif ? C.pink : C.border}`, background: contratPanelData.actif ? C.pink : C.white, display: "flex", alignItems: "center", justifyContent: "center" }}>{contratPanelData.actif && <Check size={14} color={C.white} />}</div>
@@ -774,7 +1011,7 @@ export function createAdminNPSContrats(ctx: any) {
             <div className="iz-modal iz-scale-in" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: C.white, borderRadius: 16, width: 640, maxHeight: "80vh", overflow: "auto", zIndex: 1101 }}>
               <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>Générer un contrat</h2>
+                  <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>Prévisualiser un contrat</h2>
                   <p style={{ fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{generateContrat.nom} — {generateContrat.type}</p>
                 </div>
                 <button onClick={() => { setGenerateContrat(null); setGenerateData(null); setGenerateCollabId(null); }} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
@@ -805,6 +1042,15 @@ export function createAdminNPSContrats(ctx: any) {
                 {/* Step 2: Variable preview */}
                 {generateData && (
                   <>
+                    {generateData.template_missing && (
+                      <div style={{ marginBottom: 16, padding: "12px 14px", background: C.amberLight, border: `1px solid ${C.amber}`, borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                        <AlertTriangle size={18} color={C.amber} style={{ flexShrink: 0, marginTop: 1 }} />
+                        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5 }}>
+                          <div style={{ fontWeight: 700, color: C.amber, marginBottom: 2 }}>Aucun template uploadé sur ce contrat</div>
+                          La génération réelle d'un fichier (DOCX/PDF) nécessite un template. Vous pouvez voir ci-dessous les variables qui SERAIENT remplacées. Pour activer le téléchargement, éditez ce contrat et uploadez un fichier <code style={{ background: C.white, padding: "1px 4px", borderRadius: 3 }}>.docx</code>.
+                        </div>
+                      </div>
+                    )}
                     <div style={{ marginBottom: 16 }}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>2. Variables du contrat</label>
                       <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", maxHeight: 300, overflow: "auto" }}>
@@ -827,20 +1073,20 @@ export function createAdminNPSContrats(ctx: any) {
                       </div>
                     </div>
 
-                    {/* Step 3: Download */}
+                    {/* Step 3: Download — disabled if no template */}
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>3. Télécharger le contrat généré</label>
                       <div style={{ display: "flex", gap: 10 }}>
-                        <button onClick={async () => {
+                        <button disabled={generateData.template_missing} onClick={async () => {
                           try { await downloadContratMerged(generateContrat.id, generateCollabId!, 'docx'); addToast_admin("Contrat DOCX téléchargé"); }
                           catch { addToast_admin("Erreur lors du téléchargement"); }
-                        }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center" }}>
+                        }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center", opacity: generateData.template_missing ? 0.5 : 1, cursor: generateData.template_missing ? "not-allowed" : "pointer" }}>
                           <Download size={14} /> DOCX
                         </button>
-                        <button onClick={async () => {
+                        <button disabled={generateData.template_missing} onClick={async () => {
                           try { await downloadContratMerged(generateContrat.id, generateCollabId!, 'pdf'); addToast_admin("Contrat PDF téléchargé"); }
                           catch { addToast_admin("Erreur lors du téléchargement PDF"); }
-                        }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center" }}>
+                        }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center", opacity: generateData.template_missing ? 0.5 : 1, cursor: generateData.template_missing ? "not-allowed" : "pointer" }}>
                           <Download size={14} /> PDF
                         </button>
                       </div>

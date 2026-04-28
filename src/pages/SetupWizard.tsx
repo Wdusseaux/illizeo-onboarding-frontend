@@ -323,7 +323,7 @@ export function createSetupWizard(ctx: any) {
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{t('wiz.theme_color')}</label>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {["#C2185B","#1A73E8","#2E7D32","#7B5EA7","#E65100","#37474F","#C62828","#00897B"].map(color => (
+                      {["#E41076","#1A73E8","#2E7D32","#7B5EA7","#E65100","#37474F","#C62828","#00897B"].map(color => (
                         <button key={color} onClick={() => { saveSetting("theme_color", color, setThemeColor); }} style={{ width: 40, height: 40, borderRadius: "50%", background: color, border: themeColor === color ? `3px solid ${C.text}` : "3px solid transparent", cursor: "pointer", transition: "all .15s" }} />
                       ))}
                     </div>

@@ -36,6 +36,7 @@ import {
   createEmailTemplate as apiCreateEmailTpl, updateEmailTemplate as apiUpdateEmailTpl, deleteEmailTemplate as apiDeleteEmailTpl,
   createContrat as apiCreateContrat, updateContrat as apiUpdateContrat, deleteContrat as apiDeleteContrat,
   getUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser,
+  getCollabAccompagnants, assignAccompagnant, removeAccompagnant as apiRemoveAccompagnant,
   getFieldConfig, updateFieldConfig as apiUpdateFieldConfig, createFieldConfig as apiCreateFieldConfig, deleteFieldConfig as apiDeleteFieldConfig,
   getOnboardingTeams, createOnboardingTeam as apiCreateTeam, updateOnboardingTeam as apiUpdateTeam, deleteOnboardingTeam as apiDeleteTeam,
   getADGroupMappings, createADGroupMapping, deleteADGroupMapping, syncADUsers, getADGroups,
@@ -119,6 +120,7 @@ export function createAdminPanels(ctx: any) {
     phasePanelLoading, setPhasePanelLoading, actionPanelMode, setActionPanelMode, actionPanelData, setActionPanelData, actionPanelLoading, setActionPanelLoading,
     assignMode, setAssignMode, assignSelected, setAssignSelected, assignSearch, setAssignSearch, assignOpen, setAssignOpen,
     collabPanelMode, setCollabPanelMode, collabPanelData, setCollabPanelData, collabPanelLoading, setCollabPanelLoading, collabProfileId, setCollabProfileId,
+    collabAccompagnants, setCollabAccompagnants, tenantUsersList, accompagnantDraft, setAccompagnantDraft,
     collabProfileTab, setCollabProfileTab, dossierCheck, setDossierCheck, groupePanelMode, setGroupePanelMode, groupePanelData, setGroupePanelData,
     groupePanelLoading, setGroupePanelLoading, integrationPanelId, setIntegrationPanelId, integrationConfig, setIntegrationConfig, integrationSaving, setIntegrationSaving,
     apiKeyInput, setApiKeyInput, suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, collabMenuId, setCollabMenuId,
@@ -185,7 +187,7 @@ export function createAdminPanels(ctx: any) {
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('phase.color')}</label>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {["#C2185B", "#1A73E8", "#4CAF50", "#F9A825", "#7B5EA7", "#E53935", "#00897B", "#F57C00"].map(col => (
+                    {["#E41076", "#1A73E8", "#4CAF50", "#F9A825", "#7B5EA7", "#E53935", "#00897B", "#F57C00"].map(col => (
                       <button key={col} onClick={() => setGroupePanelData(prev => ({ ...prev, couleur: col }))} style={{
                         width: 36, height: 36, borderRadius: 10, background: col, border: groupePanelData.couleur === col ? `3px solid ${C.dark}` : "3px solid transparent", cursor: "pointer", transition: "all .15s",
                       }} />
@@ -303,6 +305,15 @@ export function createAdminPanels(ctx: any) {
                         <option key={slug} value={slug}>{meta.label}</option>
                       ))}
                     </select>
+                    {(() => {
+                      const meta: any = ACTION_TYPE_META[actionPanelData.type] || ACTION_TYPE_META.tache;
+                      return meta.description ? (
+                        <div style={{ marginTop: 8, padding: "8px 12px", background: meta.bg, borderRadius: 6, fontSize: 11, color: meta.color, lineHeight: 1.5, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                          <span style={{ flexShrink: 0, fontWeight: 700 }}>ℹ</span>
+                          <span style={{ color: C.text }}>{meta.description}</span>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Délai relatif</label>
@@ -317,21 +328,60 @@ export function createAdminPanels(ctx: any) {
                     </select>
                   </div>
                 </div>
+
+                {/* XP + heure (si meeting) + responsable */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>XP gagnés</label>
+                    <input type="number" min={0} max={1000} value={(actionPanelData as any).xp ?? 50}
+                      onChange={e => setActionPanelData((prev: any) => ({ ...prev, xp: parseInt(e.target.value, 10) || 0 }))}
+                      style={{ ...sInput, fontSize: 12 }} />
+                  </div>
+                  {(["entretien", "visite", "rdv"].includes(actionPanelData.type)) && (
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>
+                        Heure {actionPanelData.type === "entretien" ? "de l'entretien" : actionPanelData.type === "visite" ? "de la visite" : "du RDV"}
+                      </label>
+                      <input type="time" value={(actionPanelData as any).heureDefault || ""}
+                        onChange={e => setActionPanelData((prev: any) => ({ ...prev, heureDefault: e.target.value }))}
+                        style={{ ...sInput, fontSize: 12 }} />
+                    </div>
+                  )}
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Responsable</label>
+                    <select value={(actionPanelData as any).accompagnantRole || ""}
+                      onChange={e => setActionPanelData((prev: any) => ({ ...prev, accompagnantRole: e.target.value || null }))}
+                      style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                      <option value="">— Personne assignée —</option>
+                      <option value="manager">Manager</option>
+                      <option value="buddy">Buddy / Parrain</option>
+                      <option value="hrbp">HRBP</option>
+                      <option value="it">IT Support</option>
+                      <option value="admin_rh">Admin RH</option>
+                    </select>
+                  </div>
+                </div>
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Phases associées</label>
                   <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, maxHeight: 220, overflow: "auto" }}>
-                    {PHASE_DEFAULTS.map(ph => {
+                    {PHASE_DEFAULTS.filter(ph => {
+                      // Filter by selected parcours if set
+                      if (!actionPanelData.parcours_id) return true;
+                      const phParcours = (ph as any).parcours_id || (ph as any).parcours_ids || [];
+                      if (Array.isArray(phParcours)) return phParcours.includes(actionPanelData.parcours_id) || phParcours.length === 0;
+                      return phParcours === actionPanelData.parcours_id || !phParcours;
+                    }).map(ph => {
                       const checked = (actionPanelData.phaseIds || []).includes(ph.id);
                       const phParcours = (ph as any).parcoursNoms || [];
                       return (
-                        <label key={ph.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer", borderBottom: `1px solid ${C.border}`, background: checked ? `${ph.couleur}15` : "transparent", transition: "all .15s" }}>
+                        <label key={ph.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: "pointer", borderBottom: `1px solid ${C.border}`, background: checked ? `${(ph.couleur || '#999')}15` : "transparent", transition: "all .15s" }}>
                           <input type="checkbox" checked={checked} onChange={() => {
                             setActionPanelData(prev => ({
                               ...prev,
                               phaseIds: checked ? prev.phaseIds.filter(id => id !== ph.id) : [...prev.phaseIds, ph.id],
                             }));
                           }} style={{ accentColor: C.pink }} />
-                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: ph.couleur, flexShrink: 0 }} />
+                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: ph.couleur || "#999", flexShrink: 0 }} />
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 13, fontWeight: checked ? 600 : 400, color: C.text }}>{ph.nom}</div>
                             {phParcours.length > 0 && <div style={{ fontSize: 10, color: C.textMuted }}>{phParcours.join(", ")}</div>}
@@ -520,14 +570,50 @@ export function createAdminPanels(ctx: any) {
                   </>)}
 
                   {/* Lecture */}
-                  {actionPanelData.type === "lecture" && (<>
-                    <div style={{ marginBottom: 12 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Document / URL</label>
-                      <input value={actionPanelData.lienExterne} onChange={e => setActionPanelData(prev => ({ ...prev, lienExterne: e.target.value }))} placeholder="https://... ou nom du document" style={{ ...sInput, fontSize: 12 }} /></div>
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
-                      <input type="checkbox" checked={actionPanelData.options.confirmationRequise !== false} onChange={e => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, confirmationRequise: e.target.checked } }))} style={{ accentColor: C.pink }} />
-                      L'employé doit confirmer avoir lu le document
-                    </label>
-                  </>)}
+                  {actionPanelData.type === "lecture" && (() => {
+                    const lectureDocs = (signDocs || []).filter((d: any) => d.actif && d.type === "lecture");
+                    const currentSource = actionPanelData.options.lecture_source || (actionPanelData.options.signature_document_id ? "document" : "url");
+                    return (<>
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Source du document *</label>
+                        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                          {[{ id: "document", label: "Document interne", desc: "PDF téléversé dans Documents" }, { id: "url", label: "Lien externe", desc: "URL vers une ressource en ligne" }].map(src => (
+                            <button key={src.id} onClick={() => setActionPanelData(prev => ({ ...prev, lienExterne: src.id === "url" ? prev.lienExterne : "", options: { ...prev.options, lecture_source: src.id, signature_document_id: src.id === "document" ? prev.options.signature_document_id : null, documentNom: "" } }))}
+                              style={{ flex: 1, padding: "8px 10px", borderRadius: 8, border: `2px solid ${currentSource === src.id ? C.pink : C.border}`, background: currentSource === src.id ? C.pinkBg : C.white, cursor: "pointer", textAlign: "left", fontFamily: font }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: currentSource === src.id ? C.pink : C.text }}>{src.label}</div>
+                              <div style={{ fontSize: 10, color: C.textMuted }}>{src.desc}</div>
+                            </button>
+                          ))}
+                        </div>
+                        {currentSource === "document" && (
+                          <>
+                            <select value={actionPanelData.options.signature_document_id || ""} onChange={e => {
+                              const docId = e.target.value ? Number(e.target.value) : null;
+                              const doc = lectureDocs.find((d: any) => d.id === docId);
+                              setActionPanelData(prev => ({ ...prev, lienExterne: "", options: { ...prev.options, signature_document_id: docId, documentNom: doc?.titre || "", lecture_source: "document" } }));
+                            }} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                              <option value="">— Sélectionner un document à lire —</option>
+                              {lectureDocs.map((d: any) => (
+                                <option key={d.id} value={d.id}>{d.titre}{d.fichier_nom ? "" : " (PDF non téléversé)"}</option>
+                              ))}
+                            </select>
+                            {lectureDocs.length === 0 && (
+                              <div style={{ marginTop: 8, padding: "8px 12px", background: C.amberLight, borderRadius: 8, fontSize: 11, color: C.amber, display: "flex", alignItems: "center", gap: 6 }}>
+                                <AlertTriangle size={13} /> Aucun document de lecture disponible. Créez-en dans <strong>Documents</strong> (type "Lecture").
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {currentSource === "url" && (
+                          <input value={actionPanelData.lienExterne} onChange={e => setActionPanelData(prev => ({ ...prev, lienExterne: e.target.value, options: { ...prev.options, signature_document_id: null, lecture_source: "url" } }))} placeholder="https://..." style={{ ...sInput, fontSize: 12 }} />
+                        )}
+                      </div>
+                      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, cursor: "pointer" }}>
+                        <input type="checkbox" checked={actionPanelData.options.confirmationRequise !== false} onChange={e => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, confirmationRequise: e.target.checked } }))} style={{ accentColor: C.pink }} />
+                        L'employé doit confirmer avoir lu le document
+                      </label>
+                    </>);
+                  })()}
 
                   {/* Rendez-vous */}
                   {actionPanelData.type === "rdv" && (<>
@@ -552,7 +638,7 @@ export function createAdminPanels(ctx: any) {
                         <input value={actionPanelData.options.destinataires || ""} onChange={e => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, destinataires: e.target.value } }))} placeholder="Équipe, Manager..." style={{ ...sInput, fontSize: 12 }} /></div>
                     </div>
                     <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Template de message</label>
-                      <textarea value={actionPanelData.options.template || ""} onChange={e => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, template: e.target.value } }))} placeholder="Bonjour, je suis {{prenom}}..." rows={3} style={{ ...sInput, fontSize: 12, resize: "vertical" }} /></div>
+                      <TranslatableField multiline rows={3} value={actionPanelData.options.template || ""} onChange={v => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, template: v } }))} placeholder="Bonjour, je suis {{prenom}}..." currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.template} onTranslationsChange={tr => setTr("template", tr)} style={{ fontSize: 12 }} /></div>
                   </>)}
 
                   {/* Entretien */}
@@ -565,9 +651,11 @@ export function createAdminPanels(ctx: any) {
                     </div>
                     <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Trame d'entretien</label>
                       {(actionPanelData.options.trame || []).map((q: string, i: number) => (
-                        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-                          <input value={q} onChange={e => { const arr = [...(actionPanelData.options.trame || [])]; arr[i] = e.target.value; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, trame: arr } })); }} placeholder="Point à aborder" style={{ ...sInput, flex: 1, padding: "6px 10px", fontSize: 12 }} />
-                          <button onClick={() => { const arr = (actionPanelData.options.trame || []).filter((_: any, j: number) => j !== i); setActionPanelData(prev => ({ ...prev, options: { ...prev.options, trame: arr } })); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red }}><X size={14} /></button>
+                        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 4, alignItems: "flex-start" }}>
+                          <div style={{ flex: 1 }}>
+                            <TranslatableField value={q} onChange={v => { const arr = [...(actionPanelData.options.trame || [])]; arr[i] = v; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, trame: arr } })); }} placeholder="Point à aborder" currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations[`trame_${i}`]} onTranslationsChange={tr => setTr(`trame_${i}`, tr)} style={{ padding: "6px 10px", fontSize: 12 }} />
+                          </div>
+                          <button onClick={() => { const arr = (actionPanelData.options.trame || []).filter((_: any, j: number) => j !== i); setActionPanelData(prev => ({ ...prev, options: { ...prev.options, trame: arr } })); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red, marginTop: 6 }}><X size={14} /></button>
                         </div>
                       ))}
                       <button onClick={() => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, trame: [...(prev.options.trame || []), ""] } }))} style={{ fontSize: 11, color: C.pink, background: "none", border: "none", cursor: "pointer", fontWeight: 600, fontFamily: font, padding: "4px 0" }}>+ Ajouter un point</button>
@@ -579,9 +667,11 @@ export function createAdminPanels(ctx: any) {
                     <div style={{ marginBottom: 12 }}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Éléments à vérifier</label>
                       {(actionPanelData.options.items || []).map((it: string, i: number) => (
-                        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-                          <input value={it} onChange={e => { const arr = [...(actionPanelData.options.items || [])]; arr[i] = e.target.value; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, items: arr } })); }} placeholder="Email, VPN, Badge..." style={{ ...sInput, flex: 1, padding: "6px 10px", fontSize: 12 }} />
-                          <button onClick={() => { const arr = (actionPanelData.options.items || []).filter((_: any, j: number) => j !== i); setActionPanelData(prev => ({ ...prev, options: { ...prev.options, items: arr } })); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red }}><X size={14} /></button>
+                        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 4, alignItems: "flex-start" }}>
+                          <div style={{ flex: 1 }}>
+                            <TranslatableField value={it} onChange={v => { const arr = [...(actionPanelData.options.items || [])]; arr[i] = v; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, items: arr } })); }} placeholder="Email, VPN, Badge..." currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations[`item_${i}`]} onTranslationsChange={tr => setTr(`item_${i}`, tr)} style={{ padding: "6px 10px", fontSize: 12 }} />
+                          </div>
+                          <button onClick={() => { const arr = (actionPanelData.options.items || []).filter((_: any, j: number) => j !== i); setActionPanelData(prev => ({ ...prev, options: { ...prev.options, items: arr } })); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red, marginTop: 6 }}><X size={14} /></button>
                         </div>
                       ))}
                       <button onClick={() => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, items: [...(prev.options.items || []), ""] } }))} style={{ fontSize: 11, color: C.pink, background: "none", border: "none", cursor: "pointer", fontWeight: 600, fontFamily: font, padding: "4px 0" }}>+ Ajouter un élément</button>
@@ -595,9 +685,11 @@ export function createAdminPanels(ctx: any) {
                     <div style={{ marginBottom: 12 }}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Éléments à transférer</label>
                       {(actionPanelData.options.elements || []).map((el: string, i: number) => (
-                        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-                          <input value={el} onChange={e => { const arr = [...(actionPanelData.options.elements || [])]; arr[i] = e.target.value; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, elements: arr } })); }} placeholder="Projet, Contact, Doc..." style={{ ...sInput, flex: 1, padding: "6px 10px", fontSize: 12 }} />
-                          <button onClick={() => { const arr = (actionPanelData.options.elements || []).filter((_: any, j: number) => j !== i); setActionPanelData(prev => ({ ...prev, options: { ...prev.options, elements: arr } })); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red }}><X size={14} /></button>
+                        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 4, alignItems: "flex-start" }}>
+                          <div style={{ flex: 1 }}>
+                            <TranslatableField value={el} onChange={v => { const arr = [...(actionPanelData.options.elements || [])]; arr[i] = v; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, elements: arr } })); }} placeholder="Projet, Contact, Doc..." currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations[`element_${i}`]} onTranslationsChange={tr => setTr(`element_${i}`, tr)} style={{ padding: "6px 10px", fontSize: 12 }} />
+                          </div>
+                          <button onClick={() => { const arr = (actionPanelData.options.elements || []).filter((_: any, j: number) => j !== i); setActionPanelData(prev => ({ ...prev, options: { ...prev.options, elements: arr } })); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red, marginTop: 6 }}><X size={14} /></button>
                         </div>
                       ))}
                       <button onClick={() => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, elements: [...(prev.options.elements || []), ""] } }))} style={{ fontSize: 11, color: C.pink, background: "none", border: "none", cursor: "pointer", fontWeight: 600, fontFamily: font, padding: "4px 0" }}>+ Ajouter un élément</button>
@@ -615,10 +707,51 @@ export function createAdminPanels(ctx: any) {
                         <input value={actionPanelData.dureeEstimee} onChange={e => setActionPanelData(prev => ({ ...prev, dureeEstimee: e.target.value }))} placeholder="1h" style={{ ...sInput, fontSize: 12 }} /></div>
                     </div>
                     <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Guide / Accompagnateur</label>
-                      <input value={actionPanelData.options.guide || ""} onChange={e => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, guide: e.target.value } }))} placeholder="Buddy, Manager..." style={{ ...sInput, fontSize: 12 }} /></div>
+                      {(() => {
+                        const guideVal = actionPanelData.options.guide || "";
+                        const isKnownToken = /^(buddy:|manager:|rh:|user:\d+)$/.test(guideVal);
+                        const isLegacyText = guideVal && !isKnownToken;
+                        return (
+                          <select
+                            value={guideVal}
+                            onChange={e => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, guide: e.target.value } }))}
+                            style={{ ...sInput, fontSize: 12, cursor: "pointer" }}
+                          >
+                            <option value="">— Aucun —</option>
+                            <optgroup label="Rôles (résolus dynamiquement)">
+                              <option value="buddy:">Buddy / Parrain assigné</option>
+                              <option value="manager:">Manager direct</option>
+                              <option value="rh:">RH / HRBP</option>
+                            </optgroup>
+                            <optgroup label="Collaborateur spécifique">
+                              {COLLABORATEURS.map((c: any) => (
+                                <option key={c.id} value={`user:${c.id}`}>{c.prenom} {c.nom}{c.poste ? ` · ${c.poste}` : ""}</option>
+                              ))}
+                            </optgroup>
+                            {isLegacyText && (
+                              <option value={guideVal}>Personnalisé : {guideVal}</option>
+                            )}
+                          </select>
+                        );
+                      })()}</div>
                   </>)}
                 </div>
+                {/* Parcours association */}
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Parcours associé</label>
+                  <select value={actionPanelData.parcours_id || ""} onChange={e => setActionPanelData(prev => ({ ...prev, parcours_id: e.target.value ? Number(e.target.value) : null }))} style={{ ...sInput, cursor: "pointer" }}>
+                    <option value="">— Aucun parcours —</option>
+                    {PARCOURS_TEMPLATES.map((p: any) => <option key={p.id} value={p.id}>{p.nom}</option>)}
+                  </select>
+                </div>
+
                 {/* Assignation section */}
+                {actionPanelMode === "create" && (
+                  <div style={{ padding: "12px 16px", background: C.bg, borderRadius: 10, marginBottom: 20, fontSize: 12, color: C.textMuted, display: "flex", alignItems: "center", gap: 8 }}>
+                    <AlertTriangle size={14} color="#F9A825" />
+                    Enregistrez l'action pour pouvoir l'assigner à des collaborateurs.
+                  </div>
+                )}
                 {actionPanelMode === "edit" && actionPanelData.id && (() => {
                   const items = assignMode === "groupe"
                     ? GROUPES.map(g => ({ id: g.nom, label: g.nom, sub: `${(g.membres || []).length} membres`, color: g.couleur }))
@@ -739,10 +872,16 @@ export function createAdminPanels(ctx: any) {
                       delai_relatif: actionPanelData.delaiRelatif,
                       obligatoire: actionPanelData.obligatoire,
                       description: actionPanelData.description,
+                      parcours_id: actionPanelData.parcours_id || null,
                     };
                     if (actionPanelData.lienExterne) payload.lien_externe = actionPanelData.lienExterne;
                     if (actionPanelData.dureeEstimee) payload.duree_estimee = actionPanelData.dureeEstimee;
+                    if ((actionPanelData as any).xp !== undefined) payload.xp = (actionPanelData as any).xp;
+                    payload.heure_default = (actionPanelData as any).heureDefault || null;
+                    payload.accompagnant_role = (actionPanelData as any).accompagnantRole || null;
                     if (Object.keys(actionPanelData.options).length > 0) payload.options = actionPanelData.options;
+                    // Mirror options.pieces into the dedicated pieces_requises column so /me/collaborateur (which reads pieces_requises) stays in sync.
+                    if (Array.isArray(actionPanelData.options?.pieces)) payload.pieces_requises = actionPanelData.options.pieces.filter((p: string) => p && p.trim());
                     const tr = buildTranslationsPayload(); if (tr) payload.translations = tr;
                     try {
                       if (actionPanelMode === "create") {
@@ -882,7 +1021,19 @@ export function createAdminPanels(ctx: any) {
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                   <div><label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>Date de début</label><input type="date" value={collabPanelData.dateDebut ? collabPanelData.dateDebut.split("/").reverse().join("-") : ""} onChange={e => { const v = e.target.value; if (v) { const [y, m, d] = v.split("-"); setCollabPanelData((prev: any) => ({ ...prev, dateDebut: `${d}/${m}/${y}` })); }}} style={{ ...sInput, fontSize: 12 }} /></div>
-                  {collabPanelMode === "edit" && <div><label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>Parcours</label><select style={{ ...sInput, fontSize: 12, cursor: "pointer" }}><option value="">Aucun</option>{PARCOURS_TEMPLATES.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}</select></div>}
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>
+                      Parcours {!collabPanelData.parcours_id && <span style={{ color: C.amber, fontWeight: 500 }}>· non assigné</span>}
+                    </label>
+                    <select
+                      value={collabPanelData.parcours_id || ""}
+                      onChange={e => setCollabPanelData((prev: any) => ({ ...prev, parcours_id: e.target.value ? Number(e.target.value) : null }))}
+                      style={{ ...sInput, fontSize: 12, cursor: "pointer" }}
+                    >
+                      <option value="">— Aucun parcours —</option>
+                      {PARCOURS_TEMPLATES.map(p => <option key={p.id} value={p.id}>{p.nom}</option>)}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Dynamic sections from field config */}
@@ -901,6 +1052,89 @@ export function createAdminPanels(ctx: any) {
                     </div>
                   </div>
                 ))}
+
+                {/* Équipe d'accompagnement (edit mode only — needs a saved collab id) */}
+                {collabPanelMode === "edit" && collabPanelData.id && (() => {
+                  const ROLE_OPTIONS = [
+                    { v: "manager", l: "Manager" },
+                    { v: "hrbp", l: "HRBP" },
+                    { v: "buddy", l: "Buddy / Parrain" },
+                    { v: "it", l: "IT Support" },
+                    { v: "recruteur", l: "Recruteur(se)" },
+                    { v: "admin_rh", l: "Admin RH" },
+                    { v: "other", l: "Autre" },
+                  ];
+                  const ROLE_LABELS: Record<string, string> = Object.fromEntries(ROLE_OPTIONS.map(r => [r.v, r.l]));
+                  const ROLE_COLORS: Record<string, string> = { manager: "#1A73E8", hrbp: "#7B5EA7", buddy: "#4CAF50", it: "#F9A825", recruteur: "#00897B", admin_rh: "#E41076", other: "#999" };
+                  const usedRoles = new Set(collabAccompagnants.map((a: any) => a.role));
+                  const availableRoles = ROLE_OPTIONS.filter(r => !usedRoles.has(r.v));
+                  const canAdd = !!accompagnantDraft.role && !!accompagnantDraft.user_id;
+                  return (
+                    <div style={{ marginTop: 8, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, textTransform: "uppercase", letterSpacing: .5, marginBottom: 12 }}>Équipe d'accompagnement</div>
+                      {/* Existing accompagnants list */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                        {collabAccompagnants.length === 0 ? (
+                          <div style={{ fontSize: 12, color: C.textMuted, fontStyle: "italic", padding: "10px 12px", background: C.bg, borderRadius: 8 }}>
+                            Aucun accompagnant assigné. Le collaborateur ne verra personne dans son équipe.
+                          </div>
+                        ) : collabAccompagnants.map((a: any) => (
+                          <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: C.bg, borderRadius: 8 }}>
+                            <span style={{ width: 26, height: 26, borderRadius: "50%", background: ROLE_COLORS[a.role] || "#999", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                              {(a.user?.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{a.user?.name || "—"}</div>
+                              <div style={{ fontSize: 10, color: C.textMuted }}>{ROLE_LABELS[a.role] || a.role} · {a.user?.email || ""}</div>
+                            </div>
+                            <button onClick={async () => {
+                              try { await apiRemoveAccompagnant(a.id); setCollabAccompagnants((prev: any[]) => prev.filter((x: any) => x.id !== a.id)); addToast_admin("Accompagnant retiré"); }
+                              catch { addToast_admin("Erreur"); }
+                            }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red, padding: 4, fontSize: 11 }}>
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Add form */}
+                      {availableRoles.length > 0 && (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr auto", gap: 8, alignItems: "end" }}>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 3 }}>Rôle</label>
+                            <select value={accompagnantDraft.role} onChange={e => setAccompagnantDraft((d: any) => ({ ...d, role: e.target.value }))} style={{ ...sInput, fontSize: 12, cursor: "pointer", padding: "7px 10px" }}>
+                              <option value="">— Choisir —</option>
+                              {availableRoles.map(r => <option key={r.v} value={r.v}>{r.l}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 3 }}>Utilisateur</label>
+                            <select value={accompagnantDraft.user_id || ""} onChange={e => setAccompagnantDraft((d: any) => ({ ...d, user_id: e.target.value ? Number(e.target.value) : null }))} style={{ ...sInput, fontSize: 12, cursor: "pointer", padding: "7px 10px" }}>
+                              <option value="">— Choisir —</option>
+                              {tenantUsersList.map((u: any) => <option key={u.id} value={u.id}>{u.name} &lt;{u.email}&gt;</option>)}
+                            </select>
+                          </div>
+                          <button disabled={!canAdd} onClick={async () => {
+                            if (!collabPanelData.id) return;
+                            try {
+                              await assignAccompagnant(collabPanelData.id, { user_id: accompagnantDraft.user_id!, role: accompagnantDraft.role as any });
+                              const list = await getCollabAccompagnants(collabPanelData.id);
+                              setCollabAccompagnants(list || []);
+                              setAccompagnantDraft({ role: "", user_id: null });
+                              addToast_admin("Accompagnant ajouté");
+                            } catch { addToast_admin("Erreur"); }
+                          }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, padding: "8px 14px", opacity: canAdd ? 1 : 0.5 }}>
+                            <Plus size={13} /> Ajouter
+                          </button>
+                        </div>
+                      )}
+                      {availableRoles.length === 0 && (
+                        <div style={{ fontSize: 11, color: C.textMuted, fontStyle: "italic", marginTop: 6 }}>
+                          Tous les rôles sont assignés. Retirez un accompagnant pour libérer un rôle.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Documents & Signature */}
                 {collabPanelMode === "edit" && (
@@ -966,6 +1200,7 @@ export function createAdminPanels(ctx: any) {
                       site: collabPanelData.site,
                       departement: collabPanelData.departement,
                       date_debut: y && m && d ? `${y}-${m}-${d}` : null,
+                      parcours_id: collabPanelData.parcours_id || null,
                     };
                     try {
                       if (collabPanelMode === "create") { await apiCreateCollab(payload); addToast_admin("Collaborateur créé"); }
@@ -1129,7 +1364,7 @@ export function createAdminPanels(ctx: any) {
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('phase.color')}</label>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    {["#4CAF50", "#1A73E8", "#F9A825", "#C2185B", "#7B5EA7", "#E53935", "#00897B", "#F57C00"].map(col => (
+                    {["#4CAF50", "#1A73E8", "#F9A825", "#E41076", "#7B5EA7", "#E53935", "#00897B", "#F57C00"].map(col => (
                       <button key={col} onClick={() => setPhasePanelData(prev => ({ ...prev, couleur: col }))} style={{
                         width: 36, height: 36, borderRadius: 10, background: col, border: phasePanelData.couleur === col ? `3px solid ${C.dark}` : "3px solid transparent",
                         cursor: "pointer", transition: "all .15s",

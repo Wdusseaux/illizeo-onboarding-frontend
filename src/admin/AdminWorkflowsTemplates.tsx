@@ -15,13 +15,14 @@ import {
   Palette, Trash, DatabaseBackup, Languages, ChevronsRight, ChevronsLeft, Settings, Crown, Lock,
   Phone, Linkedin, Paperclip, TrendingUp, Percent, FileCheck2, CalendarCheck, Rocket, Heart, Gem,
   Laptop, Monitor, Headphones, KeyRound, Mouse, Car, Armchair, Boxes, RotateCcw, PenLine,
-  Moon, Sun
+  Moon, Sun, Loader2
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode } from '../constants';
 import type { OnboardingStep, DashboardPage, DashboardTab, UserRole, AdminPage, AdminModal, Collaborateur, ParcoursCategorie, ParcourTemplate, ActionTemplate, ActionType, AssignTarget, GroupePersonnes, DocCategory, WorkflowRule, EmailTemplate, TeamMember } from '../types';
 import RichEditor from '../components/RichEditor';
 import TranslatableField, { type Translations } from '../components/TranslatableField';
+import WorkflowBuilder from '../components/WorkflowBuilder';
 import { DOC_CATEGORIES, ACTIONS, _MOCK_NOTIFICATIONS_LIST, NOTIF_RESOURCES, TEAM_MEMBERS, ACTION_TYPE_META, PHASE_ICONS, SITES, DEPARTEMENTS, TYPES_CONTRAT, _MOCK_COLLABORATEURS, _MOCK_PARCOURS_TEMPLATES, _MOCK_ACTION_TEMPLATES, _MOCK_ADMIN_DOC_CATEGORIES, _MOCK_WORKFLOW_RULES, _MOCK_EMAIL_TEMPLATES, _MOCK_PHASE_DEFAULTS, _MOCK_GROUPES, EQUIPE_ROLES, TPL_CATEGORIES, guessTplCategory } from '../mockData';
 
 import {
@@ -70,6 +71,7 @@ import {
   showNpsSurvey, getNpsStats, sendNpsSurveyToAll as apiSendNpsAll,
   type NpsSurvey, type NpsResponse, type NpsStats,
   duplicateEmailTemplate as apiDuplicateEmailTpl, sendTestEmail, getMailConfig,
+  aiTranslate,
   getEquipmentTypes, getEquipments, getEquipmentStats, createEquipment as apiCreateEquip, updateEquipment as apiUpdateEquip, deleteEquipment as apiDeleteEquip,
   createEquipmentType as apiCreateEquipType, updateEquipmentType as apiUpdateEquipType, deleteEquipmentType as apiDeleteEquipType,
   assignEquipment as apiAssignEquip, unassignEquipment as apiUnassignEquip,
@@ -156,7 +158,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
     profileTab, setProfileTab, formData, setFormData, passwordVisible, setPasswordVisible, acceptCGU, setAcceptCGU,
     employeeDocs, setEmployeeDocs, completedActions, setCompletedActions, sharedTimeline, setSharedTimeline, toasts, setToasts,
     auth, _needsPlan, isDemo, apiEnabled, COLLABORATEURS, refetchCollaborateurs, PARCOURS_TEMPLATES, refetchParcours,
-    ACTION_TEMPLATES, refetchActions, GROUPES, refetchGroupes, PHASE_DEFAULTS, refetchPhases, WORKFLOW_RULES, EMAIL_TEMPLATES,
+    ACTION_TEMPLATES, refetchActions, GROUPES, refetchGroupes, PHASE_DEFAULTS, refetchPhases, WORKFLOW_RULES, refetchWorkflows, EMAIL_TEMPLATES, refetchEmailTemplates,
     ADMIN_DOC_CATEGORIES, NOTIFICATIONS_LIST, integrations, refetchIntegrations, apiContrats, authRole, addToast_admin, showConfirm,
     showPrompt, switchLang, toggleDarkMode, resetTr, setTr, buildTranslationsPayload, addToast, addTimelineEntry,
     handleEmployeeSubmitDoc, handleRHValidateDoc, handleRHRefuseDoc, handleCompleteAction, handleRelance, docsSubmitted, docsValidated, docsTotal,
@@ -243,115 +245,118 @@ export function createAdminWorkflowsTemplates(ctx: any) {
     const renderWorkflows = () => (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.workflows')}</h1>
-          <button onClick={() => { setWfPanelData({ nom: "", declencheur: WF_TRIGGERS[0], action: WF_ACTIONS[0], destinataire: WF_RECIPIENTS[0], actif: true, email_subject: "", email_body: "", bot_message: "", badge_name: "", badge_icon: "trophy", badge_color: "#F9A825", target_user_id: "", target_group_id: "" }); resetTr(); setWfPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('wf.new')}</button>
-        </div>
-        {WORKFLOW_RULES.map((w: any) => (
-          <div key={w.id} className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 12, display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: w.actif ? C.greenLight : C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><Zap size={18} color={w.actif ? C.green : C.textMuted} /></div>
-            <div style={{ flex: 1, cursor: "pointer" }} onClick={() => { setWfPanelData({ id: w.id, nom: w.nom, declencheur: w.declencheur, action: w.action, destinataire: w.destinataire, actif: w.actif, email_subject: w.email_subject || "", email_body: w.email_body || "", bot_message: w.bot_message || "", badge_name: w.badge_name || "", badge_icon: w.badge_icon || "trophy", badge_color: w.badge_color || "#F9A825", target_user_id: w.target_user_id || "", target_group_id: w.target_group_id || "" }); setContentTranslations(w.translations || {}); setWfPanelMode("edit"); }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{w.nom}</div>
-              <div style={{ fontSize: 12, color: C.textLight }}>{t('common.trigger')}: {w.declencheur} → {w.action} → {w.destinataire}</div>
-            </div>
-            <div onClick={async () => {
-              try { await apiUpdateWorkflow(w.id, { actif: !w.actif }); refetchActions(); addToast_admin(`${w.nom} : ${!w.actif ? "activé" : "désactivé"}`); } catch {}
-            }} style={{ width: 44, height: 24, borderRadius: 12, background: w.actif ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s" }}>
-              <div style={{ width: 20, height: 20, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: w.actif ? 22 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
-            </div>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.workflows')}</h1>
+            <p style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 0" }}>Automatisez vos parcours avec des workflows personnalisables multi-étapes</p>
           </div>
-        ))}
-        {/* Workflow panel */}
+          <button onClick={() => { setWfPanelData({ nom: "", description: "", declencheur: "Document soumis", action: "Envoyer email de relance", destinataire: "Collaborateur", actif: true, steps: [], email_subject: "", email_body: "", bot_message: "", badge_name: "", badge_icon: "trophy", badge_color: "#F9A825", target_user_id: "", target_group_id: "" }); resetTr(); setWfPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={16} /> {t('wf.new')}</button>
+        </div>
+
+        {/* Workflow cards grid */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+          {WORKFLOW_RULES.map((w: any) => {
+            const stepCount = w.steps?.length || 1;
+            return (
+              <div key={w.id} className="iz-card iz-fade-up" style={{ ...sCard, cursor: "pointer", position: "relative", transition: "box-shadow .2s" }}
+                onClick={() => { setWfPanelData({ ...w, steps: w.steps || [] }); setContentTranslations(w.translations || {}); setWfPanelMode("edit"); }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: w.actif ? C.greenLight : C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Zap size={16} color={w.actif ? C.green : C.textMuted} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{w.nom}</div>
+                    {w.description && <div style={{ fontSize: 11, color: C.textMuted }}>{w.description}</div>}
+                  </div>
+                  <div onClick={(e) => { e.stopPropagation(); (async () => { try { await apiUpdateWorkflow(w.id, { actif: !w.actif }); refetchWorkflows(); addToast_admin(`${w.nom} : ${!w.actif ? "activé" : "désactivé"}`); } catch {} })(); }}
+                    style={{ width: 40, height: 22, borderRadius: 11, background: w.actif ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s", flexShrink: 0 }}>
+                    <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: w.actif ? 20 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                  </div>
+                </div>
+                {/* Visual flow preview */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: "#E3F2FD", color: "#1565C0" }}>{w.declencheur}</span>
+                  <ArrowRight size={10} color={C.textMuted} />
+                  {(w.steps && w.steps.length > 0) ? w.steps.slice(0, 3).map((s: any, i: number) => (
+                    <span key={i} style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 500, background: s.type === 'condition' ? "#FFF3E0" : s.type === 'delay' ? "#F3E5F5" : "#E8F5E9", color: s.type === 'condition' ? "#E65100" : s.type === 'delay' ? "#7B1FA2" : "#2E7D32" }}>
+                      {s.type === 'condition' ? 'Si...' : s.type === 'delay' ? `⏱ ${s.delay_value || 1}j` : (s.action || w.action)?.split(' ').slice(0, 2).join(' ')}
+                    </span>
+                  )) : (
+                    <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 500, background: "#E8F5E9", color: "#2E7D32" }}>{w.action}</span>
+                  )}
+                  {w.steps?.length > 3 && <span style={{ fontSize: 10, color: C.textMuted }}>+{w.steps.length - 3}</span>}
+                  <ArrowRight size={10} color={C.textMuted} />
+                  <span style={{ padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 500, background: "#FCE4EC", color: "#E41076" }}>{w.destinataire}</span>
+                </div>
+                <div style={{ marginTop: 8, fontSize: 10, color: C.textMuted }}>{stepCount} étape{stepCount > 1 ? 's' : ''}</div>
+              </div>
+            );
+          })}
+        </div>
+        {WORKFLOW_RULES.length === 0 && <div style={{ padding: "60px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun workflow. Créez votre premier workflow automatisé.</div>}
+
+        {/* Workflow builder panel — full width with visual canvas */}
         {wfPanelMode !== "closed" && (
           <>
-            <div onClick={() => setWfPanelMode("closed")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
-            <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 560, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
-              <div style={{ padding: "24px 28px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{wfPanelMode === "create" ? "Nouveau workflow" : "Modifier le workflow"}</h2>
+            <div onClick={() => setWfPanelMode("closed")} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1000 }} />
+            <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: "min(900px, 85vw)", height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.12)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
+              {/* Header */}
+              <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <Zap size={20} color={C.pink} />
+                  <div>
+                    <div>
+                      <TranslatableField
+                        value={wfPanelData.nom}
+                        onChange={v => setWfPanelData((p: any) => ({ ...p, nom: v, _nomError: false }))}
+                        placeholder="Nom du workflow *"
+                        currentLang={lang} activeLangs={activeLanguages}
+                        translations={contentTranslations.nom}
+                        onTranslationsChange={tr => setTr("nom", tr)}
+                        style={{ border: "none", fontSize: 16, fontWeight: 600, outline: "none", width: 300, color: wfPanelData._nomError ? C.red : C.text, borderBottom: wfPanelData._nomError ? `2px solid ${C.red}` : "2px solid transparent", paddingBottom: 2 }}
+                      />
+                      {wfPanelData._nomError && <div style={{ fontSize: 10, color: C.red, marginTop: 2, fontWeight: 500 }}>Le nom du workflow est obligatoire</div>}
+                    </div>
+                    <TranslatableField
+                      value={wfPanelData.description || ""}
+                      onChange={v => setWfPanelData((p: any) => ({ ...p, description: v }))}
+                      placeholder="Description (optionnel)"
+                      currentLang={lang} activeLangs={activeLanguages}
+                      translations={contentTranslations.description}
+                      onTranslationsChange={tr => setTr("description", tr)}
+                      style={{ border: "none", fontSize: 11, outline: "none", width: 300, color: C.textMuted, display: "block", marginTop: 2 }}
+                    />
+                  </div>
+                </div>
                 <button onClick={() => setWfPanelMode("closed")} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
               </div>
-              <div style={{ flex: 1, padding: "24px 28px", overflow: "auto" }}>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom *</label><TranslatableField value={wfPanelData.nom} onChange={v => setWfPanelData((p: any) => ({ ...p, nom: v }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} /></div>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.trigger')}</label><select value={wfPanelData.declencheur} onChange={e => setWfPanelData((p: any) => ({ ...p, declencheur: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_TRIGGERS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Action</label><select value={wfPanelData.action} onChange={e => setWfPanelData((p: any) => ({ ...p, action: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
-                <div style={{ marginBottom: 16 }}><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Destinataire</label><select value={wfPanelData.destinataire} onChange={e => setWfPanelData((p: any) => ({ ...p, destinataire: e.target.value }))} style={{ ...sInput, cursor: "pointer" }}>{WF_RECIPIENTS.map(r => <option key={r} value={r}>{r}</option>)}</select></div>
 
-                {/* Conditional config fields based on action */}
-                {(wfPanelData.action?.includes("email") || wfPanelData.action?.includes("Email") || wfPanelData.action?.includes("relance") || wfPanelData.action?.includes("confirmation") || wfPanelData.action?.includes("validation") || wfPanelData.action?.includes("approbation")) && (
-                  <div style={{ padding: 16, background: C.bg, borderRadius: 10, marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.pink, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Mail size={14} /> Configuration email</div>
-                    <div style={{ marginBottom: 10 }}><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Sujet de l'email (optionnel)</label><input value={wfPanelData.email_subject || ""} onChange={e => setWfPanelData((p: any) => ({ ...p, email_subject: e.target.value }))} style={sInput} placeholder="Laisser vide pour le sujet par défaut" /></div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Corps de l'email (optionnel)</label><textarea value={wfPanelData.email_body || ""} onChange={e => setWfPanelData((p: any) => ({ ...p, email_body: e.target.value }))} style={{ ...sInput, minHeight: 70, resize: "vertical" }} placeholder="Laisser vide pour le message par défaut. Variables : {{prenom}}, {{nom}}, {{parcours}}" /></div>
-                  </div>
-                )}
-
-                {wfPanelData.action === "Envoyer un message IllizeoBot" && (
-                  <div style={{ padding: 16, background: C.bg, borderRadius: 10, marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.pink, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><MessageSquare size={14} /> Message IllizeoBot</div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Message personnalisé (optionnel)</label><textarea value={wfPanelData.bot_message || ""} onChange={e => setWfPanelData((p: any) => ({ ...p, bot_message: e.target.value }))} style={{ ...sInput, minHeight: 70, resize: "vertical" }} placeholder="Laisser vide pour le message par défaut" /></div>
-                  </div>
-                )}
-
-                {wfPanelData.action === "Attribuer un badge" && (
-                  <div style={{ padding: 16, background: C.bg, borderRadius: 10, marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.pink, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Award size={14} /> Configuration du badge</div>
-                    <div style={{ marginBottom: 10 }}><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Nom du badge</label><input value={wfPanelData.badge_name || ""} onChange={e => setWfPanelData((p: any) => ({ ...p, badge_name: e.target.value }))} style={sInput} placeholder="Ex: Champion Onboarding" /></div>
-                    <div style={{ display: "flex", gap: 12 }}>
-                      <div style={{ flex: 1 }}><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Icône</label>
-                        <select value={wfPanelData.badge_icon || "trophy"} onChange={e => setWfPanelData((p: any) => ({ ...p, badge_icon: e.target.value }))} style={sInput}>
-                          {["trophy", "star", "award", "target", "sparkles", "gift", "check-circle"].map(i => <option key={i} value={i}>{i}</option>)}
-                        </select>
-                      </div>
-                      <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Couleur</label><input type="color" value={wfPanelData.badge_color || "#F9A825"} onChange={e => setWfPanelData((p: any) => ({ ...p, badge_color: e.target.value }))} style={{ width: 44, height: 38, border: `1px solid ${C.border}`, borderRadius: 8, cursor: "pointer", padding: 2 }} /></div>
-                    </div>
-                  </div>
-                )}
-
-                {wfPanelData.action === "Ajouter au groupe" && (
-                  <div style={{ padding: 16, background: C.bg, borderRadius: 10, marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.pink, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Users size={14} /> Groupe cible</div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Groupe</label>
-                      <select value={wfPanelData.target_group_id || ""} onChange={e => setWfPanelData((p: any) => ({ ...p, target_group_id: e.target.value ? Number(e.target.value) : null }))} style={sInput}>
-                        <option value="">— Sélectionner un groupe —</option>
-                        {GROUPES.map((g: any) => <option key={g.id} value={g.id}>{g.nom}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {wfPanelData.destinataire === "Utilisateur spécifique" && (
-                  <div style={{ padding: 16, background: C.bg, borderRadius: 10, marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.pink, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><UserCheck size={14} /> Utilisateur cible</div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Utilisateur</label>
-                      <select value={wfPanelData.target_user_id || ""} onChange={e => setWfPanelData((p: any) => ({ ...p, target_user_id: e.target.value ? Number(e.target.value) : null }))} style={sInput}>
-                        <option value="">— Sélectionner —</option>
-                        {adminUsers.map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {wfPanelData.destinataire === "Groupe spécifique" && (
-                  <div style={{ padding: 16, background: C.bg, borderRadius: 10, marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: C.pink, marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Users size={14} /> Groupe destinataire</div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Groupe</label>
-                      <select value={wfPanelData.target_group_id || ""} onChange={e => setWfPanelData((p: any) => ({ ...p, target_group_id: e.target.value ? Number(e.target.value) : null }))} style={sInput}>
-                        <option value="">— Sélectionner un groupe —</option>
-                        {GROUPES.map((g: any) => <option key={g.id} value={g.id}>{g.nom}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                )}
+              {/* Visual workflow builder canvas */}
+              <div style={{ flex: 1, overflow: "hidden" }}>
+                <WorkflowBuilder
+                  workflow={wfPanelData}
+                  onChange={(updated: any) => setWfPanelData(updated)}
+                  groups={GROUPES}
+                  users={adminUsers}
+                />
               </div>
-              <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 12, justifyContent: "space-between" }}>
-                <div>{wfPanelMode === "edit" && <button onClick={() => { setConfirmDialog({ message: "Supprimer ce workflow ?", onConfirm: async () => { try { await apiDeleteWorkflow(wfPanelData.id); addToast_admin("Workflow supprimé"); setWfPanelMode("closed"); refetchActions(); } catch {} setConfirmDialog(null); }}); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>}</div>
+
+              {/* Footer */}
+              <div style={{ padding: "12px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 12, justifyContent: "space-between" }}>
+                <div>{wfPanelMode === "edit" && <button onClick={() => { setConfirmDialog({ message: "Supprimer ce workflow ?", onConfirm: async () => { try { await apiDeleteWorkflow(wfPanelData.id); addToast_admin("Workflow supprimé"); setWfPanelMode("closed"); refetchWorkflows(); } catch {} setConfirmDialog(null); }}); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>}</div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setWfPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button onClick={async () => {
+                    if (!wfPanelData.nom?.trim()) {
+                      setWfPanelData((p: any) => ({ ...p, _nomError: true }));
+                      addToast_admin("Veuillez donner un nom au workflow");
+                      return;
+                    }
                     try {
-                      const wfPayload = { ...wfPanelData, translations: buildTranslationsPayload() };
+                      const { _nomError, ...cleanData } = wfPanelData;
+                      const wfPayload = { ...cleanData, translations: buildTranslationsPayload() };
                       if (wfPanelMode === "create") { await apiCreateWorkflow(wfPayload); addToast_admin("Workflow créé"); }
                       else { await apiUpdateWorkflow(wfPanelData.id, wfPayload); addToast_admin("Workflow modifié"); }
-                      setWfPanelMode("closed"); refetchActions();
+                      setWfPanelMode("closed"); refetchWorkflows();
                     } catch { addToast_admin(t('toast.error')); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13 }}>{wfPanelMode === "create" ? t('common.create') : t('common.save')}</button>
                 </div>
@@ -425,7 +430,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ fontSize: 11, color: C.textMuted }}>{t('common.trigger')}: {TPL_TRIGGERS.find(tr => tr.value === tpl.declencheur)?.label || tpl.declencheur}</div>
                 <div style={{ display: "flex", gap: 4 }} onClick={e => e.stopPropagation()}>
-                  <button onClick={async () => { try { await apiDuplicateEmailTpl(tpl.id); refetchActions(); addToast_admin(t('tpl.duplicated')); } catch { addToast_admin(t('toast.error')); } }} title="Dupliquer" style={{ background: C.bg, border: "none", borderRadius: 4, padding: "3px 6px", cursor: "pointer" }}><FolderOpen size={12} color={C.textMuted} /></button>
+                  <button onClick={async () => { try { await apiDuplicateEmailTpl(tpl.id); refetchEmailTemplates(); addToast_admin(t('tpl.duplicated')); } catch { addToast_admin(t('toast.error')); } }} title="Dupliquer" style={{ background: C.bg, border: "none", borderRadius: 4, padding: "3px 6px", cursor: "pointer" }}><FolderOpen size={12} color={C.textMuted} /></button>
                 </div>
               </div>
             </div>
@@ -459,7 +464,56 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{t('tpl.email_body')}</label>
                       {activeLanguages.length > 1 && (
-                        <div style={{ display: "flex", gap: 4 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {(() => {
+                            const bodyLang = (tplPanelData._bodyLang || "fr") as Lang;
+                            const frBody = bodyLang === "fr" ? (tplPanelData.contenu || "") : (tplPanelData._contenu_fr || "");
+                            const targets = activeLanguages.filter((l: Lang) => l !== "fr");
+                            const isTranslating = !!tplPanelData._translating;
+                            const canTranslate = !!frBody.trim() && targets.length > 0 && !isTranslating;
+                            return (
+                              <button
+                                type="button"
+                                disabled={!canTranslate}
+                                onClick={async () => {
+                                  if (!canTranslate) return;
+                                  setTplPanelData((p: any) => ({ ...p, _translating: true }));
+                                  try {
+                                    const result = await aiTranslate(frBody, "fr", targets);
+                                    if (result.translations) {
+                                      const updated = { ...(contentTranslations.contenu || {}), ...result.translations };
+                                      setTr("contenu", updated);
+                                      // If currently displaying a translated lang, refresh editor with new content
+                                      if (bodyLang !== "fr" && updated[bodyLang]) {
+                                        setTplPanelData((p: any) => ({ ...p, contenu: updated[bodyLang], _translating: false }));
+                                      } else {
+                                        setTplPanelData((p: any) => ({ ...p, _translating: false }));
+                                      }
+                                      addToast_admin(`Corps traduit en ${targets.length} langue${targets.length > 1 ? "s" : ""}`);
+                                    } else {
+                                      setTplPanelData((p: any) => ({ ...p, _translating: false }));
+                                    }
+                                  } catch (e) {
+                                    console.error("AI translate failed:", e);
+                                    addToast_admin("Échec de la traduction IA");
+                                    setTplPanelData((p: any) => ({ ...p, _translating: false }));
+                                  }
+                                }}
+                                title={!frBody.trim() ? "Saisissez d'abord le corps en français" : `Traduire le corps en ${targets.map((l: Lang) => LANG_META[l]?.nativeName).join(", ")}`}
+                                style={{
+                                  display: "flex", alignItems: "center", gap: 5, padding: "4px 10px",
+                                  borderRadius: 6, border: "none", fontSize: 10, fontWeight: 600, fontFamily: font,
+                                  cursor: !canTranslate ? "not-allowed" : "pointer",
+                                  background: "linear-gradient(135deg, #1a1a2e, #1A73E8)", color: "#fff",
+                                  opacity: !canTranslate ? 0.4 : 1,
+                                }}
+                              >
+                                {isTranslating ? <Loader2 size={11} style={{ animation: "spin 1s linear infinite" }} /> : <Sparkles size={11} />}
+                                Traduire avec IA
+                              </button>
+                            );
+                          })()}
+                          <div style={{ display: "flex", gap: 4 }}>
                           {activeLanguages.map(l => (
                             <button key={l} onClick={() => {
                               // Save current content for current lang before switching
@@ -486,6 +540,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                               color: (tplPanelData._bodyLang || "fr") === l ? C.white : C.textMuted,
                             }}>{LANG_META[l as Lang]?.flag} {l.toUpperCase()}</button>
                           ))}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -548,8 +603,8 @@ export function createAdminWorkflowsTemplates(ctx: any) {
               </div>
               <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 12, justifyContent: "space-between" }}>
                 <div style={{ display: "flex", gap: 8 }}>
-                  {tplPanelMode === "edit" && <button onClick={() => { setConfirmDialog({ message: t('tpl.delete_confirm'), onConfirm: async () => { try { await apiDeleteEmailTpl(tplPanelData.id); addToast_admin(t('tpl.deleted')); setTplPanelMode("closed"); refetchActions(); } catch {} setConfirmDialog(null); }}); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>}
-                  {tplPanelMode === "edit" && tplPanelData.id && <button onClick={async () => { try { await apiDuplicateEmailTpl(tplPanelData.id); addToast_admin(t('tpl.duplicated')); refetchActions(); } catch {} }} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.duplicate')}</button>}
+                  {tplPanelMode === "edit" && <button onClick={() => { setConfirmDialog({ message: t('tpl.delete_confirm'), onConfirm: async () => { try { await apiDeleteEmailTpl(tplPanelData.id); addToast_admin(t('tpl.deleted')); setTplPanelMode("closed"); refetchEmailTemplates(); } catch {} setConfirmDialog(null); }}); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 13 }}>{t('common.delete')}</button>}
+                  {tplPanelMode === "edit" && tplPanelData.id && <button onClick={async () => { try { await apiDuplicateEmailTpl(tplPanelData.id); addToast_admin(t('tpl.duplicated')); refetchEmailTemplates(); } catch {} }} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.duplicate')}</button>}
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setTplPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
@@ -558,7 +613,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                       const payload: Record<string, any> = { nom: tplPanelData.nom, sujet: tplPanelData.sujet, declencheur: tplPanelData.declencheur, variables: tplPanelData.variables, actif: tplPanelData.actif, contenu: tplPanelData.contenu, translations: buildTranslationsPayload() };
                       if (tplPanelMode === "create") { await apiCreateEmailTpl(payload); addToast_admin(t('tpl.created')); }
                       else { await apiUpdateEmailTpl(tplPanelData.id, payload); addToast_admin(t('tpl.updated')); }
-                      setTplPanelMode("closed"); refetchActions();
+                      setTplPanelMode("closed"); refetchEmailTemplates();
                     } catch { addToast_admin(t('toast.error')); }
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13 }}>{tplPanelMode === "create" ? t('common.create') : t('common.save')}</button>
                 </div>
@@ -574,7 +629,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
     // ─── EQUIPES ───────────────────────────────────────────────
     const ACCOMP_ROLES = [
       { key: "manager", label: t('team_role.manager'), icon: Users, color: "#4CAF50" },
-      { key: "hrbp", label: t('team_role.hrbp'), icon: UserCheck, color: "#C2185B" },
+      { key: "hrbp", label: t('team_role.hrbp'), icon: UserCheck, color: "#E41076" },
       { key: "buddy", label: t('team_role.buddy'), icon: Hand, color: "#F9A825" },
       { key: "it", label: t('team_role.it_support'), icon: Clock, color: "#1A73E8" },
       { key: "recruteur", label: t('team_role.recruiter'), icon: Search, color: "#7B5EA7" },
@@ -774,7 +829,30 @@ export function createAdminWorkflowsTemplates(ctx: any) {
       { type: "values", label: t('block.values'), icon: Star },
       { type: "video", label: t('block.videos'), icon: Play },
       { type: "team", label: t('block.team'), icon: Users },
+      { type: "office_tour", label: "Tour des bureaux", icon: MapPin },
+      { type: "culture_quiz", label: "Quiz culture", icon: BookMarked },
+      { type: "gamification_quests", label: "Quêtes gamification", icon: Trophy },
+      { type: "journey_milestones", label: "Jalons parcours 100j", icon: Award },
     ];
+
+    // Defaults used to seed a freshly-created block so the editor isn't empty.
+    // For culture_quiz, mirror the 5 starter questions that the employee view falls back to.
+    const BLOCK_DEFAULTS: Record<string, { titre?: string; data?: any }> = {
+      culture_quiz: {
+        titre: "Quiz culture",
+        data: {
+          category: "Notre raison d'être",
+          xp_per_correct: 10,
+          questions: [
+            { q: "Notre raison d'être tient en une phrase. Laquelle ?", options: ["Maximiser le profit", "Faire grandir les hommes pour faire grandir l'industrie", "Dominer notre marché", "Innover à tout prix"], correct: 1, explain: "C'est exactement notre boussole. Cette phrase guide chaque décision stratégique." },
+            { q: "Quelle valeur place-t-on en premier dans nos prises de décision ?", options: ["Vitesse", "Bienveillance", "Qualité", "Profit"], correct: 1, explain: "La bienveillance est notre socle relationnel et opérationnel." },
+            { q: "Quel rituel d'équipe est sacré chez nous ?", options: ["Le café du lundi 9h", "Le all-hands mensuel", "Le retro vendredi", "Tout cela"], correct: 3, explain: "Tous nos rituels comptent — ils tissent la culture au quotidien." },
+            { q: "Que signifie être 'Illizéen' au quotidien ?", options: ["Suivre les process à la lettre", "Oser, partager, transmettre", "Travailler seul efficacement", "Maximiser ses KPIs"], correct: 1, explain: "Trois verbes simples qui résument notre ADN." },
+            { q: "Combien de jours dure votre parcours d'intégration ?", options: ["30 jours", "60 jours", "100 jours", "Une année"], correct: 2, explain: "100 jours pour vous accompagner pas à pas, jusqu'à votre pleine autonomie." },
+          ],
+        },
+      },
+    };
 
 
     // Drag & drop state for block reordering (plain closure vars, no hooks)
@@ -828,7 +906,8 @@ export function createAdminWorkflowsTemplates(ctx: any) {
             const BtIcon = bt.icon;
             return (
               <button key={bt.type} className="iz-sidebar-item" onClick={async () => {
-                const newBlock = await apiCreateBlock({ type: bt.type, titre: "Nouveau bloc", contenu: "", ordre: companyBlocks.length + 1, actif: true, data: {} });
+                const defaults = BLOCK_DEFAULTS[bt.type] || {};
+                const newBlock = await apiCreateBlock({ type: bt.type, titre: defaults.titre || "Nouveau bloc", contenu: "", ordre: companyBlocks.length + 1, actif: true, data: defaults.data || {} });
                 setCompanyBlocks(prev => [...prev, newBlock]);
                 setEditingBlockId(newBlock.id);
                 addToast_admin(t('block.created'));
@@ -881,7 +960,22 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                   style={{ width: 40, height: 22, borderRadius: 11, background: block.actif ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s", flexShrink: 0 }}>
                   <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: block.actif ? 20 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
                 </div>
-                <button onClick={() => { setContentTranslations((block as any).translations || {}); setEditingBlockId(block.id === editingBlockId ? null : block.id); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>{t('common.edit')}</button>
+                <button onClick={() => {
+                  setContentTranslations((block as any).translations || {});
+                  // Seed empty blocks with starter data so the editor isn't blank
+                  // (covers blocks created before the create-time defaults were added).
+                  const defaults = BLOCK_DEFAULTS[block.type];
+                  const isEmpty = !block.data || Object.keys(block.data).length === 0
+                    || (block.type === "culture_quiz" && !(block.data?.questions?.length));
+                  if (defaults && isEmpty) {
+                    setCompanyBlocks(prev => prev.map(b => b.id === block.id ? {
+                      ...b,
+                      titre: (b.titre && b.titre !== "Nouveau bloc") ? b.titre : (defaults.titre || b.titre),
+                      data: { ...(defaults.data || {}), ...(b.data || {}) },
+                    } : b));
+                  }
+                  setEditingBlockId(block.id === editingBlockId ? null : block.id);
+                }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>{t('common.edit')}</button>
                 <button onClick={() => {
                   setConfirmDialog({ message: t('block.delete_confirm'), onConfirm: async () => {
                     await apiDeleteBlock(block.id);
@@ -948,6 +1042,192 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                       </div>
                     ))}
                     <button onClick={() => { const vids = [...(editBlock.data?.videos || []), { title: "", youtube_id: "", dashboard_featured: false }]; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, videos: vids } } : b)); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>+ {lang === "fr" ? "Ajouter une vidéo" : "Add video"}</button>
+                  </div>
+                )}
+
+                {/* OFFICE TOUR EDITOR */}
+                {editBlock.type === "office_tour" && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Site (ex: Siège Paris)</label>
+                        <input value={editBlock.data?.site || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, site: e.target.value } } : b))} style={{ ...sInput, fontSize: 12 }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Étage / zone (ex: Étage 4)</label>
+                        <input value={editBlock.data?.etage || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, etage: e.target.value } } : b))} style={{ ...sInput, fontSize: 12 }} />
+                      </div>
+                    </div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>Salles & lieux</label>
+                    {(editBlock.data?.rooms || []).map((r: any, ri: number) => (
+                      <div key={ri} style={{ padding: "12px", border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: 8, marginBottom: 8 }}>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Nom *</label>
+                            <input value={r.title || ""} onChange={e => { const rs = [...(editBlock.data?.rooms || [])]; rs[ri] = { ...rs[ri], title: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, rooms: rs } } : b)); }} placeholder="Open-space RSE" style={{ ...sInput, fontSize: 11 }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Description</label>
+                            <input value={r.subtitle || ""} onChange={e => { const rs = [...(editBlock.data?.rooms || [])]; rs[ri] = { ...rs[ri], subtitle: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, rooms: rs } } : b)); }} placeholder="Votre poste · 4.12" style={{ ...sInput, fontSize: 11 }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Largeur</label>
+                            <select value={r.span || 1} onChange={e => { const rs = [...(editBlock.data?.rooms || [])]; rs[ri] = { ...rs[ri], span: Number(e.target.value) }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, rooms: rs } } : b)); }} style={{ ...sInput, fontSize: 11 }}>
+                              <option value={1}>1 col</option>
+                              <option value={2}>2 col</option>
+                              <option value={3}>3 col</option>
+                            </select>
+                          </div>
+                        </div>
+                        <button onClick={() => { const rs = (editBlock.data?.rooms || []).filter((_: any, i: number) => i !== ri); setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, rooms: rs } } : b)); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: C.red, fontSize: 11 }}>Supprimer</button>
+                      </div>
+                    ))}
+                    <button onClick={() => { const rs = [...(editBlock.data?.rooms || []), { title: "", subtitle: "", span: 1 }]; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, rooms: rs } } : b)); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px", marginBottom: 14 }}>+ Ajouter un lieu</button>
+                    <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>🎁 Chasse au trésor</label>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <input value={editBlock.data?.treasure_title || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, treasure_title: e.target.value } } : b))} placeholder="Trouvez la mascotte !" style={{ ...sInput, fontSize: 12 }} />
+                        <textarea value={editBlock.data?.treasure_desc || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, treasure_desc: (e.target as HTMLTextAreaElement).value } } : b))} placeholder="Une peluche cachée à chaque étage. Photo + #welcome = mug collector." style={{ ...sInput, fontSize: 12, minHeight: 60, resize: "vertical" }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* CULTURE QUIZ EDITOR */}
+                {editBlock.type === "culture_quiz" && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Catégorie (badge)</label>
+                        <input value={editBlock.data?.category || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, category: e.target.value } } : b))} placeholder="Notre raison d'être" style={{ ...sInput, fontSize: 12 }} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>XP par bonne réponse</label>
+                        <input type="number" value={editBlock.data?.xp_per_correct ?? 10} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, xp_per_correct: Number(e.target.value) } } : b))} style={{ ...sInput, fontSize: 12 }} />
+                      </div>
+                    </div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>Questions</label>
+                    {(editBlock.data?.questions || []).map((q: any, qi: number) => (
+                      <div key={qi} style={{ padding: "12px", border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 8 }}>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Question</label>
+                          <input value={q.q || ""} onChange={e => { const qs = [...(editBlock.data?.questions || [])]; qs[qi] = { ...qs[qi], q: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, questions: qs } } : b)); }} style={{ ...sInput, fontSize: 11 }} />
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Options (une par ligne) — préfixer la bonne réponse par * (ex: *Bonne réponse)</label>
+                          <textarea
+                            value={(q.options || []).map((o: string, oi: number) => oi === q.correct ? `*${o}` : o).join("\n")}
+                            onChange={e => {
+                              const lines = (e.target as HTMLTextAreaElement).value.split("\n");
+                              const opts: string[] = [];
+                              let correct = 0;
+                              lines.forEach((l, idx) => {
+                                if (l.startsWith("*")) { correct = idx; opts.push(l.slice(1)); }
+                                else opts.push(l);
+                              });
+                              const qs = [...(editBlock.data?.questions || [])];
+                              qs[qi] = { ...qs[qi], options: opts, correct };
+                              setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, questions: qs } } : b));
+                            }}
+                            style={{ ...sInput, fontSize: 11, minHeight: 90, resize: "vertical" }}
+                            placeholder="Option A&#10;*Bonne réponse&#10;Option C&#10;Option D"
+                          />
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Explication (affichée après réponse)</label>
+                          <input value={q.explain || ""} onChange={e => { const qs = [...(editBlock.data?.questions || [])]; qs[qi] = { ...qs[qi], explain: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, questions: qs } } : b)); }} style={{ ...sInput, fontSize: 11 }} />
+                        </div>
+                        <button onClick={() => { const qs = (editBlock.data?.questions || []).filter((_: any, i: number) => i !== qi); setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, questions: qs } } : b)); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: C.red, fontSize: 11 }}>Supprimer la question</button>
+                      </div>
+                    ))}
+                    <button onClick={() => { const qs = [...(editBlock.data?.questions || []), { q: "", options: ["", "", "", ""], correct: 0, explain: "" }]; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, questions: qs } } : b)); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>+ Ajouter une question</button>
+                  </div>
+                )}
+
+                {/* JOURNEY MILESTONES EDITOR */}
+                {editBlock.type === "journey_milestones" && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ marginBottom: 14 }}>
+                      <label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>S'applique à</label>
+                      <select value={editBlock.data?.categorie || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, categorie: e.target.value } } : b))} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                        <option value="">Tous les parcours (générique)</option>
+                        <option value="onboarding">Onboarding</option>
+                        <option value="offboarding">Offboarding</option>
+                        <option value="reboarding">Reboarding</option>
+                        <option value="crossboarding">Crossboarding</option>
+                      </select>
+                      <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4, lineHeight: 1.4 }}>
+                        Si une catégorie spécifique est choisie, ce bloc s'applique uniquement aux collaborateurs en parcours de cette catégorie. La catégorie la plus précise gagne sur le générique.
+                      </div>
+                    </div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>Jalons (badges débloqués automatiquement)</label>
+                    {(editBlock.data?.milestones || []).map((m: any, mi: number) => (
+                      <div key={mi} style={{ padding: "12px", border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 8 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Jour J+</label>
+                            <input type="number" value={m.day || ""} onChange={e => { const ms = [...(editBlock.data?.milestones || [])]; ms[mi] = { ...ms[mi], day: parseInt(e.target.value, 10) || 0 }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, milestones: ms } } : b)); }} style={{ ...sInput, fontSize: 11 }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Libellé du jalon</label>
+                            <input value={m.label || ""} onChange={e => { const ms = [...(editBlock.data?.milestones || [])]; ms[mi] = { ...ms[mi], label: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, milestones: ms } } : b)); }} placeholder="Ex: Premier mois" style={{ ...sInput, fontSize: 11 }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Nom du badge</label>
+                            <input value={m.badge_name || ""} onChange={e => { const ms = [...(editBlock.data?.milestones || [])]; ms[mi] = { ...ms[mi], badge_name: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, milestones: ms } } : b)); }} placeholder="Ex: Autonome" style={{ ...sInput, fontSize: 11 }} />
+                          </div>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px", gap: 8, marginBottom: 8 }}>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Description (affichée à l'employé)</label>
+                            <input value={m.description || ""} onChange={e => { const ms = [...(editBlock.data?.milestones || [])]; ms[mi] = { ...ms[mi], description: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, milestones: ms } } : b)); }} placeholder="Vous êtes opérationnel..." style={{ ...sInput, fontSize: 11 }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Couleur</label>
+                            <input type="color" value={m.badge_color || "#E91E8C"} onChange={e => { const ms = [...(editBlock.data?.milestones || [])]; ms[mi] = { ...ms[mi], badge_color: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, milestones: ms } } : b)); }} style={{ ...sInput, fontSize: 11, padding: "2px 4px", height: 32 }} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Icône</label>
+                            <select value={m.icon || "trophy"} onChange={e => { const ms = [...(editBlock.data?.milestones || [])]; ms[mi] = { ...ms[mi], icon: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, milestones: ms } } : b)); }} style={{ ...sInput, fontSize: 11 }}>
+                              <option value="rocket">🚀 Rocket</option>
+                              <option value="sparkles">✨ Sparkles</option>
+                              <option value="award">🏅 Award</option>
+                              <option value="star">⭐ Star</option>
+                              <option value="trophy">🏆 Trophy</option>
+                              <option value="heart">❤️ Heart</option>
+                              <option value="gem">💎 Gem</option>
+                              <option value="crown">👑 Crown</option>
+                            </select>
+                          </div>
+                        </div>
+                        <button onClick={() => { const ms = (editBlock.data?.milestones || []).filter((_: any, i: number) => i !== mi); setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, milestones: ms } } : b)); }} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, color: C.red, fontSize: 11 }}>Supprimer ce jalon</button>
+                      </div>
+                    ))}
+                    <button onClick={() => { const ms = [...(editBlock.data?.milestones || []), { day: 1, label: "", badge_name: "", description: "", badge_color: "#E91E8C", icon: "trophy" }]; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, milestones: ms } } : b)); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>+ Ajouter un jalon</button>
+                    <div style={{ marginTop: 12, padding: "10px 12px", background: C.amberLight, borderRadius: 8, fontSize: 11, color: C.text, lineHeight: 1.5 }}>
+                      <b style={{ color: C.amber }}>💡 Auto-attribution :</b> Quand un collaborateur dépasse le J+X d'un jalon, le badge correspondant lui est automatiquement décerné. Une notification est envoyée à l'employé, son manager et son RH (in-app + Teams + Slack si connectés).
+                    </div>
+                  </div>
+                )}
+
+                {/* GAMIFICATION QUESTS EDITOR */}
+                {editBlock.type === "gamification_quests" && (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>Quêtes du moment</label>
+                    {(editBlock.data?.quests || []).map((q: any, qi: number) => (
+                      <div key={qi} style={{ padding: "12px", border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 8, display: "grid", gridTemplateColumns: "2fr 100px 50px", gap: 8, alignItems: "end" }}>
+                        <div>
+                          <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Titre de la quête</label>
+                          <input value={q.title || ""} onChange={e => { const qs = [...(editBlock.data?.quests || [])]; qs[qi] = { ...qs[qi], title: e.target.value }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, quests: qs } } : b)); }} style={{ ...sInput, fontSize: 11 }} placeholder="Ex: Compléter 3 actions urgentes" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>Récompense XP</label>
+                          <input type="number" value={q.reward ?? 50} onChange={e => { const qs = [...(editBlock.data?.quests || [])]; qs[qi] = { ...qs[qi], reward: Number(e.target.value) }; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, quests: qs } } : b)); }} style={{ ...sInput, fontSize: 11 }} />
+                        </div>
+                        <button onClick={() => { const qs = (editBlock.data?.quests || []).filter((_: any, i: number) => i !== qi); setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, quests: qs } } : b)); }} style={{ background: "none", border: `1px solid ${C.red}`, borderRadius: 6, cursor: "pointer", padding: "6px 8px", color: C.red, fontSize: 11 }}>×</button>
+                      </div>
+                    ))}
+                    <button onClick={() => { const qs = [...(editBlock.data?.quests || []), { title: "", reward: 50 }]; setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, quests: qs } } : b)); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px" }}>+ Ajouter une quête</button>
                   </div>
                 )}
 

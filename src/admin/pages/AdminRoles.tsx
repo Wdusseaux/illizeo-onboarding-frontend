@@ -99,7 +99,7 @@ export function createAdminRoles(ctx: any) {
             </div>
           ))}
           {/* New role button */}
-          <div onClick={() => { setRolePanelData({ nom: "", slug: "", description: "", couleur: "#C2185B", permissions: Object.fromEntries(PERM_MODULES.map(m => [m.key, "none"])), scope_type: "global" }); setRolePanelMode("create"); }}
+          <div onClick={() => { setRolePanelData({ nom: "", slug: "", description: "", couleur: "#E41076", permissions: Object.fromEntries(PERM_MODULES.map(m => [m.key, "none"])), scope_type: "global" }); setRolePanelMode("create"); }}
             style={{ minWidth: 120, padding: "16px", border: `2px dashed ${C.border}`, borderRadius: 12, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, transition: "all .2s" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = C.pink; }} onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}>
             <Plus size={20} color={C.textMuted} />
@@ -114,9 +114,9 @@ export function createAdminRoles(ctx: any) {
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: selectedRole.couleur }} />
               <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: selectedRole.couleur }}>{selectedRole.nom}</h2>
               <div style={{ marginLeft: "auto", display: "flex", gap: 0 }}>
-                {(["scope", "exclusions", "members", "security", "history"] as const).map(tab => (
+                {(["scope", "members", "security", "history"] as const).map(tab => (
                   <button key={tab} onClick={() => setRoleTab(tab)} style={{ padding: "8px 16px", fontSize: 12, fontWeight: roleTab === tab ? 600 : 400, color: roleTab === tab ? C.pink : C.textLight, background: "none", border: "none", borderBottom: roleTab === tab ? `2px solid ${C.pink}` : "2px solid transparent", cursor: "pointer", fontFamily: font }}>
-                    {tab === "scope" ? t('roles.scope') : tab === "exclusions" ? t('roles.exclusions') : tab === "members" ? `${t('roles.members')} (${selectedRole.users_count || 0})` : tab === "security" ? t('roles.security') : t('roles.history')}
+                    {tab === "scope" ? t('roles.scope') : tab === "members" ? `${t('roles.members')} (${selectedRole.users_count || 0})` : tab === "security" ? t('roles.security') : t('roles.history')}
                   </button>
                 ))}
               </div>
@@ -303,7 +303,9 @@ export function createAdminRoles(ctx: any) {
               )}
 
               {/* -- EXCLUSIONS TAB -- */}
-              {roleTab === "exclusions" && (() => {
+              {/* Exclusions block — rendered inside both Population cible & Population autorisée tabs.
+                  Acts as a hard filter that subtracts matching users from whatever the tab's main rule produced. */}
+              {(roleTab === "scope" || roleTab === "members") && (() => {
                 const EXCL_CRITERIA = [
                   { key: "employe", label: t('perm.collaborateurs'), Icon: Users, color: C.pink },
                   { key: "societe", label: lang === "fr" ? "Société" : "Company", Icon: Building2, color: "#1A73E8" },
@@ -313,11 +315,15 @@ export function createAdminRoles(ctx: any) {
                   { key: "equipe", label: lang === "fr" ? "Équipe" : "Team", Icon: Users, color: "#4CAF50" },
                   { key: "poste", label: lang === "fr" ? "Poste" : "Position", Icon: Landmark, color: "#E65100" },
                 ];
+                // Exclusions are stored per tab: scope tab uses `exclusion_groups`,
+                // members tab uses `members_exclusion_groups`. Editing one tab does
+                // NOT affect the other.
+                const exclField = roleTab === "members" ? "members_exclusion_groups" : "exclusion_groups";
                 const excludeSelf = selectedRole.exclude_self || false;
-                const exclGroups: any[] = selectedRole.exclusion_groups || [];
+                const exclGroups: any[] = (selectedRole as any)[exclField] || [];
 
                 const saveExcl = (groups: any[], selfExcl?: boolean) => {
-                  const patch: any = { exclusion_groups: groups };
+                  const patch: any = { [exclField]: groups };
                   if (selfExcl !== undefined) patch.exclude_self = selfExcl;
                   const patched = adminRoles.map(r => r.id === selectedRole.id ? { ...r, ...patch } : r);
                   setAdminRoles(patched);
@@ -330,10 +336,23 @@ export function createAdminRoles(ctx: any) {
                 const removeExclCriterion = (gid: number, key: string) => saveExcl(exclGroups.map((g: any) => g.id === gid ? { ...g, criteria: g.criteria.filter((c: any) => c.key !== key) } : g));
 
                 return (
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                  <div style={{ marginTop: 24, paddingTop: 20, borderTop: `2px dashed ${C.border}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <X size={16} color={C.red} />
+                      <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0, color: C.text }}>
+                        {lang === "fr" ? "Exclusions" : "Exclusions"}
+                      </h3>
+                      <span style={{ padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: C.redLight, color: C.red }}>
+                        {lang === "fr" ? "Prioritaire" : "Priority"}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12 }}>
                       <div style={{ fontSize: 12, color: C.textLight }}>
-                        {lang === "fr" ? "Les exclusions sont prioritaires. Groupes combinés en" : "Exclusions take priority. Groups combined with"} <b style={{ color: C.pink }}>OU</b>, {lang === "fr" ? "critères dans un groupe en" : "criteria within a group with"} <b>ET</b>.
+                        {roleTab === "members"
+                          ? (lang === "fr" ? "Retirer des employés de la population autorisée même s'ils matchent les critères ci-dessus." : "Remove employees from the authorized population even if they match the criteria above.")
+                          : (lang === "fr" ? "Restreindre la population cible en excluant des sous-ensembles." : "Restrict the target population by excluding subsets.")}
+                        {" "}
+                        {lang === "fr" ? "Groupes combinés en" : "Groups combined with"} <b style={{ color: C.pink }}>OU</b>, {lang === "fr" ? "critères dans un groupe en" : "criteria within a group with"} <b>ET</b>.
                       </div>
                       <button onClick={addExclGroup} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "4px 12px", color: C.pink, borderColor: C.pink, whiteSpace: "nowrap" }}>+ {lang === "fr" ? "Ajouter un groupe d'exclusion" : "Add exclusion group"}</button>
                     </div>
@@ -1081,7 +1100,7 @@ export function createAdminRoles(ctx: any) {
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 6 }}>{t('phase.color')}</label>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {["#E53935", "#C2185B", "#7B5EA7", "#1A73E8", "#00897B", "#4CAF50", "#F9A825", "#78909C"].map(col => (
+                    {["#E53935", "#E41076", "#7B5EA7", "#1A73E8", "#00897B", "#4CAF50", "#F9A825", "#78909C"].map(col => (
                       <button key={col} onClick={() => setRolePanelData((p: any) => ({ ...p, couleur: col }))} style={{ width: 28, height: 28, borderRadius: 8, background: col, border: rolePanelData.couleur === col ? "3px solid #333" : "3px solid transparent", cursor: "pointer" }} />
                     ))}
                   </div>

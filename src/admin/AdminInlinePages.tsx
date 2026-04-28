@@ -63,7 +63,8 @@ import {
   superAdminListPlans, superAdminCreatePlan, superAdminUpdatePlan, superAdminDeletePlan,
   superAdminUpdateModules, superAdminListSubscriptions, superAdminListInvoices,
   superAdminGetStripeConfig, superAdminUpdateStripeConfig,
-  getMySubscription, subscribeToPlan, cancelSubscription, getAvailablePlans, getActiveModules, getStorageUsage, getSignatureUsage, getMonthlyConsumption, type ConsumptionUser,
+  getMySubscription, subscribeToPlan, cancelSubscription, getAvailablePlans, getActiveModules, getStorageUsage, getSignatureUsage, getMonthlyConsumption, getInvoices, getSupportAccesses, grantSupportAccess, revokeSupportAccess, getIpWhitelist, addIpWhitelist, toggleIpWhitelist, removeIpWhitelist, getSecuritySessions, revokeSession as apiRevokeSession, revokeAllOtherSessions, getLoginHistory, getAllLoginHistory, getSecuritySettings, updateSecuritySettings, createAccessSchedule, deleteAccessSchedule, seedDemoData, type ConsumptionUser,
+  createStripeSetupIntent, getStripePaymentMethods, setDefaultPaymentMethod, deleteStripePaymentMethod, saveInvoiceConfig as apiSaveInvoiceConfig, saveBillingContact, saveBillingInfo as apiSaveBillingInfo, getPaymentConfig,
   getDocuments, uploadDocument, validateDocument as apiValidateDoc, refuseDocument as apiRefuseDoc,
   type UploadedDocument,
   getNpsSurveys, createNpsSurvey as apiCreateNps, updateNpsSurvey as apiUpdateNps, deleteNpsSurvey as apiDeleteNps,
@@ -84,12 +85,162 @@ import {
   type ApiRole,
 } from "../api/endpoints";
 import { apiFetch } from "../api/client";
+// Stripe is loaded lazily — see lazyLoadStripe() below — so the SDK isn't in the
+// main bundle and js.stripe.com / m.stripe.network are only contacted when the
+// user actually clicks a payment button.
+import { Elements, CardElement, IbanElement, useStripe, useElements } from "@stripe/react-stripe-js";
+
+// Cache the dynamic import so we only fetch @stripe/stripe-js once per session
+let _stripeJsModule: typeof import("@stripe/stripe-js") | null = null;
+const lazyLoadStripe = async (publishableKey: string) => {
+  if (!_stripeJsModule) {
+    _stripeJsModule = await import("@stripe/stripe-js");
+  }
+  return _stripeJsModule.loadStripe(publishableKey);
+};
 import { createAdminRoles } from './pages/AdminRoles';
 import { createAdminCalendar } from './pages/AdminCalendar';
 import { createAdminOrgChart } from './pages/AdminOrgChart';
 import { createAdminBuddy } from './pages/AdminBuddy';
 import { createAdminAuditLog } from './pages/AdminAuditLog';
 
+
+/** Stripe Card Form — proper React component so hooks work */
+function StripeCardFormInner({ billingInfo, auth, stripeMethods, setStripeMethods, setPaymentMethod, setStripeModalOpen, addToast_admin, loadMethods, onCardSaved, isSepa }: any) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const BRAND_ICONS: Record<string, string> = { visa: "Visa", mastercard: "Mastercard", amex: "Amex", discover: "Discover" };
+  const handleSubmit = async () => {
+    if (!stripe || !elements) return;
+    setLoading(true); setError("");
+    try {
+      const intent = await createStripeSetupIntent();
+      const billingDetails = { name: `${billingInfo.prenom} ${billingInfo.nom}`.trim() || auth.user?.name || "", email: billingInfo.email || auth.user?.email || "" };
+      let result: any;
+      if (isSepa) {
+        const ibanEl = elements.getElement(IbanElement);
+        if (!ibanEl) { setError("Élément IBAN non disponible"); setLoading(false); return; }
+        result = await stripe.confirmSepaDebitSetup(intent.client_secret, { payment_method: { sepa_debit: ibanEl, billing_details: billingDetails } });
+      } else {
+        const cardEl = elements.getElement(CardElement);
+        if (!cardEl) { setError("Élément de carte non disponible"); setLoading(false); return; }
+        result = await stripe.confirmCardSetup(intent.client_secret, { payment_method: { card: cardEl, billing_details: billingDetails } });
+      }
+      if (result.error) { setError(result.error.message || "Erreur Stripe"); setLoading(false); return; }
+      if (result.setupIntent?.payment_method) {
+        await setDefaultPaymentMethod(result.setupIntent.payment_method as string);
+      }
+      const methods = await getStripePaymentMethods();
+      setStripeMethods(methods.methods || []);
+      setPaymentMethod(isSepa ? "sepa" : "stripe");
+      setStripeModalOpen(false);
+      addToast_admin(isSepa ? "Prélèvement SEPA configuré avec succès !" : "Carte enregistrée avec succès !");
+      if (onCardSaved) onCardSaved();
+    } catch (err: any) { setError(err.message || "Erreur lors de l'enregistrement"); }
+    setLoading(false);
+  };
+  const accentColor = isSepa ? "#00897B" : "#635BFF";
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{isSepa ? "IBAN" : "Informations de la carte"}</label>
+        <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 14px", background: C.white }}>
+          {isSepa ? (
+            <IbanElement options={{ supportedCountries: ['SEPA'], style: { base: { fontSize: "15px", color: C.text, fontFamily: font, "::placeholder": { color: C.textMuted } }, invalid: { color: C.red } } }} />
+          ) : (
+            <CardElement options={{ style: { base: { fontSize: "15px", color: C.text, fontFamily: font, "::placeholder": { color: C.textMuted } }, invalid: { color: C.red } }, hidePostalCode: true }} />
+          )}
+        </div>
+        {isSepa && <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6 }}>En fournissant votre IBAN, vous autorisez Illizeo à débiter votre compte conformément au mandat SEPA.</div>}
+      </div>
+      {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 12, padding: "8px 12px", background: "#FFF0F0", borderRadius: 6 }}>{error}</div>}
+      {stripeMethods.filter((m: any) => isSepa ? m.type === "sepa_debit" : m.type === "card").length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{isSepa ? "Comptes enregistrés" : "Cartes enregistrées"}</label>
+          {stripeMethods.filter((m: any) => isSepa ? m.type === "sepa_debit" : m.type === "card").map((m: any) => (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", border: `1px solid ${m.is_default ? accentColor : C.border}`, borderRadius: 8, marginBottom: 6, background: m.is_default ? accentColor + "08" : C.white }}>
+              <span style={{ fontSize: 13 }}>{m.type === "sepa_debit" ? `SEPA •••• ${m.last4} ${m.country || ""}` : `${BRAND_ICONS[m.brand] || m.brand} •••• ${m.last4} — ${String(m.exp_month).padStart(2, "0")}/${m.exp_year}`} {m.is_default && <span style={{ fontSize: 9, fontWeight: 700, color: accentColor, marginLeft: 6 }}>PAR DÉFAUT</span>}</span>
+              <div style={{ display: "flex", gap: 6 }}>
+                {!m.is_default && <button onClick={async () => { try { await setDefaultPaymentMethod(m.id); loadMethods(); addToast_admin("Méthode par défaut mise à jour"); } catch { addToast_admin("Erreur"); } }} style={{ background: "none", border: "none", fontSize: 11, color: accentColor, cursor: "pointer", fontWeight: 600 }}>Par défaut</button>}
+                <button onClick={async () => { try { await deleteStripePaymentMethod(m.id); loadMethods(); addToast_admin("Méthode supprimée"); } catch { addToast_admin("Erreur"); } }} style={{ background: "none", border: "none", fontSize: 11, color: C.red, cursor: "pointer" }}>Supprimer</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+        <button onClick={() => setStripeModalOpen(false)} style={{ padding: "8px 20px", fontSize: 12, background: "none", border: `1px solid ${C.border}`, borderRadius: 8, cursor: "pointer", color: C.text }}>Fermer</button>
+        <button onClick={handleSubmit} disabled={loading || !stripe} style={{ fontSize: 12, padding: "8px 20px", opacity: loading ? 0.6 : 1, background: accentColor, color: "#fff", border: "none", borderRadius: 8, fontWeight: 600, cursor: loading ? "wait" : "pointer" }}>
+          {loading ? "Enregistrement..." : isSepa ? "Enregistrer le prélèvement" : "Enregistrer la carte"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Checkout payment section — Stripe Card or SEPA, save logic exposed via submitRef */
+function CheckoutPaymentSection({ billingInfo, auth, submitRef, paymentMethod }: any) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [error, setError] = useState("");
+
+  submitRef.current = async (): Promise<boolean> => {
+    if (!stripe || !elements) return false;
+    setError("");
+    try {
+      const intent = await createStripeSetupIntent();
+      const billingDetails = { name: `${billingInfo.prenom} ${billingInfo.nom}`.trim() || auth.user?.name || "", email: billingInfo.email || auth.user?.email || "" };
+
+      if (paymentMethod === "sepa") {
+        const ibanEl = elements.getElement(IbanElement);
+        if (!ibanEl) { setError("Élément IBAN non disponible"); return false; }
+        const { error: stripeErr, setupIntent } = await stripe.confirmSepaDebitSetup(intent.client_secret, {
+          payment_method: { sepa_debit: ibanEl, billing_details: billingDetails }
+        });
+        if (stripeErr) { setError(stripeErr.message || "Erreur SEPA"); return false; }
+        if (setupIntent?.payment_method) await setDefaultPaymentMethod(setupIntent.payment_method as string);
+      } else {
+        const cardEl = elements.getElement(CardElement);
+        if (!cardEl) { setError("Élément de carte non disponible"); return false; }
+        const { error: stripeErr, setupIntent } = await stripe.confirmCardSetup(intent.client_secret, {
+          payment_method: { card: cardEl, billing_details: billingDetails }
+        });
+        if (stripeErr) { setError(stripeErr.message || "Erreur Stripe"); return false; }
+        if (setupIntent?.payment_method) await setDefaultPaymentMethod(setupIntent.payment_method as string);
+      }
+      return true;
+    } catch (err: any) { setError(err.message || "Erreur"); return false; }
+  };
+
+  return (
+    <div>
+      {paymentMethod === "sepa" ? (
+        <>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 14px", background: C.white, marginBottom: 12 }}>
+            <IbanElement options={{ supportedCountries: ['SEPA'], style: { base: { fontSize: "15px", color: C.text, fontFamily: font, "::placeholder": { color: C.textMuted } }, invalid: { color: C.red } } }} />
+          </div>
+          <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 8 }}>En fournissant votre IBAN, vous autorisez Illizeo à envoyer des instructions à votre banque pour débiter votre compte conformément au mandat SEPA.</div>
+        </>
+      ) : (
+        <>
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, padding: "12px 14px", background: C.white, marginBottom: 12 }}>
+            <CardElement options={{ style: { base: { fontSize: "15px", color: C.text, fontFamily: font, "::placeholder": { color: C.textMuted } }, invalid: { color: C.red } }, hidePostalCode: true }} />
+          </div>
+          <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 8 }}>Paiement sécurisé via Stripe avec 3D Secure.</div>
+        </>
+      )}
+      {error && <div style={{ fontSize: 12, color: C.red, marginBottom: 12, padding: "8px 12px", background: "#FFF0F0", borderRadius: 6 }}>{error}</div>}
+    </div>
+  );
+}
+
+// Module-level spending cap cache to avoid infinite re-render loops
+let _spendingCapCache: any = null;
+let _spendingCapLoading = false;
+let _autoRechargeCache: any = null;
+let _autoRechargeLoading = false;
 
 /**
  * Factory: inline admin page render functions.
@@ -101,7 +252,11 @@ export function createAdminInlinePages(ctx: any) {
     resetToken, setResetToken, resetEmail, setResetEmail, resetPassword, setResetPassword, resetConfirm, setResetConfirm,
     resetLoading, setResetLoading, resetDone, setResetDone, twoFactorCode, setTwoFactorCode, showRegister, setShowRegister,
     tenantActiveModules, setTenantActiveModules, tenantSubscriptions, setTenantSubscriptions, selectedPlanIds, setSelectedPlanIds, subTab, setSubTab,
-    subView, setSubView, subEmployeeCount, setSubEmployeeCount, billingInfo, setBillingInfo, paymentMethod, setPaymentMethod,
+    subView, setSubView, subEmployeeCount, setSubEmployeeCount, billingInfo, setBillingInfo, paymentMethod, setPaymentMethod, subStep, setSubStep,
+    stripeModalOpen, setStripeModalOpen, stripeMethods, setStripeMethods,
+    invoiceConfigOpen, setInvoiceConfigOpen, invoiceConfig, setInvoiceConfig,
+    billingContactEdit, setBillingContactEdit, billingModalOpen, setBillingModalOpen, billingModalCallback, invoicesList, setInvoicesList, supportAccesses, setSupportAccesses, supportAccessForm, setSupportAccessForm, billingInfoEdit, setBillingInfoEdit,
+    stripePromise, setStripePromise,
     storageUsage, setStorageUsage, signatureUsage, setSignatureUsage, showPricing, setShowPricing, plans, setPlans,
     pricingBilling, setPricingBilling, superAdminMode, setSuperAdminMode, saTab, setSaTab, saDashData, setSaDashData,
     saTenants, setSaTenants, saPlans, setSaPlans, saSubscriptions, setSaSubscriptions, saStripe, setSaStripe,
@@ -136,7 +291,7 @@ export function createAdminInlinePages(ctx: any) {
     fieldConfig, setFieldConfig, translateFieldId, setTranslateFieldId, translateEN, setTranslateEN, adminUsers, setAdminUsers,
     adminRoles, setAdminRoles, rolePanelMode, setRolePanelMode, rolePanelData, setRolePanelData,
     roleTab, setRoleTab, selectedRoleId, setSelectedRoleId, permMatrixFilter, setPermMatrixFilter,
-    securitySubTab, setSecuritySubTab, pwdPolicy, setPwdPolicy,
+    securitySubTab, setSecuritySubTab, pwdPolicy, setPwdPolicy, ipWhitelist, setIpWhitelist, secSessions, setSecSessions, secLoginHistory, setSecLoginHistory, secSettings, setSecSettings,
     calendarMonth, setCalendarMonth, calendarView, setCalendarView, calendarListFilter, setCalendarListFilter,
     orgView, setOrgView, orgSearch, setOrgSearch, auditFilter, setAuditFilter, auditSearch, setAuditSearch, buddyPairs, setBuddyPairs, selectedBuddyPair, setSelectedBuddyPair,
     orgExpandedNodes, setOrgExpandedNodes, orgSortCol, setOrgSortCol, orgSortDir, setOrgSortDir,
@@ -195,7 +350,7 @@ export function createAdminInlinePages(ctx: any) {
             "cooptation": { label: t('badge.crit_coopt'), description: t('badge.crit_coopt_desc') },
             "nps_complete": { label: t('badge.crit_nps'), description: t('badge.crit_nps_desc') },
           };
-          const BADGE_COLORS = ["#F9A825", "#C2185B", "#4CAF50", "#1A73E8", "#7B5EA7", "#E91E8C", "#00897B", "#FF6B35", "#E53935", "#FF9800"];
+          const BADGE_COLORS = ["#F9A825", "#E41076", "#4CAF50", "#1A73E8", "#7B5EA7", "#E91E8C", "#00897B", "#FF6B35", "#E53935", "#FF9800"];
           const BADGE_ICONS = Object.keys(BADGE_ICON_MAP);
           return (
           <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
@@ -408,7 +563,7 @@ export function createAdminInlinePages(ctx: any) {
             : {
               super_admin: { label: t('role.super_admin'), color: "#E53935", bg: C.redLight },
               admin: { label: t('role.admin'), color: "#7B5EA7", bg: C.purple + "15" },
-              admin_rh: { label: t('role.admin_rh'), color: "#C2185B", bg: C.pinkBg },
+              admin_rh: { label: t('role.admin_rh'), color: "#E41076", bg: C.pinkBg },
               manager: { label: t('role.manager'), color: "#1A73E8", bg: C.blueLight },
               onboardee: { label: t('role.onboardee'), color: "#4CAF50", bg: C.greenLight },
             };
@@ -604,6 +759,9 @@ export function createAdminInlinePages(ctx: any) {
           );
   };
 
+  let _abonnementDataLoaded = false;
+  let _invoicesLoaded = false;
+  let _supportAccessLoaded = false;
   const renderAdminAbonnement = () => {
           const trialStart = localStorage.getItem("illizeo_trial_start");
           const isInTrial = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) <= 14 * 24 * 60 * 60 * 1000;
@@ -612,13 +770,88 @@ export function createAdminInlinePages(ctx: any) {
           const reloadSub = () => {
             getMySubscription().then(res => { setTenantSubscriptions(res.subscriptions || []); setTenantActiveModules(res.active_modules || []); }).catch(() => {});
             if (plans.length === 0) getAvailablePlans().then(setPlans).catch(() => {});
+            getStripePaymentMethods().then(r => setStripeMethods(r.methods || [])).catch(() => {});
+            getPaymentConfig().then((cfg: any) => {
+              if (cfg) {
+                if (cfg.invoice_email || cfg.po_number) setInvoiceConfig({ invoice_email: cfg.invoice_email || "", po_number: cfg.po_number || "" });
+                // Merge billing contact — use auth user as fallback for empty fields
+                const contact = cfg.billing_contact || {};
+                const userName = auth.user?.name || "";
+                const nameParts = userName.split(" ");
+                setBillingInfo((prev: any) => ({
+                  ...prev,
+                  prenom: contact.prenom || prev.prenom || nameParts[0] || "",
+                  nom: contact.nom || prev.nom || nameParts.slice(1).join(" ") || "",
+                  email: contact.email || prev.email || auth.user?.email || "",
+                  telephone: contact.telephone || prev.telephone || "",
+                  pays: contact.pays || prev.pays || "Suisse",
+                }));
+                // Merge billing info (company, address)
+                if (cfg.billing) {
+                  setBillingInfo((prev: any) => ({
+                    ...prev,
+                    company: cfg.billing.company || prev.company || "",
+                    vat: cfg.billing.vat || prev.vat || "",
+                    rue: cfg.billing.rue || prev.rue || "",
+                    numero: cfg.billing.numero || prev.numero || "",
+                    complement: cfg.billing.complement || prev.complement || "",
+                    case_postale: cfg.billing.case_postale || prev.case_postale || "",
+                    localite: cfg.billing.localite || prev.localite || "",
+                    code_postal: cfg.billing.code_postal || prev.code_postal || "",
+                    ville: cfg.billing.ville || prev.ville || "",
+                    canton: cfg.billing.canton || prev.canton || "",
+                    pays_facturation: cfg.billing.pays || prev.pays_facturation || "Suisse",
+                  }));
+                }
+                if (cfg.payment_method) setPaymentMethod(cfg.payment_method);
+              }
+            }).catch(() => {});
           };
-          if (plans.length === 0) getAvailablePlans().then(setPlans).catch(() => {});
+          if (!_abonnementDataLoaded) {
+            _abonnementDataLoaded = true;
+            if (plans.length === 0) getAvailablePlans().then(setPlans).catch(() => {});
+            if (stripeMethods.length === 0) getStripePaymentMethods().then(r => setStripeMethods(r.methods || [])).catch(() => {});
+            // Load billing info on first render
+            if (!billingInfo.prenom && !billingInfo.nom) {
+              getPaymentConfig().then((cfg: any) => {
+                if (cfg) {
+                  const contact = cfg.billing_contact || {};
+                  const userName = auth.user?.name || "";
+                  const nameParts = userName.split(" ");
+                  setBillingInfo((prev: any) => ({
+                    ...prev,
+                    prenom: contact.prenom || nameParts[0] || "",
+                    nom: contact.nom || nameParts.slice(1).join(" ") || "",
+                    email: contact.email || auth.user?.email || "",
+                    telephone: contact.telephone || "",
+                    pays: contact.pays || "Suisse",
+                    ...(cfg.billing ? {
+                      company: cfg.billing.company || "",
+                      vat: cfg.billing.vat || "",
+                      rue: cfg.billing.rue || "",
+                      numero: cfg.billing.numero || "",
+                      complement: cfg.billing.complement || "",
+                      case_postale: cfg.billing.case_postale || "",
+                      localite: cfg.billing.localite || "",
+                      code_postal: cfg.billing.code_postal || "",
+                      ville: cfg.billing.ville || "",
+                      canton: cfg.billing.canton || "",
+                      pays_facturation: cfg.billing.pays || "Suisse",
+                    } : {}),
+                  }));
+                  if (cfg.payment_method) setPaymentMethod(cfg.payment_method);
+                  if (cfg.invoice_email || cfg.po_number) setInvoiceConfig({ invoice_email: cfg.invoice_email || "", po_number: cfg.po_number || "" });
+                }
+              }).catch(() => {});
+            }
+          }
           const activeSubs = tenantSubscriptions.filter(s => s.status === "active" || s.status === "trialing");
           const availablePlans = plans.length > 0 ? plans : saPlans;
-          const currentOnboardingSub = activeSubs.filter((s: any) => s.plan?.slug !== "cooptation").sort((a: any, b: any) => (a.canceled_at ? 1 : 0) - (b.canceled_at ? 1 : 0))[0] || null;
+          const currentOnboardingSub = activeSubs.filter((s: any) => s.plan?.slug !== "cooptation" && s.plan?.addon_type !== "ai" && !s.plan?.is_addon).sort((a: any, b: any) => (a.canceled_at ? 1 : 0) - (b.canceled_at ? 1 : 0))[0] || null;
           const currentCooptSub = activeSubs.find((s: any) => s.plan?.slug === "cooptation");
           const currentPlan = currentOnboardingSub?.plan;
+          const onboardingPlans = availablePlans.filter((p: any) => !p.is_addon && p.addon_type !== "ai" && p.slug !== "cooptation").sort((a, b) => a.ordre - b.ordre);
+          const cooptationPlan = availablePlans.find(p => p.slug === "cooptation");
           const MODULE_LABELS: Record<string, string> = { onboarding: "Onboarding", offboarding: "Offboarding", crossboarding: "Crossboarding", cooptation: "Cooptation", nps: "NPS", signature: "Signature", sso: "SSO", provisioning: "Provisionnement", api: "API", white_label: "White-label", gamification: "Gamification" };
           return (
           <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
@@ -630,8 +863,8 @@ export function createAdminInlinePages(ctx: any) {
                   {currentOnboardingSub && <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: C.greenLight, color: C.green }}>Plan {currentOnboardingSub.billing_cycle === "yearly" ? "Annuel" : "Mensuel"}</span>}
                   {!currentOnboardingSub && <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: C.amberLight, color: C.amber }}>Aucun abonnement</span>}
                 </div>
-                <div style={{ fontSize: 13, color: C.textLight }}>{currentPlan?.description || "Choisissez un plan pour activer votre espace"}</div>
-                {currentOnboardingSub && <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>{currentPlan?.prix_chf_mensuel} CHF/emp/mois · {activeSubs.length} abonnement{activeSubs.length > 1 ? "s" : ""} actif{activeSubs.length > 1 ? "s" : ""}</div>}
+                <div style={{ fontSize: 13, color: C.textLight }}>{currentPlan?.description || (currentOnboardingSub ? "Votre abonnement est actif" : "Choisissez un plan pour activer votre espace")}</div>
+                {currentOnboardingSub && (() => { const appCount = activeSubs.filter((s: any) => s.plan?.is_addon || s.plan?.addon_type === "ai" || s.plan?.slug === "cooptation").length; return <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>{currentPlan?.prix_chf_mensuel} CHF/emp/mois · 1 plan{appCount > 0 ? ` + ${appCount} app${appCount > 1 ? "s" : ""}` : ""}</div>; })()}
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {currentOnboardingSub && !currentOnboardingSub.canceled_at && (
@@ -650,17 +883,14 @@ export function createAdminInlinePages(ctx: any) {
                     );
                   }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 12 }}>Annuler le plan</button>
                 )}
-                <button onClick={() => setSubView(subView === "change" ? "overview" : "change")} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12 }}>{subView === "change" ? "Retour" : (currentOnboardingSub ? "Changer le plan" : "Souscrire maintenant")}</button>
+                <button onClick={() => { if (subView === "change") { setSubView("overview"); } else { setSubStep("plan"); setSubView("change"); } }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12 }}>{subView === "change" ? "Retour" : (currentOnboardingSub ? "Changer le plan" : "Souscrire maintenant")}</button>
               </div>
             </div>
 
             {/* ═══ VIEW: Change plan ═══ */}
             {subView === "change" && (() => {
-              const onboardingPlans = availablePlans.filter((p: any) => !p.is_addon && p.addon_type !== "ai" && p.slug !== "cooptation").sort((a, b) => a.ordre - b.ordre);
-              const cooptationPlan = availablePlans.find(p => p.slug === "cooptation");
               return (
               <div>
-                {/* Plan selector + employee count */}
                 {/* Trial banner */}
                 {isInTrial && !hasActiveSub && (
                   <div style={{ padding: "14px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -683,93 +913,97 @@ export function createAdminInlinePages(ctx: any) {
                     </div>
                   </div>
                 )}
-                <div style={{ display: "flex", gap: 24, marginBottom: 24 }}>
-                  <div style={{ flex: 1 }}>
-                    <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4, textAlign: "center" }}>Choisissez l'abonnement idéal pour votre entreprise</h2>
-                    <p style={{ fontSize: 13, color: C.textMuted, textAlign: "center", marginBottom: 20 }}>Tous nos abonnements sont modulables. Min. 25 employés.</p>
-                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${onboardingPlans.length}, 1fr)`, gap: 16 }}>
-                      {onboardingPlans.map(plan => {
-                        const isCurrent = currentOnboardingSub?.plan_id === plan.id;
-                        const isSelected = selectedPlanIds.includes(plan.id);
-                        const monthlyPrice = Number(plan.prix_chf_mensuel);
-                        const planModules = (plan.modules || []).filter(m => m.actif).map(m => m.module);
-                        return (
-                        <div key={plan.id} style={{ border: isCurrent ? `2px solid ${C.green}` : isSelected ? `2px solid ${C.pink}` : `1px solid ${C.border}`, borderRadius: 12, padding: "20px", cursor: "pointer", transition: "all .15s", background: isSelected ? C.pinkBg : C.white }}
-                          onClick={() => { if (!isCurrent) { setSelectedPlanIds(prev => prev.includes(plan.id) ? prev.filter(id => id !== plan.id) : [plan.id]); } }}>
-                          {isCurrent && <div style={{ fontSize: 10, fontWeight: 700, color: C.green, marginBottom: 6 }}>PLAN ACTUEL</div>}
-                          {plan.populaire && !isCurrent && <div style={{ fontSize: 10, fontWeight: 700, color: C.pink, marginBottom: 6 }}>POPULAIRE</div>}
-                          <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 4px" }}>{plan.nom}</h3>
-                          <div style={{ fontSize: 11, color: C.textLight, marginBottom: 10 }}>{plan.description}</div>
-                          <div style={{ marginBottom: 8 }}><span style={{ fontSize: 24, fontWeight: 800 }}>CHF {monthlyPrice}</span> <span style={{ fontSize: 11, color: C.textMuted }}>/ Mois / Employé</span></div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
-                            {planModules.map(mod => <div key={mod} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.text }}><CheckCircle size={13} color={C.green} /> {MODULE_LABELS[mod]}</div>)}
-                          </div>
-                          {/* Plan limits */}
-                          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
-                            {[
-                              { label: "Collaborateurs", value: plan.max_collaborateurs },
-                              { label: "Parcours", value: plan.max_parcours },
-                              { label: "Intégrations", value: plan.max_integrations },
-                              { label: "Workflows", value: plan.max_workflows },
-                            ].map(limit => (
-                              <div key={limit.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.textMuted }}>
-                                <span>{limit.label}</span>
-                                <span style={{ fontWeight: 600, color: limit.value ? C.text : C.green }}>{limit.value ?? "Illimité"}</span>
-                              </div>
-                            ))}
-                          </div>
-                          {!isCurrent && (
-                            <button onClick={e => { e.stopPropagation(); setSelectedPlanIds([plan.id]); }} className="iz-btn-pink" style={{ ...sBtn(isSelected ? "pink" : "outline"), width: "100%", marginTop: 14, fontSize: 12, padding: "8px 0" }}>{isSelected ? "Sélectionné" : "Sélectionner"}</button>
-                          )}
-                        </div>
-                        );
-                      })}
-                    </div>
+                {(() => {
+                  const step = subStep || "plan";
+                  const selectedMainPlan = onboardingPlans.find(p => selectedPlanIds.includes(p.id));
+                  const appPlans = availablePlans.filter((p: any) => p.is_addon || p.addon_type === "ai" || p.slug === "cooptation").sort((a, b) => a.ordre - b.ordre);
+                  const perEmployee = selectedMainPlan ? (pricingBilling === "yearly" ? Number(selectedMainPlan.prix_chf_mensuel) * 0.9 : Number(selectedMainPlan.prix_chf_mensuel)) : 0;
+                  const total = selectedPlanIds.reduce((sum: number, id: number) => {
+                    const p = availablePlans.find(pl => pl.id === id) as any;
+                    if (!p) return sum;
+                    const price = Number(p.prix_chf_mensuel || 0);
+                    const isAi = p.addon_type === "ai";
+                    if (isAi) return sum + price;
+                    const isAddon = p.is_addon || p.slug === "cooptation";
+                    if (isAddon) return sum + price * subEmployeeCount;
+                    return sum + (pricingBilling === "yearly" ? price * 0.9 : price) * subEmployeeCount;
+                  }, 0);
+                  const isSwiss = (billingInfo.pays || "").toLowerCase().includes("suisse") || (billingInfo.pays || "").toLowerCase().includes("switzerland") || (billingInfo.pays || "").toUpperCase() === "CH";
+                  const tax = isSwiss ? Math.round(total * 0.081 * 100) / 100 : 0;
 
-                    {/* Cooptation add-on */}
-                    {cooptationPlan && (
-                      <div style={{ marginTop: 20, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, background: currentCooptSub ? C.greenLight + "40" : C.white }}>
-                        <input type="checkbox" checked={!!currentCooptSub || selectedPlanIds.includes(cooptationPlan.id)} onChange={() => {
-                          if (currentCooptSub) return;
-                          setSelectedPlanIds(prev => prev.includes(cooptationPlan.id) ? prev.filter(id => id !== cooptationPlan.id) : [...prev, cooptationPlan.id]);
-                        }} style={{ width: 18, height: 18, accentColor: C.pink, cursor: currentCooptSub ? "default" : "pointer" }} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600 }}>{cooptationPlan.nom} {currentCooptSub && <span style={{ fontSize: 10, color: C.green, fontWeight: 600 }}>Actif</span>}</div>
-                          <div style={{ fontSize: 11, color: C.textMuted }}>{cooptationPlan.description}</div>
-                        </div>
-                        <div style={{ fontSize: 14, fontWeight: 700 }}>CHF {cooptationPlan.prix_chf_mensuel} <span style={{ fontSize: 11, fontWeight: 400, color: C.textMuted }}>/ emp / mois</span></div>
-                      </div>
-                    )}
-                    {/* AI add-on plans */}
-                    {(() => {
-                      const aiPlans = availablePlans.filter((p: any) => p.addon_type === "ai").sort((a: any, b: any) => a.ordre - b.ordre);
-                      if (aiPlans.length === 0) return null;
-                      const currentAiSub = activeSubs.find((s: any) => s.plan?.addon_type === "ai");
-                      return (
-                        <div style={{ marginTop: 24 }}>
-                          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={18} color={C.blue} /> Add-ons Intelligence Artificielle</h3>
-                          <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>OCR pièces d'identité, IllizeoBot, génération de contrats IA. Prix fixe mensuel, pas de réduction annuelle.</p>
-                          <div style={{ display: "grid", gridTemplateColumns: `repeat(${aiPlans.length}, 1fr)`, gap: 12 }}>
-                            {aiPlans.map((plan: any) => {
-                              const isCurrent = currentAiSub?.plan_id === plan.id;
+                  const APP_ICONS: Record<string, any> = { cooptation: Users, ia_starter: Sparkles, ia_business: Sparkles, ia_enterprise: Sparkles };
+
+                  return (
+                  <div>
+                    <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, textAlign: "center" }}>Choisissez l'abonnement idéal pour votre entreprise</h2>
+                    <p style={{ fontSize: 13, color: C.textMuted, textAlign: "center", marginBottom: 24 }}>Tous nos abonnements sont modulables grâce à notre suite d'applications sur mesure.</p>
+
+                    <div style={{ display: "flex", gap: 24 }}>
+                      {/* ── LEFT: Plan cards or Apps ── */}
+                      <div style={{ flex: 1 }}>
+                        {step === "plan" && (
+                          <div style={{ display: "grid", gridTemplateColumns: `repeat(${onboardingPlans.length}, 1fr)`, gap: 20 }}>
+                            {onboardingPlans.map(plan => {
                               const isSelected = selectedPlanIds.includes(plan.id);
+                              const isCurrent = currentOnboardingSub?.plan_id === plan.id;
+                              const isEnterprise = plan.slug === "enterprise";
+                              const monthlyPrice = Number(plan.prix_chf_mensuel);
+                              const displayPrice = pricingBilling === "yearly" ? Math.round(monthlyPrice * 0.9 * 100) / 100 : monthlyPrice;
+                              const planModules = (plan.modules || []).filter(m => m.actif).map(m => m.module);
+
                               return (
-                                <div key={plan.id} onClick={() => { if (!isCurrent) setSelectedPlanIds(prev => prev.includes(plan.id) ? prev.filter((id: number) => id !== plan.id) : [...prev.filter((id: number) => !aiPlans.some((ap: any) => ap.id === id)), plan.id]); }}
-                                  style={{ border: isCurrent ? `2px solid ${C.green}` : isSelected ? `2px solid ${C.blue}` : `1px solid ${C.border}`, borderRadius: 12, padding: "16px", cursor: "pointer", transition: "all .15s", background: isSelected ? C.blueLight + "30" : C.white }}>
-                                  {isCurrent && <div style={{ fontSize: 10, fontWeight: 700, color: C.green, marginBottom: 4 }}>PLAN ACTUEL</div>}
-                                  <h4 style={{ fontSize: 14, fontWeight: 700, margin: "0 0 2px" }}>{plan.nom}</h4>
-                                  <div style={{ fontSize: 11, color: C.textLight, marginBottom: 8 }}>{plan.description}</div>
-                                  <div style={{ marginBottom: 10 }}><span style={{ fontSize: 20, fontWeight: 800 }}>CHF {plan.prix_chf_mensuel}</span> <span style={{ fontSize: 11, color: C.textMuted }}>/ mois</span></div>
-                                  <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Scans OCR</span><span style={{ fontWeight: 600 }}>{plan.ai_ocr_scans}/mois</span></div>
-                                    {plan.ai_bot_messages > 0 && <div style={{ display: "flex", justifyContent: "space-between" }}><span>IllizeoBot</span><span style={{ fontWeight: 600 }}>{plan.ai_bot_messages} msgs</span></div>}
-                                    {plan.ai_bot_messages === 0 && <div style={{ display: "flex", justifyContent: "space-between", color: C.textMuted }}><span>IllizeoBot</span><span>—</span></div>}
-                                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Contrats IA</span><span style={{ fontWeight: 600 }}>{plan.ai_contrat_generations}/mois</span></div>
-                                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Modèle</span><span style={{ fontWeight: 600, fontSize: 10 }}>{plan.ai_model === "claude-opus-4-6" ? "Opus (précision max)" : "Sonnet"}</span></div>
-                                    <div style={{ display: "flex", justifyContent: "space-between" }}><span>Scan suppl.</span><span style={{ fontWeight: 600 }}>CHF {plan.ai_extra_scan_price_chf}</span></div>
+                                <div key={plan.id} style={{
+                                  borderRadius: 12, padding: "32px 24px", cursor: "pointer", transition: "all .15s",
+                                  border: isSelected ? `2px solid ${C.pink}` : isCurrent ? `2px solid ${C.green}` : `1px solid ${C.border}`,
+                                  background: C.white, display: "flex", flexDirection: "column",
+                                }} onClick={() => { if (!isCurrent) setSelectedPlanIds((prev: number[]) => [plan.id, ...prev.filter((id: number) => !onboardingPlans.some(op => op.id === id))]); }}>
+                                  {isCurrent && <div style={{ fontSize: 10, fontWeight: 700, color: C.green, marginBottom: 6, textTransform: "uppercase" }}>Plan actuel</div>}
+                                  {plan.populaire && !isCurrent && <div style={{ fontSize: 10, fontWeight: 700, color: C.pink, marginBottom: 6, textTransform: "uppercase" }}>Populaire</div>}
+
+                                  <h3 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 8px" }}>{plan.nom}</h3>
+                                  <p style={{ fontSize: 13, color: C.textLight, marginBottom: 20, lineHeight: 1.5 }}>{plan.description}</p>
+
+                                  <div style={{ marginBottom: 4 }}>
+                                    <span style={{ fontSize: 28, fontWeight: 800 }}>CHF {displayPrice}</span>
+                                    <span style={{ fontSize: 12, color: C.textMuted, marginLeft: 6 }}>/ Mois / Employé</span>
                                   </div>
-                                  {!isCurrent && (
-                                    <button onClick={e => { e.stopPropagation(); setSelectedPlanIds(prev => [...prev.filter((id: number) => !aiPlans.some((ap: any) => ap.id === id)), plan.id]); }} className="iz-btn-pink" style={{ ...sBtn(isSelected ? "pink" : "outline"), width: "100%", marginTop: 10, fontSize: 11, padding: "6px 0", borderColor: isSelected ? C.blue : C.border, background: isSelected ? C.blue : "transparent", color: isSelected ? C.white : C.textMuted }}>
+                                  <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 20 }}>Min. {plan.min_mensuel_chf || displayPrice} CHF / Mois</div>
+
+                                  {/* Modules */}
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16, flex: 1 }}>
+                                    {planModules.map(mod => (
+                                      <div key={mod} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13 }}>
+                                        <Check size={16} color={C.green} style={{ flexShrink: 0, marginTop: 1 }} />
+                                        <span>{MODULE_LABELS[mod] || mod}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Limits */}
+                                  <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 10, display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+                                    {[
+                                      { label: "Parcours", value: plan.max_parcours },
+                                      { label: "Intégrations", value: plan.max_integrations },
+                                      { label: "Workflows", value: plan.max_workflows },
+                                    ].map(limit => (
+                                      <div key={limit.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.textMuted }}>
+                                        <span>{limit.label}</span>
+                                        <span style={{ fontWeight: 600, color: limit.value ? C.text : C.green }}>{limit.value ?? "Illimité"}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {isCurrent ? (
+                                    <div style={{ width: "100%", padding: "12px 0", borderRadius: 8, fontSize: 14, fontWeight: 600, textAlign: "center", background: C.greenLight, color: C.green, fontFamily: font }}>
+                                      Plan actuel
+                                    </div>
+                                  ) : (
+                                    <button onClick={e => { e.stopPropagation(); setSelectedPlanIds((prev: number[]) => [plan.id, ...prev.filter((id: number) => !onboardingPlans.some(op => op.id === id))]); }}
+                                      style={{
+                                        width: "100%", padding: "12px 0", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                                        border: "none", fontFamily: font, transition: "all .15s",
+                                        background: isSelected ? C.pink : "#1565C0", color: "#fff",
+                                      }}>
                                       {isSelected ? "Sélectionné" : "Sélectionner"}
                                     </button>
                                   )}
@@ -777,88 +1011,306 @@ export function createAdminInlinePages(ctx: any) {
                               );
                             })}
                           </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
+                        )}
 
-                  {/* Right sidebar: summary */}
-                  <div style={{ width: 300, flexShrink: 0 }}>
-                    <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px", position: "sticky", top: 24 }}>
-                      {/* Billing toggle */}
-                      <div style={{ display: "flex", gap: 0, marginBottom: 16, background: C.bg, borderRadius: 8, padding: 3 }}>
-                        {(["monthly", "yearly"] as const).map(b => (
-                          <button key={b} onClick={() => setPricingBilling(b)} style={{ flex: 1, padding: "8px 0", borderRadius: 6, fontSize: 12, fontWeight: pricingBilling === b ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font, background: pricingBilling === b ? C.pink : "transparent", color: pricingBilling === b ? C.white : C.textMuted }}>
-                            {b === "monthly" ? "Mensuellement" : "Annuellement"}
-                          </button>
-                        ))}
+                        {step === "apps" && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                            {appPlans.map((plan: any) => {
+                              const isCurrentApp = activeSubs.some((s: any) => s.plan_id === plan.id && !s.canceled_at);
+                              const isSelected = isCurrentApp || selectedPlanIds.includes(plan.id);
+                              const IconComp = APP_ICONS[plan.slug] || Package;
+                              const price = Number(plan.prix_chf_mensuel);
+                              const isAi = plan.addon_type === "ai";
+                              const priceLabel = isAi ? `CHF ${price} / mois (fixe)` : `CHF ${price} / employé actif / mois`;
+                              const iconColor = isAi ? "#2196F3" : plan.slug === "cooptation" ? "#E91E8C" : C.textMuted;
+
+                              return (
+                                <div key={plan.id} onClick={() => { if (isCurrentApp) return; setSelectedPlanIds((prev: number[]) => {
+                                  if (prev.includes(plan.id)) return prev.filter((id: number) => id !== plan.id);
+                                  if (isAi) return [...prev.filter((id: number) => !appPlans.some((ap: any) => ap.addon_type === "ai" && ap.id === id)), plan.id];
+                                  return [...prev, plan.id];
+                                }); }}
+                                  style={{
+                                    border: isCurrentApp ? `2px solid ${C.green}` : isSelected ? `2px solid ${iconColor}` : `1px solid ${C.border}`,
+                                    borderRadius: 12, padding: "20px 24px", cursor: isCurrentApp ? "default" : "pointer", transition: "all .15s",
+                                    background: isCurrentApp ? C.greenLight + "30" : isSelected ? iconColor + "08" : C.white,
+                                    display: "flex", alignItems: "center", gap: 16,
+                                  }}>
+                                  <div style={{ width: 44, height: 44, borderRadius: 10, background: isCurrentApp ? C.greenLight : iconColor + "15", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                    {isCurrentApp ? <CheckCircle size={22} color={C.green} /> : <IconComp size={22} color={iconColor} />}
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontSize: 15, fontWeight: 700 }}>{plan.nom} {isCurrentApp && <span style={{ fontSize: 10, color: C.green, fontWeight: 600 }}>Actif</span>}</div>
+                                    <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{plan.description}</div>
+                                    <div style={{ fontSize: 12, color: C.textLight, marginTop: 6, fontWeight: 600 }}>{priceLabel}</div>
+                                    {isAi && (
+                                      <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11, color: C.textMuted }}>
+                                        {plan.ai_ocr_scans && <span>OCR: {plan.ai_ocr_scans}/mois</span>}
+                                        {plan.ai_bot_messages > 0 && <span>Bot: {plan.ai_bot_messages} msgs</span>}
+                                        {plan.ai_contrat_generations && <span>Contrats IA: {plan.ai_contrat_generations}/mois</span>}
+                                        {plan.ai_translations && <span>Traductions IA: {plan.ai_translations}/mois</span>}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {!isCurrentApp && <div style={{
+                                    width: 24, height: 24, borderRadius: 6, border: isSelected ? `2px solid ${iconColor}` : `2px solid ${C.border}`,
+                                    background: isSelected ? iconColor : "transparent",
+                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all .15s",
+                                  }}>
+                                    {isSelected && <Check size={14} color="#fff" />}
+                                  </div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                      {pricingBilling === "yearly" && <div style={{ fontSize: 10, color: C.green, fontWeight: 600, textAlign: "center", marginBottom: 12 }}>10% Réduction</div>}
 
-                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>1. Choisissez un abonnement</div>
-                      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>
-                        {selectedPlanIds.length > 0 ? selectedPlanIds.map(id => availablePlans.find(p => p.id === id)?.nom).join(" + ") : currentPlan?.nom || "Aucun"}
-                      </div>
+                      {/* ── RIGHT SIDEBAR ── */}
+                      <div style={{ width: 320, flexShrink: 0 }}>
+                        <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: "24px", position: "sticky", top: 24, background: C.white }}>
+                          {/* Billing toggle */}
+                          <div style={{ display: "flex", gap: 0, marginBottom: 8, background: C.bg, borderRadius: 8, padding: 3 }}>
+                            {(["monthly", "yearly"] as const).map(b => (
+                              <button key={b} onClick={() => setPricingBilling(b)} style={{
+                                flex: 1, padding: "10px 0", borderRadius: 6, fontSize: 13, fontWeight: pricingBilling === b ? 600 : 400,
+                                border: "none", cursor: "pointer", fontFamily: font,
+                                background: pricingBilling === b ? C.pink : "transparent",
+                                color: pricingBilling === b ? C.white : C.textMuted,
+                              }}>
+                                {b === "monthly" ? "Mensuellement" : "Annuellement"}
+                              </button>
+                            ))}
+                          </div>
+                          {pricingBilling === "yearly" && (
+                            <div style={{ fontSize: 11, color: C.green, fontWeight: 700, textAlign: "right", marginBottom: 12, padding: "2px 8px", background: C.greenLight, borderRadius: 4, display: "inline-block", float: "right" }}>10% Réduction</div>
+                          )}
+                          <div style={{ clear: "both" }} />
 
-                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>2. Sélectionnez vos employés</div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                        <button onClick={() => setSubEmployeeCount(Math.max(25, subEmployeeCount - 5))} style={{ width: 32, height: 32, borderRadius: "50%", border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                        <input type="number" value={subEmployeeCount} onChange={e => setSubEmployeeCount(Math.max(25, Number(e.target.value)))} style={{ width: 60, textAlign: "center", padding: "6px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 15, fontWeight: 700, fontFamily: font }} />
-                        <button onClick={() => setSubEmployeeCount(subEmployeeCount + 5)} style={{ width: 32, height: 32, borderRadius: "50%", border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
-                      </div>
-
-                      {/* Payment method */}
-                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>3. Mode de paiement</div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-                        {([
-                          { id: "stripe" as const, label: "Payer par carte", desc: "Visa, Mastercard, SEPA via Stripe", icon: "💳" },
-                          { id: "invoice" as const, label: "Payer par facture", desc: "Facture 30 jours, virement bancaire", icon: "📄" },
-                        ]).map(pm => (
-                          <button key={pm.id} onClick={() => setPaymentMethod(pm.id)} style={{
-                            display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8,
-                            border: paymentMethod === pm.id ? `2px solid ${C.pink}` : `1px solid ${C.border}`,
-                            background: paymentMethod === pm.id ? C.pinkBg : C.white,
-                            cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s",
-                          }}>
-                            <span style={{ fontSize: 18 }}>{pm.icon}</span>
-                            <div>
-                              <div style={{ fontSize: 12, fontWeight: paymentMethod === pm.id ? 600 : 400, color: paymentMethod === pm.id ? C.pink : C.text }}>{pm.label}</div>
-                              <div style={{ fontSize: 10, color: C.textMuted }}>{pm.desc}</div>
+                          {/* Step 1: Plan */}
+                          <div style={{ marginTop: 16, marginBottom: 16 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                              <span style={{ fontSize: 14, fontWeight: 700 }}>1. Choisissez un plan</span>
+                              {selectedMainPlan && <span style={{ fontSize: 13, fontWeight: 700 }}>{Math.round(perEmployee * subEmployeeCount * 100) / 100} CHF</span>}
                             </div>
-                          </button>
-                        ))}
-                      </div>
+                            <div style={{ fontSize: 13, color: C.textMuted }}>
+                              {selectedMainPlan ? (
+                                <>
+                                  {selectedMainPlan.nom}
+                                  <div style={{ fontSize: 11, color: C.textLight }}>( {perEmployee} CHF / employé actif )</div>
+                                </>
+                              ) : "Aucun plan sélectionné"}
+                            </div>
+                          </div>
 
-                      {selectedPlanIds.length > 0 && (
-                        <button onClick={async () => {
-                          for (const pid of selectedPlanIds) {
-                            try { await subscribeToPlan(pid, pricingBilling, paymentMethod); } catch {}
-                          }
-                          reloadSub(); setSubView("overview"); setSelectedPlanIds([]);
-                          addToast_admin(paymentMethod === "invoice" ? "Abonnement activé — facture envoyée" : "Abonnement activé — 14 jours d'essai gratuit");
-                        }} className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", padding: "12px 0", fontSize: 14, marginBottom: 16 }}>
-                          {paymentMethod === "invoice" ? "Démarrer — Paiement par facture" : "Démarrer — Paiement par carte"}
-                        </button>
-                      )}
+                          {/* Step 2: Employees */}
+                          <div style={{ marginBottom: 16 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>2. Nombre d'employés</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <button onClick={() => setSubEmployeeCount(Math.max(25, subEmployeeCount - 5))} style={{ width: 36, height: 36, borderRadius: "50%", border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font }}>−</button>
+                              <input type="number" value={subEmployeeCount} onChange={(e: any) => setSubEmployeeCount(Math.max(25, Number(e.target.value)))} style={{ width: 60, textAlign: "center", padding: "8px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 16, fontWeight: 700, fontFamily: font }} />
+                              <button onClick={() => setSubEmployeeCount(subEmployeeCount + 5)} style={{ width: 36, height: 36, borderRadius: "50%", border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font }}>+</button>
+                            </div>
+                          </div>
 
-                      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Prix Total Estimatif</div>
-                        <div style={{ fontSize: 24, fontWeight: 800 }}>
-                          {(() => {
-                            const total = selectedPlanIds.reduce((sum, id) => {
-                              const p = availablePlans.find(pl => pl.id === id) as any;
-                              const price = Number(p?.prix_chf_mensuel || 0);
-                              const isAi = p?.addon_type === "ai";
-                              // AI plans: fixed price, no annual discount, not per-employee
-                              if (isAi) return sum + price;
-                              return sum + (pricingBilling === "yearly" ? price * 0.9 : price) * subEmployeeCount;
-                            }, 0);
-                            return `${Math.round(total * 100) / 100} CHF`;
-                          })()}
+                          {/* Navigation buttons */}
+                          {step === "plan" && selectedMainPlan && (
+                            <button onClick={() => setSubStep("apps")} style={{
+                              width: "100%", padding: "12px 0", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                              border: "none", background: "#1565C0", color: "#fff", fontFamily: font, marginBottom: 16,
+                            }}>
+                              Choisir les applications
+                            </button>
+                          )}
+
+                          {step === "apps" && (
+                            <>
+                              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>3. Applications</div>
+                              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Sélectionnez les applications nécessaires.</div>
+
+                              {/* Payment method */}
+                              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>4. Mode de paiement</div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
+                                {([
+                                  { id: "stripe" as const, label: "Payer par carte", desc: "Visa, Mastercard — 3D Secure", icon: "💳" },
+                                  { id: "sepa" as const, label: "Prélèvement SEPA", desc: "Débit direct sur votre compte bancaire (IBAN)", icon: "🏦" },
+                                  { id: "invoice" as const, label: "Payer par facture", desc: "Facture 30 jours, virement bancaire", icon: "📄" },
+                                ] as const).map(pm => (
+                                  <button key={pm.id} onClick={() => setPaymentMethod(pm.id)} style={{
+                                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8,
+                                    border: paymentMethod === pm.id ? `2px solid ${C.pink}` : `1px solid ${C.border}`,
+                                    background: paymentMethod === pm.id ? C.pinkBg : C.white,
+                                    cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s",
+                                  }}>
+                                    <span style={{ fontSize: 18 }}>{pm.icon}</span>
+                                    <div>
+                                      <div style={{ fontSize: 12, fontWeight: paymentMethod === pm.id ? 600 : 400, color: paymentMethod === pm.id ? C.pink : C.text }}>{pm.label}</div>
+                                      <div style={{ fontSize: 10, color: C.textMuted }}>{pm.desc}</div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+
+                              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                                <button onClick={() => setSubStep("plan")} style={{ ...sBtn("outline"), fontSize: 12, padding: "10px 16px" }}>Retour</button>
+                                <button onClick={async () => {
+                                  // Always open checkout modal
+                                  if ((paymentMethod === "stripe" || paymentMethod === "sepa") && !stripePromise) {
+                                    try {
+                                      const r = await createStripeSetupIntent();
+                                      if (r.publishable_key) setStripePromise(lazyLoadStripe(r.publishable_key));
+                                    } catch { addToast_admin("Impossible de charger Stripe"); return; }
+                                  }
+                                  setBillingModalOpen(true);
+                                }} style={{
+                                  flex: 1, padding: "10px 0", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                                  border: "none", background: "#1565C0", color: "#fff", fontFamily: font,
+                                }}>
+                                  {paymentMethod === "invoice" ? "Souscrire — Facture" : paymentMethod === "sepa" ? "Souscrire — Prélèvement" : "Souscrire — Carte"}
+                                </button>
+                              </div>
+
+                              {/* Saved cards */}
+                              {paymentMethod === "stripe" && stripeMethods.length > 0 && (
+                                <div style={{ marginBottom: 14 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>Carte enregistrée</div>
+                                  {stripeMethods.filter((m: any) => m.is_default).map((m: any) => (
+                                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", border: `1px solid #635BFF`, borderRadius: 8, background: "#635BFF08", fontSize: 12 }}>
+                                      <span style={{ fontWeight: 600 }}>{m.brand?.toUpperCase()}</span>
+                                      <span>•••• {m.last4}</span>
+                                      <span style={{ color: C.textMuted }}>{String(m.exp_month).padStart(2, "0")}/{m.exp_year}</span>
+                                      <button onClick={() => { if (!stripePromise) createStripeSetupIntent().then(r => { if (r.publishable_key) setStripePromise(lazyLoadStripe(r.publishable_key)); }).catch(() => {}); setStripeModalOpen(true); }} style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 10, color: "#635BFF", cursor: "pointer", fontWeight: 600 }}>Modifier</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {/* Total */}
+                          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+                            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Prix Total Estimatif</div>
+                            <div style={{ fontSize: 28, fontWeight: 800 }}>{Math.round(total * 100) / 100} CHF</div>
+                            <div style={{ fontSize: 12, color: C.textMuted }}>( {pricingBilling === "yearly" ? "Annuellement" : "Mensuellement"} )</div>
+                            {isSwiss
+                              ? <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>TVA 8.10% incluse : {Math.round((total + tax) * 100) / 100} CHF</div>
+                              : <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>Hors taxes (TVA non applicable)</div>
+                            }
+                          </div>
                         </div>
-                        <div style={{ fontSize: 11, color: C.textMuted }}>( {pricingBilling === "yearly" ? "Annuellement" : "Mensuellement"} )</div>
                       </div>
                     </div>
+                  </div>
+                  );
+                })()}
+              </div>
+              );
+            })()}
+
+
+            {/* ═══ Unified Checkout Modal ═══ */}
+            {billingModalOpen && (() => {
+              const checkoutCardRef = { current: null as ((() => Promise<boolean>) | null) };
+              const doSubscribe = async () => {
+                // 1. Validate billing
+                if (!billingInfo.prenom || !billingInfo.nom || !billingInfo.email) {
+                  addToast_admin("Prénom, Nom et E-mail sont obligatoires");
+                  return;
+                }
+                // 2. Save billing info
+                try {
+                  await saveBillingContact({ prenom: billingInfo.prenom, nom: billingInfo.nom, email: billingInfo.email, telephone: billingInfo.telephone, pays: billingInfo.pays });
+                  await apiSaveBillingInfo({ company: billingInfo.company, vat: billingInfo.vat, rue: billingInfo.rue, numero: billingInfo.numero, complement: billingInfo.complement, case_postale: billingInfo.case_postale, localite: billingInfo.localite, code_postal: billingInfo.code_postal, ville: billingInfo.ville, canton: billingInfo.canton, pays: billingInfo.pays_facturation || billingInfo.pays });
+                } catch { addToast_admin("Erreur lors de la sauvegarde des informations"); return; }
+                // 3. If stripe/sepa + no payment method saved → save via Stripe
+                if ((paymentMethod === "stripe" || paymentMethod === "sepa") && stripeMethods.length === 0) {
+                  if (checkoutCardRef.current) {
+                    const ok = await checkoutCardRef.current();
+                    if (!ok) return;
+                    const methods = await getStripePaymentMethods();
+                    setStripeMethods(methods.methods || []);
+                  }
+                }
+                // 4. Subscribe
+                for (const pid of selectedPlanIds) {
+                  try { await subscribeToPlan(pid, pricingBilling, paymentMethod, subEmployeeCount); } catch {}
+                }
+                setBillingModalOpen(false);
+                reloadSub(); setSubView("overview"); setSelectedPlanIds([]); setSubStep("plan");
+                addToast_admin("Abonnement activé avec succès !");
+              };
+
+              return (
+              <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.45)" }} onClick={() => setBillingModalOpen(false)}>
+                <div style={{ background: C.white, borderRadius: 16, width: 640, maxWidth: "95vw", maxHeight: "90vh", overflow: "auto", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,.2)" }} onClick={e => e.stopPropagation()}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+                    <div>
+                      <h3 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Finaliser votre souscription</h3>
+                      <p style={{ fontSize: 12, color: C.textMuted, margin: 0 }}>Complétez vos informations et {paymentMethod === "stripe" ? "enregistrez votre carte" : "confirmez"} pour activer votre abonnement</p>
+                    </div>
+                    <button onClick={() => setBillingModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={C.textMuted} /></button>
+                  </div>
+
+                  {/* ── Section 1: Contact ── */}
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: C.text }}>1. Contact de facturation</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Prénom *</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.prenom} onChange={e => setBillingInfo({ ...billingInfo, prenom: e.target.value })} /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Nom *</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.nom} onChange={e => setBillingInfo({ ...billingInfo, nom: e.target.value })} /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>E-mail *</label><input type="email" style={{ ...sInput, width: "100%" }} value={billingInfo.email} onChange={e => setBillingInfo({ ...billingInfo, email: e.target.value })} /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Téléphone</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.telephone} onChange={e => setBillingInfo({ ...billingInfo, telephone: e.target.value })} /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Pays</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.pays} onChange={e => setBillingInfo({ ...billingInfo, pays: e.target.value })} /></div>
+                  </div>
+
+                  {/* ── Section 2: Company ── */}
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: C.text }}>2. Adresse de facturation</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                    <div style={{ gridColumn: "1/-1" }}><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Entreprise</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.company} onChange={e => setBillingInfo({ ...billingInfo, company: e.target.value })} /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Numéro de TVA</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.vat} onChange={e => setBillingInfo({ ...billingInfo, vat: e.target.value })} placeholder="CHE-xxx.xxx.xxx" /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Rue</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.rue} onChange={e => setBillingInfo({ ...billingInfo, rue: e.target.value })} /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Numéro</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.numero} onChange={e => setBillingInfo({ ...billingInfo, numero: e.target.value })} /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Code postal</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.code_postal} onChange={e => setBillingInfo({ ...billingInfo, code_postal: e.target.value })} /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Ville</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.ville} onChange={e => setBillingInfo({ ...billingInfo, ville: e.target.value })} /></div>
+                    <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Canton / Région</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.canton} onChange={e => setBillingInfo({ ...billingInfo, canton: e.target.value })} /></div>
+                  </div>
+
+                  {/* ── Section 3: Payment ── */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: C.text }}>3. Mode de paiement</div>
+                    {(paymentMethod === "stripe" || paymentMethod === "sepa") && stripeMethods.length === 0 && (
+                      stripePromise ? (
+                        <Elements stripe={stripePromise}>
+                          <CheckoutPaymentSection billingInfo={billingInfo} auth={auth} submitRef={checkoutCardRef} paymentMethod={paymentMethod} />
+                        </Elements>
+                      ) : (
+                        <div style={{ textAlign: "center", padding: "20px 0", color: C.textMuted, fontSize: 13 }}>Chargement de Stripe...</div>
+                      )
+                    )}
+                    {(paymentMethod === "stripe" || paymentMethod === "sepa") && stripeMethods.length > 0 && (
+                      stripeMethods.filter((m: any) => m.is_default).map((m: any) => (
+                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", border: `1px solid #635BFF`, borderRadius: 8, background: "#635BFF08", fontSize: 13 }}>
+                          {m.type === "sepa_debit" ? <Landmark size={16} color="#635BFF" /> : <span style={{ fontWeight: 600 }}>{m.brand?.toUpperCase()}</span>}
+                          <span>•••• {m.last4}</span>
+                          {m.type !== "sepa_debit" && <span style={{ color: C.textMuted }}>exp. {String(m.exp_month).padStart(2, "0")}/{m.exp_year}</span>}
+                          {m.type === "sepa_debit" && m.country && <span style={{ color: C.textMuted }}>{m.country}</span>}
+                          <CheckCircle size={16} color={C.green} style={{ marginLeft: "auto" }} />
+                        </div>
+                      ))
+                    )}
+                    {paymentMethod === "invoice" && (
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", border: `1px solid ${C.blue}`, borderRadius: 8, background: C.blueLight + "30", fontSize: 13 }}>
+                        <FileText size={18} color={C.blue} />
+                        <span>Paiement par facture — 30 jours, virement bancaire</span>
+                        <CheckCircle size={16} color={C.green} style={{ marginLeft: "auto" }} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Actions ── */}
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+                    <button onClick={() => setBillingModalOpen(false)} style={{ padding: "12px 20px", fontSize: 13, background: "none", border: `1px solid ${C.border}`, borderRadius: 8, cursor: "pointer", color: C.text, fontFamily: font }}>Annuler</button>
+                    <button onClick={doSubscribe} style={{ padding: "12px 28px", fontSize: 14, fontWeight: 600, background: C.pink, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: font }}>
+                      Confirmer la souscription
+                    </button>
                   </div>
                 </div>
               </div>
@@ -895,8 +1347,7 @@ export function createAdminInlinePages(ctx: any) {
               {currentOnboardingSub && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
                   {[
-                    { label: "Modules actifs", value: `${tenantActiveModules.length} module${tenantActiveModules.length > 1 ? "s" : ""}`, max: "inclus dans votre plan" },
-                    { label: "Signature électronique", value: signatureUsage ? `${signatureUsage.total} signature${signatureUsage.total > 1 ? "s" : ""} envoyée${signatureUsage.total > 1 ? "s" : ""}` : "Chargement...", max: signatureUsage ? `${signatureUsage.signed} signée${signatureUsage.signed > 1 ? "s" : ""} · ${signatureUsage.sent} en attente · ${signatureUsage.declined} refusée${signatureUsage.declined > 1 ? "s" : ""}` : "" },
+                    { label: "Modules actifs", value: (() => { const appSubs = activeSubs.filter((s: any) => s.plan?.is_addon || s.plan?.addon_type === "ai" || s.plan?.slug === "cooptation"); return currentOnboardingSub ? `1 plan${appSubs.length > 0 ? ` + ${appSubs.length} app${appSubs.length > 1 ? "s" : ""}` : ""}` : `${tenantActiveModules.length} module${tenantActiveModules.length > 1 ? "s" : ""}`; })(), max: "inclus dans votre plan" },
                     { label: "Stockage", value: storageUsage ? `${storageUsage.used_formatted} sur ${storageUsage.max_formatted}` : "Chargement...", max: storageUsage ? `${storageUsage.percent} % utilisé · ${storageUsage.file_count} fichier${storageUsage.file_count > 1 ? "s" : ""} · DB: ${storageUsage.db_size}` : "" },
                   ].map((m, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", border: `1px solid ${C.border}`, borderRadius: 8 }}>
@@ -1045,40 +1496,298 @@ export function createAdminInlinePages(ctx: any) {
 
                               if (!aiUsageData) return null;
 
+                              const usage = aiUsageData.usage || {};
+                              const billedChf = aiUsageData.billed_chf || 0;
+                              const costChf = aiUsageData.cost_chf || 0;
+                              const planMonthly = aiUsageData.plan_monthly_chf || 0;
+
                               const items = [
-                                { label: "Scans OCR", used: aiUsageData.usage?.ocr_scans || 0, limit: aiUsageData.quota?.ocr_limit || 0, color: C.blue },
-                                { label: "Messages IllizeoBot", used: aiUsageData.usage?.bot_messages || 0, limit: aiUsageData.quota?.bot_limit || 0, color: "#7B5EA7" },
-                                { label: "Contrats IA", used: aiUsageData.usage?.contrat_generations || 0, limit: aiUsageData.quota?.contrat_limit || 0, color: C.pink },
+                                { label: "Assistant employé", count: usage.chat_employee || 0, color: C.blue, Icon: MessageCircle },
+                                { label: "Assistant admin", count: usage.chat_admin || 0, color: "#7B5EA7", Icon: UserCheck },
+                                { label: "Scans OCR", count: usage.ocr_scans || 0, color: "#1A73E8", Icon: Search },
+                                { label: "Contrats IA", count: usage.contrat_generations || 0, color: C.pink, Icon: FileSignature },
+                                { label: "Génération parcours", count: usage.generate_parcours || 0, color: C.green, Icon: Route },
+                                { label: "Insights IA", count: usage.insights || 0, color: "#F9A825", Icon: Sparkles },
+                                { label: "Traductions IA", count: usage.translation || 0, color: "#00897B", Icon: Languages },
                               ];
 
                               return (
                                 <div style={{ marginTop: 24 }}>
-                                  <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={16} color={C.blue} /> Consommation IA — {aiPlan?.nom}</h3>
-                                  <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Utilisation ce mois de votre add-on Intelligence Artificielle</p>
-                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
-                                    {items.filter(it => it.limit > 0).map(it => {
-                                      const pct = it.limit > 0 ? Math.round((it.used / it.limit) * 100) : 0;
-                                      return (
-                                        <div key={it.label} style={{ padding: "14px 16px", borderRadius: 10, border: `1px solid ${C.border}` }}>
-                                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-                                            <span style={{ fontSize: 11, fontWeight: 600, color: it.color }}>{it.label}</span>
-                                            <span style={{ fontSize: 11, color: C.textMuted }}>{pct}%</span>
-                                          </div>
-                                          <div style={{ fontSize: 20, fontWeight: 700, color: C.text, marginBottom: 6 }}>{it.used} <span style={{ fontSize: 12, fontWeight: 400, color: C.textMuted }}>/ {it.limit}</span></div>
-                                          <div style={{ height: 6, background: C.bg, borderRadius: 3, overflow: "hidden" }}>
-                                            <div style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, pct)}%`, background: pct >= 90 ? C.red : pct >= 70 ? "#FF9800" : it.color, transition: "width .3s" }} />
-                                          </div>
-                                          <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>{Math.max(0, it.limit - it.used)} restants</div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                  {items.some(it => it.limit > 0 && (it.used / it.limit) >= 0.9) && (
-                                    <div style={{ padding: "10px 14px", background: "#FFF3E0", borderRadius: 8, fontSize: 12, color: "#E65100", display: "flex", alignItems: "center", gap: 8 }}>
-                                      <AlertTriangle size={16} />
-                                      <span>Vous approchez de votre limite. <b onClick={() => { setSubView("change"); }} style={{ cursor: "pointer", textDecoration: "underline" }}>Upgrader votre plan IA</b></span>
+                                  <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}><Sparkles size={16} color={C.blue} /> Consommation IA — {aiUsageData.plan_name || aiPlan?.nom}</h3>
+                                  <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Facturation à l'usage · Mois en cours</p>
+
+                                  {/* Usage cost summary */}
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                                    <div style={{ padding: "16px 20px", borderRadius: 10, background: C.bg }}>
+                                      <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>Forfait mensuel</div>
+                                      <div style={{ fontSize: 22, fontWeight: 700, color: C.text }}>{planMonthly} <span style={{ fontSize: 12, fontWeight: 400 }}>CHF</span></div>
                                     </div>
-                                  )}
+                                    <div style={{ padding: "16px 20px", borderRadius: 10, background: billedChf > planMonthly ? "#FFF3E0" : C.greenLight }}>
+                                      <div style={{ fontSize: 10, color: billedChf > planMonthly ? "#E65100" : C.green, marginBottom: 4 }}>Consommation ce mois</div>
+                                      <div style={{ fontSize: 22, fontWeight: 700, color: billedChf > planMonthly ? "#E65100" : C.green }}>{billedChf < 0.01 && billedChf > 0 ? billedChf.toFixed(4) : billedChf.toFixed(2)} <span style={{ fontSize: 12, fontWeight: 400 }}>CHF</span></div>
+                                    </div>
+                                  </div>
+
+                                  {/* Usage counts — all AI features */}
+                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+                                    {items.filter(it => it.count > 0 || ["Assistant employé", "Assistant admin", "Scans OCR", "Traductions IA"].includes(it.label)).map(it => (
+                                      <div key={it.label} style={{ padding: "12px 14px", borderRadius: 10, border: `1px solid ${C.border}`, textAlign: "center" }}>
+                                        <div style={{ marginBottom: 2, display: "flex", justifyContent: "center" }}><it.Icon size={20} color={it.color} /></div>
+                                        <div style={{ fontSize: 18, fontWeight: 700, color: it.color }}>{it.count}</div>
+                                        <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{it.label}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Spending cap */}
+                                  {(() => {
+                                    const maxCap = planMonthly * 3;
+                                    if (!_spendingCapLoading && !_spendingCapCache) {
+                                      _spendingCapLoading = true;
+                                      apiFetch('/ai/spending-cap').then((d: any) => {
+                                        if (d && typeof d === 'object' && 'spending_cap_chf' in d) {
+                                          _spendingCapCache = d;
+                                        } else {
+                                          _spendingCapCache = { spending_cap_chf: planMonthly || 29, current_billed_chf: 0, current_cost_chf: 0, percent_used: 0 };
+                                        }
+                                        setAiUsageData((prev: any) => ({ ...prev, _capTick: Date.now() }));
+                                      }).catch(() => {
+                                        _spendingCapCache = { spending_cap_chf: planMonthly || 29, current_billed_chf: 0, current_cost_chf: 0, percent_used: 0 };
+                                        setAiUsageData((prev: any) => ({ ...prev, _capTick: Date.now() }));
+                                      });
+                                    }
+                                    const cap = _spendingCapCache;
+                                    return (
+                                      <div style={{ padding: "14px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.white }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                            <ShieldCheck size={14} color={C.blue} />
+                                            <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>Plafond de dépense mensuel</span>
+                                          </div>
+                                          {cap && <span style={{ fontSize: 11, color: cap.percent_used > 80 ? C.red : C.textMuted }}>{cap.percent_used}% utilisé</span>}
+                                        </div>
+                                        {cap ? (
+                                          <>
+                                            <div style={{ height: 6, borderRadius: 3, background: C.bg, overflow: "hidden", marginBottom: 8 }}>
+                                              <div style={{ height: "100%", borderRadius: 3, width: `${Math.min(100, cap.percent_used)}%`, background: cap.percent_used > 80 ? C.red : cap.percent_used > 50 ? "#FF9800" : C.green, transition: "width .3s" }} />
+                                            </div>
+                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11 }}>
+                                              <span style={{ color: C.textMuted }}>{cap.current_billed_chf} CHF consommés / {cap.spending_cap_chf} CHF max</span>
+                                              <button onClick={() => {
+                                                showPrompt(`Plafond mensuel en CHF (max ${maxCap} CHF = 3× votre forfait, 0 = illimité) :`, async (val: string) => {
+                                                  const num = Number(val);
+                                                  if (isNaN(num) || num < 0) { addToast_admin("Montant invalide"); return; }
+                                                  if (num > 0 && num > maxCap) { addToast_admin(`Le plafond ne peut pas dépasser ${maxCap} CHF (3× votre forfait de ${planMonthly} CHF)`); return; }
+                                                  try {
+                                                    await apiFetch('/ai/spending-cap', { method: 'POST', body: JSON.stringify({ spending_cap_chf: num }) });
+                                                    _spendingCapCache = null; _spendingCapLoading = false;
+                                                    setAiUsageData((prev: any) => ({ ...prev, _capTick: Date.now() }));
+                                                    addToast_admin("Plafond mis à jour");
+                                                  } catch { addToast_admin("Erreur"); }
+                                                }, { label: `Montant en CHF (max ${maxCap})`, defaultValue: String(cap.spending_cap_chf) });
+                                              }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: C.blue, fontWeight: 500 }}>Modifier</button>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div style={{ fontSize: 11, color: C.textMuted }}>Chargement...</div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+
+                                  {/* Auto-recharge IA */}
+                                  {(() => {
+                                    if (!_autoRechargeLoading && !_autoRechargeCache) {
+                                      _autoRechargeLoading = true;
+                                      apiFetch('/ai/auto-recharge').then((d: any) => {
+                                        if (d && typeof d === 'object') _autoRechargeCache = d;
+                                        else _autoRechargeCache = { enabled: false, threshold_percent: 90, recharge_amount_chf: 50, recharge_credits: 100, max_recharges_per_month: 3, recharges_this_month: 0 };
+                                        setAiUsageData((prev: any) => ({ ...prev, _rechargeTick: Date.now() }));
+                                      }).catch(() => {
+                                        _autoRechargeCache = { enabled: false, threshold_percent: 90, recharge_amount_chf: 50, recharge_credits: 100, max_recharges_per_month: 3, recharges_this_month: 0 };
+                                        setAiUsageData((prev: any) => ({ ...prev, _rechargeTick: Date.now() }));
+                                      });
+                                    }
+                                    const rc = _autoRechargeCache;
+                                    if (!rc) return null;
+
+                                    const saveRecharge = async (updates: any) => {
+                                      const newConfig = { ...rc, ...updates };
+                                      try {
+                                        await apiFetch('/ai/auto-recharge', { method: 'POST', body: JSON.stringify(newConfig) });
+                                        _autoRechargeCache = newConfig;
+                                        setAiUsageData((prev: any) => ({ ...prev, _rechargeTick: Date.now() }));
+                                        addToast_admin("Configuration mise à jour");
+                                      } catch { addToast_admin("Erreur"); }
+                                    };
+
+                                    return (
+                                      <div style={{ padding: "14px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.white, marginTop: 12 }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                            <Zap size={14} color="#F9A825" />
+                                            <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>Recharge automatique</span>
+                                          </div>
+                                          <button
+                                            onClick={() => saveRecharge({ enabled: !rc.enabled })}
+                                            style={{
+                                              position: "relative", width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
+                                              background: rc.enabled ? C.green : C.border, transition: "background .2s",
+                                            }}
+                                          >
+                                            <div style={{
+                                              position: "absolute", top: 2, left: rc.enabled ? 18 : 2, width: 16, height: 16,
+                                              borderRadius: "50%", background: "#fff", transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+                                            }} />
+                                          </button>
+                                        </div>
+
+                                        {rc.enabled ? (
+                                          <div style={{ fontSize: 11, color: C.textMuted }}>
+                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                                              <div>
+                                                <div style={{ marginBottom: 2, fontWeight: 500, color: C.text }}>Seuil de déclenchement</div>
+                                                <select
+                                                  value={rc.threshold_percent}
+                                                  onChange={(e) => saveRecharge({ threshold_percent: Number(e.target.value) })}
+                                                  style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, background: C.white, color: C.text }}
+                                                >
+                                                  {[50, 60, 70, 80, 90].map(v => <option key={v} value={v}>{v}% du plafond</option>)}
+                                                </select>
+                                              </div>
+                                              <div>
+                                                <div style={{ marginBottom: 2, fontWeight: 500, color: C.text }}>Montant par recharge</div>
+                                                <select
+                                                  value={rc.recharge_amount_chf}
+                                                  onChange={(e) => saveRecharge({ recharge_amount_chf: Number(e.target.value) })}
+                                                  style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, background: C.white, color: C.text }}
+                                                >
+                                                  {[10, 20, 50, 100, 200].map(v => <option key={v} value={v}>{v} CHF</option>)}
+                                                </select>
+                                              </div>
+                                              <div>
+                                                <div style={{ marginBottom: 2, fontWeight: 500, color: C.text }}>Max recharges / mois</div>
+                                                <select
+                                                  value={rc.max_recharges_per_month}
+                                                  onChange={(e) => saveRecharge({ max_recharges_per_month: Number(e.target.value) })}
+                                                  style={{ width: "100%", padding: "6px 8px", borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, background: C.white, color: C.text }}
+                                                >
+                                                  {[1, 2, 3, 5, 10].map(v => <option key={v} value={v}>{v} fois</option>)}
+                                                </select>
+                                              </div>
+                                              <div>
+                                                <div style={{ marginBottom: 2, fontWeight: 500, color: C.text }}>Recharges ce mois</div>
+                                                <div style={{ padding: "6px 8px", borderRadius: 6, background: C.bg, fontWeight: 600, color: C.text }}>{rc.recharges_this_month} / {rc.max_recharges_per_month}</div>
+                                              </div>
+                                            </div>
+                                            <div style={{ padding: "8px 10px", borderRadius: 6, background: C.blueLight, color: C.blue, fontSize: 10 }}>
+                                              Quand votre consommation atteint {rc.threshold_percent}% du plafond, {rc.recharge_amount_chf} CHF de crédits sont ajoutés automatiquement (max {rc.max_recharges_per_month}×/mois).
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div style={{ fontSize: 11, color: C.textMuted }}>
+                                            Activez la recharge automatique pour ne jamais être bloqué quand votre plafond IA est atteint.
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+
+                                  {/* Acheter des crédits + historique */}
+                                  <div style={{ padding: "14px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.white, marginTop: 12 }}>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                        <Plus size={14} color={C.green} />
+                                        <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>Acheter des crédits IA</span>
+                                      </div>
+                                    </div>
+                                    <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>
+                                      Achetez des crédits supplémentaires pour augmenter votre quota ce mois-ci. 1 CHF = 2 crédits IA.
+                                    </div>
+                                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                      {[10, 20, 50, 100].map(amt => (
+                                        <button key={amt} onClick={async () => {
+                                          if (!confirm(`Acheter ${amt * 2} crédits pour ${amt} CHF ? Le montant sera débité sur votre carte.`)) return;
+                                          try {
+                                            const res = await apiFetch('/ai/recharge', { method: 'POST', body: JSON.stringify({ amount_chf: amt }) });
+                                            if ((res as any).success) {
+                                              addToast_admin(`${(res as any).credits_added} crédits ajoutés pour ${amt} CHF`);
+                                              _spendingCapCache = null; _spendingCapLoading = false;
+                                              _autoRechargeCache = null; _autoRechargeLoading = false;
+                                              setAiUsageData((prev: any) => ({ ...prev, _capTick: Date.now() }));
+                                            } else {
+                                              addToast_admin((res as any).error || "Erreur de paiement");
+                                            }
+                                          } catch (e: any) {
+                                            addToast_admin(e?.message || "Erreur de paiement");
+                                          }
+                                        }} style={{
+                                          padding: "8px 16px", borderRadius: 8, border: `1px solid ${C.border}`,
+                                          background: C.white, cursor: "pointer", fontSize: 11, fontWeight: 600,
+                                          color: C.text, transition: "all .2s",
+                                        }}>
+                                          {amt} CHF <span style={{ color: C.textMuted, fontWeight: 400 }}>({amt * 2} crédits)</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Historique des recharges */}
+                                  {(() => {
+                                    if (!ctx._rechargeHistoryLoaded) {
+                                      ctx._rechargeHistoryLoaded = true;
+                                      apiFetch('/ai/recharges').then((d: any) => {
+                                        ctx._rechargeHistory = Array.isArray(d) ? d : [];
+                                        setAiUsageData((prev: any) => ({ ...prev, _histTick: Date.now() }));
+                                      }).catch(() => { ctx._rechargeHistory = []; });
+                                    }
+                                    const history = ctx._rechargeHistory;
+                                    if (!history || history.length === 0) return null;
+
+                                    return (
+                                      <div style={{ padding: "14px 16px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.white, marginTop: 12 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                                          <Clock size={14} color={C.textMuted} />
+                                          <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>Historique des recharges</span>
+                                        </div>
+                                        <div style={{ maxHeight: 200, overflow: "auto" }}>
+                                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                                            <thead>
+                                              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                                                <th style={{ textAlign: "left", padding: "4px 8px", color: C.textMuted, fontWeight: 500 }}>Date</th>
+                                                <th style={{ textAlign: "left", padding: "4px 8px", color: C.textMuted, fontWeight: 500 }}>Type</th>
+                                                <th style={{ textAlign: "right", padding: "4px 8px", color: C.textMuted, fontWeight: 500 }}>Crédits</th>
+                                                <th style={{ textAlign: "right", padding: "4px 8px", color: C.textMuted, fontWeight: 500 }}>Montant</th>
+                                                <th style={{ textAlign: "center", padding: "4px 8px", color: C.textMuted, fontWeight: 500 }}>Statut</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {history.map((r: any) => (
+                                                <tr key={r.id} style={{ borderBottom: `1px solid ${C.bg}` }}>
+                                                  <td style={{ padding: "6px 8px" }}>{new Date(r.created_at).toLocaleDateString('fr-CH')}</td>
+                                                  <td style={{ padding: "6px 8px" }}>{r.trigger === 'auto' ? 'Auto' : 'Manuel'}</td>
+                                                  <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 600 }}>+{r.credits_added}</td>
+                                                  <td style={{ padding: "6px 8px", textAlign: "right" }}>{r.amount_chf} CHF</td>
+                                                  <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                                                    <span style={{
+                                                      fontSize: 9, fontWeight: 600, padding: "2px 6px", borderRadius: 4,
+                                                      background: r.status === 'charged' ? C.greenLight : r.status === 'failed' ? C.redLight : C.bg,
+                                                      color: r.status === 'charged' ? C.green : r.status === 'failed' ? C.red : C.textMuted,
+                                                    }}>{r.status === 'charged' ? 'Payé' : r.status === 'failed' ? 'Échoué' : 'En cours'}</span>
+                                                  </td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                        {history.some((r: any) => r.invoice_number) && (
+                                          <div style={{ fontSize: 10, color: C.textMuted, marginTop: 8 }}>
+                                            Les recharges apparaissent sur votre prochaine facture mensuelle.
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               );
                             })()}
@@ -1091,66 +1800,140 @@ export function createAdminInlinePages(ctx: any) {
                   })()}
                   {subTab === "facturation" && (
                     <div>
+                      {/* ── Contact de facturation ── */}
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                         <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Contact de facturation</h3>
-                        <button className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "4px 12px" }}>{t('common.edit')}</button>
+                        <button onClick={() => setBillingContactEdit(!billingContactEdit)} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "4px 12px" }}>
+                          {billingContactEdit ? "Annuler" : t('common.edit')}
+                        </button>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "8px 20px", fontSize: 13 }}>
-                        <span style={{ color: C.textMuted }}>Prénom</span><span>{billingInfo.prenom || auth.user?.name?.split(" ")[0] || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Nom</span><span>{billingInfo.nom || auth.user?.name?.split(" ").slice(1).join(" ") || "—"}</span>
-                        <span style={{ color: C.textMuted }}>E-mail</span><span>{billingInfo.email || auth.user?.email || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Téléphone</span><span>{billingInfo.telephone || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Pays</span><span>{billingInfo.pays}</span>
-                      </div>
+                      {billingContactEdit ? (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Prénom</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.prenom} onChange={e => setBillingInfo({ ...billingInfo, prenom: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Nom</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.nom} onChange={e => setBillingInfo({ ...billingInfo, nom: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>E-mail</label><input type="email" style={{ ...sInput, width: "100%" }} value={billingInfo.email} onChange={e => setBillingInfo({ ...billingInfo, email: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Téléphone</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.telephone} onChange={e => setBillingInfo({ ...billingInfo, telephone: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Pays</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.pays} onChange={e => setBillingInfo({ ...billingInfo, pays: e.target.value })} /></div>
+                          <div style={{ gridColumn: "1/-1", display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+                            <button onClick={() => setBillingContactEdit(false)} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "6px 16px" }}>Annuler</button>
+                            <button onClick={async () => {
+                              try {
+                                await saveBillingContact({ prenom: billingInfo.prenom, nom: billingInfo.nom, email: billingInfo.email, telephone: billingInfo.telephone, pays: billingInfo.pays });
+                                setBillingContactEdit(false);
+                                addToast_admin("Contact de facturation enregistré");
+                              } catch { addToast_admin("Erreur lors de la sauvegarde"); }
+                            }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 11, padding: "6px 16px" }}>Enregistrer</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "8px 20px", fontSize: 13 }}>
+                          <span style={{ color: C.textMuted }}>Prénom</span><span>{billingInfo.prenom || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Nom</span><span>{billingInfo.nom || "—"}</span>
+                          <span style={{ color: C.textMuted }}>E-mail</span><span>{billingInfo.email || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Téléphone</span><span>{billingInfo.telephone || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Pays</span><span>{billingInfo.pays}</span>
+                        </div>
+                      )}
+                      {/* ── Informations de facturation ── */}
                       <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                         <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>Informations de facturation</h3>
-                        <button className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "4px 12px" }}>{t('common.edit')}</button>
+                        <button onClick={() => setBillingInfoEdit(!billingInfoEdit)} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "4px 12px" }}>
+                          {billingInfoEdit ? "Annuler" : t('common.edit')}
+                        </button>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "8px 20px", fontSize: 13 }}>
-                        <span style={{ color: C.textMuted }}>Entreprise</span><span>{billingInfo.company || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Numéro de TVA</span><span>{billingInfo.vat || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Rue</span><span>{billingInfo.rue || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Numéro</span><span>{billingInfo.numero || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Complément d'adresse</span><span>{billingInfo.complement || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Case postale</span><span>{billingInfo.case_postale || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Localité</span><span>{billingInfo.localite || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Code postal</span><span>{billingInfo.code_postal || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Ville</span><span>{billingInfo.ville || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Canton / Région</span><span>{billingInfo.canton || "—"}</span>
-                        <span style={{ color: C.textMuted }}>Pays</span><span>{billingInfo.pays_facturation || billingInfo.pays || "—"}</span>
-                      </div>
-                    </div>
-                  )}
-                  {subTab === "factures" && (
-                    <div>
-                      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 40px", gap: 0, padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight }}>
-                        <span>Facture</span><span>Statut</span><span>Date</span><span>Montant</span><span></span>
-                      </div>
-                      {activeSubs.length === 0 && <div style={{ padding: "30px 0", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucune facture</div>}
-                      {activeSubs.map((sub: any, i: number) => (
-                        <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 40px", gap: 0, padding: "12px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13 }}>
-                          <span style={{ color: C.blue, fontWeight: 500 }}>#INV{String(sub.id).padStart(7, "0")}</span>
-                          <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: C.greenLight, color: C.green, justifySelf: "start" }}>{sub.status === "trialing" ? "Essai" : "Payée"}</span>
-                          <span style={{ color: C.textMuted }}>{fmtDate(sub.current_period_start)}</span>
-                          <span style={{ fontWeight: 600 }}>{Number(sub.plan?.prix_chf_mensuel || 0) * 25} CHF</span>
-                          <button style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted }}><MoreHorizontal size={16} /></button>
+                      {billingInfoEdit ? (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                          <div style={{ gridColumn: "1/-1" }}><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Entreprise</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.company} onChange={e => setBillingInfo({ ...billingInfo, company: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Numéro de TVA</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.vat} onChange={e => setBillingInfo({ ...billingInfo, vat: e.target.value })} placeholder="CHE-xxx.xxx.xxx" /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Rue</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.rue} onChange={e => setBillingInfo({ ...billingInfo, rue: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Numéro</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.numero} onChange={e => setBillingInfo({ ...billingInfo, numero: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Complément d'adresse</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.complement} onChange={e => setBillingInfo({ ...billingInfo, complement: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Case postale</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.case_postale} onChange={e => setBillingInfo({ ...billingInfo, case_postale: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Localité</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.localite} onChange={e => setBillingInfo({ ...billingInfo, localite: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Code postal</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.code_postal} onChange={e => setBillingInfo({ ...billingInfo, code_postal: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Ville</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.ville} onChange={e => setBillingInfo({ ...billingInfo, ville: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Canton / Région</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.canton} onChange={e => setBillingInfo({ ...billingInfo, canton: e.target.value })} /></div>
+                          <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Pays</label><input style={{ ...sInput, width: "100%" }} value={billingInfo.pays_facturation || billingInfo.pays} onChange={e => setBillingInfo({ ...billingInfo, pays_facturation: e.target.value })} /></div>
+                          <div style={{ gridColumn: "1/-1", display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+                            <button onClick={() => setBillingInfoEdit(false)} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "6px 16px" }}>Annuler</button>
+                            <button onClick={async () => {
+                              try {
+                                await apiSaveBillingInfo({ company: billingInfo.company, vat: billingInfo.vat, rue: billingInfo.rue, numero: billingInfo.numero, complement: billingInfo.complement, case_postale: billingInfo.case_postale, localite: billingInfo.localite, code_postal: billingInfo.code_postal, ville: billingInfo.ville, canton: billingInfo.canton, pays_facturation: billingInfo.pays_facturation || billingInfo.pays });
+                                setBillingInfoEdit(false);
+                                addToast_admin("Informations de facturation enregistrées");
+                              } catch { addToast_admin("Erreur lors de la sauvegarde"); }
+                            }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 11, padding: "6px 16px" }}>Enregistrer</button>
+                          </div>
                         </div>
-                      ))}
+                      ) : (
+                        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "8px 20px", fontSize: 13 }}>
+                          <span style={{ color: C.textMuted }}>Entreprise</span><span>{billingInfo.company || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Numéro de TVA</span><span>{billingInfo.vat || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Rue</span><span>{billingInfo.rue || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Numéro</span><span>{billingInfo.numero || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Complément d'adresse</span><span>{billingInfo.complement || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Case postale</span><span>{billingInfo.case_postale || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Localité</span><span>{billingInfo.localite || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Code postal</span><span>{billingInfo.code_postal || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Ville</span><span>{billingInfo.ville || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Canton / Région</span><span>{billingInfo.canton || "—"}</span>
+                          <span style={{ color: C.textMuted }}>Pays</span><span>{billingInfo.pays_facturation || billingInfo.pays || "—"}</span>
+                        </div>
+                      )}
                     </div>
                   )}
+                  {subTab === "factures" && (() => {
+                    const STATUS_LABELS: Record<string, { label: string; bg: string; color: string }> = {
+                      draft: { label: "Brouillon", bg: C.bg, color: C.textMuted },
+                      sent: { label: "Envoyée", bg: C.blueLight, color: C.blue },
+                      paid: { label: "Payée", bg: C.greenLight, color: C.green },
+                      processing: { label: "En cours", bg: C.amberLight, color: C.amber },
+                      failed: { label: "Échouée", bg: C.redLight, color: C.red },
+                      canceled: { label: "Annulée", bg: C.bg, color: C.textMuted },
+                      refunded: { label: "Remboursée", bg: C.amberLight, color: C.amber },
+                      disputed: { label: "Contestée", bg: C.redLight, color: C.red },
+                    };
+                    // Load invoices on first display
+                    if (!(_invoicesLoaded)) {
+                      _invoicesLoaded = true;
+                      getInvoices().then(setInvoicesList).catch(() => {});
+                    }
+                    return (
+                    <div>
+                      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 0, padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight }}>
+                        <span>Facture</span><span>Plan</span><span>Statut</span><span>Date</span><span>Montant TTC</span>
+                      </div>
+                      {invoicesList.length === 0 && <div style={{ padding: "30px 0", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucune facture</div>}
+                      {invoicesList.map((inv: any) => {
+                        const st = STATUS_LABELS[inv.status] || STATUS_LABELS.draft;
+                        return (
+                        <div key={inv.id} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 0, padding: "12px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13 }}>
+                          <span style={{ color: C.blue, fontWeight: 500 }}>{inv.invoice_number}</span>
+                          <span style={{ fontSize: 12, color: C.textMuted }}>{inv.plan?.nom || "—"}</span>
+                          <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: st.bg, color: st.color, justifySelf: "start" }}>{st.label}</span>
+                          <span style={{ color: C.textMuted }}>{fmtDate(inv.date_emission)}</span>
+                          <span style={{ fontWeight: 600 }}>{inv.montant_ttc} {inv.currency?.toUpperCase()}</span>
+                        </div>
+                        );
+                      })}
+                    </div>
+                    );
+                  })()}
                   {subTab === "paiement" && (() => {
-                    // Default to invoice if stripe not configured
-                    const stripeConfigured = false; // TODO: check real Stripe status
+                    const stripeConfigured = stripeMethods.length > 0;
+                    const defaultCard = stripeMethods.find(m => m.is_default) || stripeMethods[0];
                     const activeMethod = paymentMethod || (stripeConfigured ? "stripe" : "invoice");
+                    const BRAND_ICONS: Record<string, string> = { visa: "💳 Visa", mastercard: "💳 Mastercard", amex: "💳 Amex", discover: "💳 Discover" };
+                    const loadMethods = () => { getStripePaymentMethods().then(r => setStripeMethods(r.methods || [])).catch(() => {}); };
 
                     return (
                     <div>
                       <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Méthode de paiement active</h3>
                       <p style={{ fontSize: 12, color: C.textMuted, marginBottom: 16 }}>Sélectionnez votre méthode de paiement préférée. Au moins une méthode doit être active.</p>
                       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                        {/* Stripe */}
+                        {/* ── Stripe Card ── */}
                         <div style={{ border: activeMethod === "stripe" ? `2px solid #635BFF` : `1px solid ${C.border}`, borderRadius: 10, padding: "16px 20px", cursor: "pointer", transition: "all .2s", background: activeMethod === "stripe" ? "#635BFF08" : C.white }}
-                          onClick={() => { if (stripeConfigured) setPaymentMethod("stripe"); else addToast_admin("Configurez d'abord votre carte bancaire via Stripe"); }}>
+                          onClick={async () => { if (stripeConfigured) { setPaymentMethod("stripe"); try { await updateCompanySettings({ payment_method: "stripe" }); addToast_admin("Mode de paiement mis à jour : Carte bancaire"); } catch {} } else { if (!stripePromise) createStripeSetupIntent().then(r => { if (r.publishable_key) setStripePromise(lazyLoadStripe(r.publishable_key)); }).catch(() => addToast_admin("Impossible de charger Stripe")); setStripeModalOpen(true); } }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                               <div style={{ width: 40, height: 40, borderRadius: 8, background: "#635BFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1174,14 +1957,64 @@ export function createAdminInlinePages(ctx: any) {
                           <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "6px 16px", fontSize: 12, padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
                             <span style={{ color: C.textMuted }}>Statut</span>
                             <span style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: stripeConfigured ? C.green : C.textMuted }} /> {stripeConfigured ? "Configuré" : "Non configuré"}</span>
-                            <span style={{ color: C.textMuted }}>Carte enregistrée</span><span>—</span>
-                            <span style={{ color: C.textMuted }}>Prochaine facturation</span><span>—</span>
+                            <span style={{ color: C.textMuted }}>Carte enregistrée</span>
+                            <span>{defaultCard ? `${BRAND_ICONS[defaultCard.brand] || defaultCard.brand} •••• ${defaultCard.last4} — exp. ${String(defaultCard.exp_month).padStart(2, "0")}/${defaultCard.exp_year}` : "—"}</span>
+                            <span style={{ color: C.textMuted }}>Prochaine facturation</span><span>{currentOnboardingSub?.current_period_end ? fmtDate(currentOnboardingSub.current_period_end) : "—"}</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
+                            <button onClick={() => { if (!stripePromise) createStripeSetupIntent().then(r => { if (r.publishable_key) setStripePromise(lazyLoadStripe(r.publishable_key)); }).catch(() => addToast_admin("Impossible de charger Stripe")); loadMethods(); setStripeModalOpen(true); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px", borderColor: "#635BFF", color: "#635BFF" }}>
+                              {stripeConfigured ? "Gérer les cartes" : "Configurer"}
+                            </button>
+                            {stripeMethods.length > 1 && stripeMethods.filter(m => !m.is_default).map(m => (
+                              <button key={m.id} onClick={async () => {
+                                try { await deleteStripePaymentMethod(m.id); loadMethods(); addToast_admin("Carte supprimée"); } catch { addToast_admin("Erreur"); }
+                              }} style={{ background: "none", border: "none", fontSize: 11, color: C.red, cursor: "pointer" }}>
+                                Supprimer •••• {m.last4}
+                              </button>
+                            ))}
                           </div>
                         </div>
 
-                        {/* Invoice */}
+                        {/* ── SEPA Direct Debit ── */}
+                        <div style={{ border: activeMethod === "sepa" ? `2px solid #00897B` : `1px solid ${C.border}`, borderRadius: 10, padding: "16px 20px", cursor: "pointer", transition: "all .2s", background: activeMethod === "sepa" ? "#E0F2F108" : C.white }}
+                          onClick={async () => {
+                            const sepaMethod = stripeMethods.find((m: any) => m.type === "sepa_debit");
+                            if (sepaMethod) { setPaymentMethod("sepa"); try { await updateCompanySettings({ payment_method: "sepa" }); addToast_admin("Mode de paiement mis à jour : Prélèvement SEPA"); } catch {} }
+                            else { if (!stripePromise) createStripeSetupIntent().then(r => { if (r.publishable_key) setStripePromise(lazyLoadStripe(r.publishable_key)); }).catch(() => addToast_admin("Impossible de charger Stripe")); setPaymentMethod("sepa"); setStripeModalOpen(true); }
+                          }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div style={{ width: 40, height: 40, borderRadius: 8, background: "#00897B", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <Landmark size={18} color="#fff" />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+                                  Prélèvement SEPA
+                                  {activeMethod === "sepa" && <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 9, fontWeight: 700, background: "#00897B", color: "#fff" }}>ACTIF</span>}
+                                </div>
+                                <div style={{ fontSize: 12, color: C.textMuted }}>Débit direct sur votre compte bancaire via IBAN</div>
+                              </div>
+                            </div>
+                            <div style={{ width: 22, height: 22, borderRadius: "50%", border: activeMethod === "sepa" ? "none" : `2px solid ${C.border}`, background: activeMethod === "sepa" ? "#00897B" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              {activeMethod === "sepa" && <Check size={13} color="#fff" />}
+                            </div>
+                          </div>
+                          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "6px 16px", fontSize: 12, padding: "10px 14px", background: C.bg, borderRadius: 8 }}>
+                            <span style={{ color: C.textMuted }}>Statut</span>
+                            {(() => { const sepaMethod = stripeMethods.find((m: any) => m.type === "sepa_debit"); return (
+                              <span style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 8, height: 8, borderRadius: "50%", background: sepaMethod ? C.green : C.textMuted }} /> {sepaMethod ? "Configuré" : "Non configuré"}</span>
+                            ); })()}
+                            <span style={{ color: C.textMuted }}>IBAN enregistré</span>
+                            {(() => { const sepaMethod = stripeMethods.find((m: any) => m.type === "sepa_debit"); return (
+                              <span>{sepaMethod ? `•••• ${sepaMethod.last4} ${sepaMethod.country || ""}` : "—"}</span>
+                            ); })()}
+                            <span style={{ color: C.textMuted }}>Délai de prélèvement</span><span>5-7 jours ouvrés</span>
+                          </div>
+                        </div>
+
+                        {/* ── Invoice ── */}
                         <div style={{ border: activeMethod === "invoice" ? `2px solid ${C.blue}` : `1px solid ${C.border}`, borderRadius: 10, padding: "16px 20px", cursor: "pointer", transition: "all .2s", background: activeMethod === "invoice" ? C.blueLight + "30" : C.white }}
-                          onClick={() => setPaymentMethod("invoice")}>
+                          onClick={async () => { setPaymentMethod("invoice"); try { await updateCompanySettings({ payment_method: "invoice" }); addToast_admin("Mode de paiement mis à jour : Facture"); } catch {} }}>
                           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                               <div style={{ width: 40, height: 40, borderRadius: 8, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1208,10 +2041,90 @@ export function createAdminInlinePages(ctx: any) {
                               <div>BIC: <span style={{ fontWeight: 600 }}>UBSWCHZH80A</span></div>
                               <div style={{ color: C.textMuted, marginTop: 6, fontSize: 11 }}>UBS Switzerland AG, Bahnhofstrasse 45, 8048 Zürich</div>
                             </div>
+                            <span style={{ color: C.textMuted }}>Email de réception</span><span>{invoiceConfig.invoice_email || billingInfo.email || auth.user?.email || "—"}</span>
+                            <span style={{ color: C.textMuted }}>Numéro PO</span><span>{invoiceConfig.po_number || "—"}</span>
                             <span style={{ color: C.textMuted }}>Délai de paiement</span><span>30 jours net</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, marginTop: 12 }} onClick={e => e.stopPropagation()}>
+                            <button onClick={() => setInvoiceConfigOpen(true)} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 14px" }}>
+                              Configurer facture
+                            </button>
                           </div>
                         </div>
                       </div>
+
+                      {/* ── Stripe Card Modal ── */}
+                      {stripeModalOpen && (() => {
+                        const isSepaMode = paymentMethod === "sepa";
+                        const modalColor = isSepaMode ? "#00897B" : "#635BFF";
+                        return (
+                        <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.45)" }} onClick={() => setStripeModalOpen(false)}>
+                          <div style={{ background: C.white, borderRadius: 16, width: 520, maxWidth: "95vw", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,.2)" }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 8, background: modalColor, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  {isSepaMode ? <Landmark size={18} color="#fff" /> : <span style={{ color: "#fff", fontWeight: 700, fontSize: 13 }}>S</span>}
+                                </div>
+                                <div>
+                                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{isSepaMode ? "Configurer prélèvement SEPA" : "Configurer carte bancaire"}</h3>
+                                  <p style={{ fontSize: 12, color: C.textMuted, margin: 0 }}>{isSepaMode ? "Débit direct sur votre compte bancaire" : "Paiement sécurisé via Stripe"}</p>
+                                </div>
+                              </div>
+                              <button onClick={() => setStripeModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={C.textMuted} /></button>
+                            </div>
+                            {stripePromise ? (
+                              <Elements stripe={stripePromise}>
+                                <StripeCardFormInner billingInfo={billingInfo} auth={auth} stripeMethods={stripeMethods} setStripeMethods={setStripeMethods} setPaymentMethod={setPaymentMethod} setStripeModalOpen={setStripeModalOpen} addToast_admin={addToast_admin} loadMethods={loadMethods} isSepa={isSepaMode} />
+                              </Elements>
+                            ) : (
+                              <div style={{ textAlign: "center", padding: "30px 0", color: C.textMuted, fontSize: 13 }}>Chargement de Stripe...</div>
+                            )}
+                          </div>
+                        </div>
+                        );
+                      })()}
+
+                      {/* ── Invoice Config Modal ── */}
+                      {invoiceConfigOpen && (
+                        <div style={{ position: "fixed", inset: 0, zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.45)" }} onClick={() => setInvoiceConfigOpen(false)}>
+                          <div style={{ background: C.white, borderRadius: 16, width: 460, maxWidth: "95vw", padding: 28, boxShadow: "0 20px 60px rgba(0,0,0,.2)" }} onClick={e => e.stopPropagation()}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 8, background: C.blue, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <FileText size={18} color="#fff" />
+                                </div>
+                                <div>
+                                  <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Configuration facture</h3>
+                                  <p style={{ fontSize: 12, color: C.textMuted, margin: 0 }}>Paramètres de réception des factures</p>
+                                </div>
+                              </div>
+                              <button onClick={() => setInvoiceConfigOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><X size={18} color={C.textMuted} /></button>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                              <div>
+                                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Email de réception des factures</label>
+                                <input type="email" style={{ ...sInput, width: "100%" }} value={invoiceConfig.invoice_email} onChange={e => setInvoiceConfig({ ...invoiceConfig, invoice_email: e.target.value })} placeholder={billingInfo.email || auth.user?.email || "comptabilite@entreprise.ch"} />
+                                <p style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Adresse email où les factures seront envoyées</p>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Numéro de bon de commande (PO)</label>
+                                <input style={{ ...sInput, width: "100%" }} value={invoiceConfig.po_number} onChange={e => setInvoiceConfig({ ...invoiceConfig, po_number: e.target.value })} placeholder="PO-2024-001 (optionnel)" />
+                                <p style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Référence interne à inclure sur les factures</p>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+                              <button onClick={() => setInvoiceConfigOpen(false)} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 12, padding: "8px 20px" }}>Annuler</button>
+                              <button onClick={async () => {
+                                try {
+                                  await apiSaveInvoiceConfig({ invoice_email: invoiceConfig.invoice_email, po_number: invoiceConfig.po_number });
+                                  setInvoiceConfigOpen(false);
+                                  addToast_admin("Configuration facture enregistrée");
+                                } catch { addToast_admin("Erreur lors de la sauvegarde"); }
+                              }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, padding: "8px 20px" }}>Enregistrer</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     );
                   })()}
@@ -1270,24 +2183,24 @@ export function createAdminInlinePages(ctx: any) {
 Les instructions doivent être transmises par écrit (email ou via la plateforme). Illizeo n'exécute aucune instruction verbale concernant le traitement de données personnelles.
 
 Tout changement dans la liste des personnes autorisées doit être notifié à Illizeo par le représentant légal du Client.` },
-                      { id: "soustraitants", title: "Sous-traitants", content: `Illizeo fait appel aux sous-traitants suivants pour le traitement des données :
-
-| Sous-traitant | Fonction | Localisation |
-|---|---|---|
-| **Infomaniak** | Hébergement serveurs et bases de données | Suisse (Genève) |
-| **Anthropic (Claude)** | Intelligence artificielle — OCR pièces d'identité, analyse de documents (si add-on IA souscrit) | États-Unis* |
-| **Mailtrap** | Envoi d'emails transactionnels | UE (Pologne) |
-
-*Anthropic : les données envoyées à l'API Claude (images de documents) ne sont pas stockées par Anthropic et ne sont pas utilisées pour l'entraînement des modèles (politique zero-retention de l'API). Le traitement est ponctuel et les données ne transitent que le temps de l'analyse.
-
-**Intégrations optionnelles configurées par le Client :**
-Ces services ne sont activés que si le Client les configure explicitement dans les paramètres d'intégration :
-- DocuSign / UgoSign — Signature électronique (localisation selon le fournisseur)
-- Microsoft Entra ID — SSO et provisionnement (Microsoft, UE/US)
-- Slack / Microsoft Teams — Notifications (localisation selon le fournisseur)
-- SIRH tiers (Personio, BambooHR, Workday, Lucca, etc.) — Synchronisation des données RH
-
-Le Client est informé préalablement de tout changement de sous-traitant et dispose d'un droit d'opposition.` },
+                      { id: "soustraitants", title: "Sous-traitants", html: true, content: `<p>Illizeo fait appel aux sous-traitants suivants pour le traitement des données :</p>
+<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:13px">
+<thead><tr style="background:#f8f9fa;text-align:left"><th style="padding:8px 12px;border:1px solid #e0e0e0;font-weight:600">Sous-traitant</th><th style="padding:8px 12px;border:1px solid #e0e0e0;font-weight:600">Fonction</th><th style="padding:8px 12px;border:1px solid #e0e0e0;font-weight:600">Localisation</th></tr></thead>
+<tbody>
+<tr><td style="padding:8px 12px;border:1px solid #e0e0e0"><strong>Infomaniak</strong></td><td style="padding:8px 12px;border:1px solid #e0e0e0">Hébergement serveurs et bases de données</td><td style="padding:8px 12px;border:1px solid #e0e0e0">Suisse (Genève)</td></tr>
+<tr><td style="padding:8px 12px;border:1px solid #e0e0e0"><strong>Anthropic (Claude)</strong></td><td style="padding:8px 12px;border:1px solid #e0e0e0">Intelligence artificielle — OCR pièces d'identité, analyse de documents (si add-on IA souscrit)</td><td style="padding:8px 12px;border:1px solid #e0e0e0">États-Unis*</td></tr>
+<tr><td style="padding:8px 12px;border:1px solid #e0e0e0"><strong>Mailtrap</strong></td><td style="padding:8px 12px;border:1px solid #e0e0e0">Envoi d'emails transactionnels</td><td style="padding:8px 12px;border:1px solid #e0e0e0">UE (Pologne)</td></tr>
+</tbody></table>
+<p style="font-size:11px;color:#888;margin-top:8px">*Anthropic : les données envoyées à l'API Claude (images de documents) ne sont pas stockées par Anthropic et ne sont pas utilisées pour l'entraînement des modèles (politique zero-retention de l'API). Le traitement est ponctuel et les données ne transitent que le temps de l'analyse.</p>
+<p style="font-weight:600;margin-top:16px">Intégrations optionnelles configurées par le Client :</p>
+<p>Ces services ne sont activés que si le Client les configure explicitement dans les paramètres d'intégration :</p>
+<ul style="margin:8px 0;padding-left:20px">
+<li>DocuSign / UgoSign — Signature électronique (localisation selon le fournisseur)</li>
+<li>Microsoft Entra ID — SSO et provisionnement (Microsoft, UE/US)</li>
+<li>Slack / Microsoft Teams — Notifications (localisation selon le fournisseur)</li>
+<li>SIRH tiers (Personio, BambooHR, Workday, Lucca, etc.) — Synchronisation des données RH</li>
+</ul>
+<p>Le Client est informé préalablement de tout changement de sous-traitant et dispose d'un droit d'opposition.</p>` },
                     ];
                     return (
                     <div>
@@ -1302,7 +2215,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
                           </div>
                           {openSection === section.id && (
                             <div style={{ padding: "0 20px 20px", fontSize: 13, color: C.text, lineHeight: 1.7 }}>
-                              {section.content.split("\n").map((line: string, li: number) => {
+                              {(section as any).html ? <div dangerouslySetInnerHTML={{ __html: section.content }} /> : section.content.split("\n").map((line: string, li: number) => {
                                 // Parse bold **text**
                                 const parts = line.split(/\*\*(.*?)\*\*/g);
                                 const rendered = parts.map((part: string, pi: number) => pi % 2 === 1 ? <b key={pi}>{part}</b> : part);
@@ -1324,11 +2237,89 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
                 </div>
               </div>
 
-              {/* Gérer les apps */}
-              <div style={{ marginTop: 24 }}>
+              {/* ═══ Support Access — visible in protection tab ═══ */}
+              {subTab === "protection" && (() => {
+                if (!_supportAccessLoaded) { _supportAccessLoaded = true; getSupportAccesses().then(setSupportAccesses).catch(() => {}); }
+                const MODULE_OPTIONS = ["onboarding","offboarding","crossboarding","cooptation","nps","signature","api"];
+                return (
+                <div style={{ marginTop: 24, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 24px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Accès support Illizeo</h3>
+                      <p style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 0" }}>Accordez un accès temporaire à un employé Illizeo pour le diagnostic de bugs. Toutes les actions sont tracées.</p>
+                    </div>
+                    <button onClick={() => setSupportAccessForm({ open: true, email: "support@illizeo.com", modules: null, reason: "", hours: 24 })} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Accorder un accès</button>
+                  </div>
+
+                  {/* Grant form */}
+                  {supportAccessForm?.open && (
+                    <div style={{ border: `1px solid ${C.blue}`, borderRadius: 10, padding: "16px 20px", marginBottom: 16, background: C.blueLight + "20" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                        <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Email du support *</label><input style={{ ...sInput, width: "100%" }} value={supportAccessForm.email} onChange={e => setSupportAccessForm({ ...supportAccessForm, email: e.target.value })} /></div>
+                        <div><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Durée (heures)</label>
+                          <select style={{ ...sInput, width: "100%" }} value={supportAccessForm.hours} onChange={e => setSupportAccessForm({ ...supportAccessForm, hours: Number(e.target.value) })}>
+                            <option value={1}>1 heure</option><option value={4}>4 heures</option><option value={8}>8 heures</option>
+                            <option value={24}>24 heures</option><option value={72}>3 jours</option><option value={168}>7 jours</option>
+                          </select>
+                        </div>
+                        <div style={{ gridColumn: "1/-1" }}><label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 4 }}>Raison</label><input style={{ ...sInput, width: "100%" }} value={supportAccessForm.reason} onChange={e => setSupportAccessForm({ ...supportAccessForm, reason: e.target.value })} placeholder="Ex: Bug sur la page parcours" /></div>
+                        <div style={{ gridColumn: "1/-1" }}>
+                          <label style={{ fontSize: 11, color: C.textMuted, display: "block", marginBottom: 6 }}>Modules autorisés</label>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button onClick={() => setSupportAccessForm({ ...supportAccessForm, modules: null })} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: `1px solid ${supportAccessForm.modules === null ? C.pink : C.border}`, background: supportAccessForm.modules === null ? C.pinkBg : C.white, color: supportAccessForm.modules === null ? C.pink : C.text, cursor: "pointer", fontFamily: font }}>Tous</button>
+                            {MODULE_OPTIONS.map(m => {
+                              const sel = supportAccessForm.modules?.includes(m);
+                              return <button key={m} onClick={() => {
+                                const curr = supportAccessForm.modules || [];
+                                setSupportAccessForm({ ...supportAccessForm, modules: sel ? curr.filter((x: string) => x !== m) : [...curr, m] });
+                              }} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 6, border: `1px solid ${sel ? C.blue : C.border}`, background: sel ? C.blueLight : C.white, color: sel ? C.blue : C.text, cursor: "pointer", fontFamily: font }}>{m}</button>;
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <button onClick={() => setSupportAccessForm(null)} style={{ ...sBtn("outline"), fontSize: 11, padding: "6px 16px" }}>Annuler</button>
+                        <button onClick={async () => {
+                          try {
+                            const res = await grantSupportAccess({ email: supportAccessForm.email, allowed_modules: supportAccessForm.modules, reason: supportAccessForm.reason, duration_hours: supportAccessForm.hours });
+                            addToast_admin(res.message || "Accès accordé");
+                            setSupportAccessForm(null);
+                            _supportAccessLoaded = false;
+                            getSupportAccesses().then(setSupportAccesses).catch(() => {});
+                          } catch { addToast_admin("Erreur lors de l'octroi de l'accès"); }
+                        }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 11, padding: "6px 16px" }}>Accorder l'accès</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active accesses list */}
+                  {(supportAccesses || []).length === 0 && <div style={{ padding: "20px 0", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucun accès support en cours</div>}
+                  {(supportAccesses || []).map((a: any) => (
+                    <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: `1px solid ${a.is_active ? C.green : C.border}`, borderRadius: 8, marginBottom: 6, background: a.is_active ? C.greenLight + "20" : C.bg }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 8, background: a.is_active ? C.greenLight : C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        {a.is_active ? <CheckCircle size={18} color={C.green} /> : <Clock size={18} color={C.textMuted} />}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{a.email} {a.is_active && <span style={{ fontSize: 10, color: C.green, fontWeight: 600 }}>Actif</span>}{!a.is_active && <span style={{ fontSize: 10, color: C.textMuted }}>Expiré</span>}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted }}>{a.reason || "—"} · Modules : {a.allowed_modules ? a.allowed_modules.join(", ") : "Tous"} · Par {a.granted_by}</div>
+                        <div style={{ fontSize: 10, color: C.textMuted }}>Expire : {fmtDateTime(a.expires_at)}{a.last_used_at ? ` · Dernière utilisation : ${fmtDateTime(a.last_used_at)}` : ""}</div>
+                      </div>
+                      {a.is_active && (
+                        <button onClick={async () => {
+                          try { await revokeSupportAccess(a.id); addToast_admin("Accès révoqué"); _supportAccessLoaded = false; getSupportAccesses().then(setSupportAccesses).catch(() => {}); } catch { addToast_admin("Erreur"); }
+                        }} style={{ ...sBtn("outline"), fontSize: 11, padding: "5px 12px", color: C.red, borderColor: C.red }}>Révoquer</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                );
+              })()}
+
+              {/* Gérer les apps — visible uniquement dans l'onglet Facturation si un plan est souscrit */}
+              {hasActiveSub && subTab === "factures" && <div style={{ marginTop: 24 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                   <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Gérer les apps</h2>
-                  <button onClick={() => setSubView("change")} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Ajouter app</button>
+                  <button onClick={() => { setSubStep("apps"); setSubView("change"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> Ajouter app</button>
                 </div>
                 {tenantActiveModules.length === 0 ? (
                   <div style={{ padding: "30px 0", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucune app active. Souscrivez à un plan pour activer des modules.</div>
@@ -1360,7 +2351,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
                   </div>
                   );
                 })}
-              </div>
+              </div>}
             </>)}
           </div>
           );
@@ -1421,7 +2412,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
   let _sectionDragTo: number | null = null;
   // Sections order stored in state-like closure
   const SECTION_DEFS_DEFAULT = [
-    { key: "personal", label: t('fields.personal'), icon: Users, color: "#C2185B" },
+    { key: "personal", label: t('fields.personal'), icon: Users, color: "#E41076" },
     { key: "contract", label: t('fields.contract'), icon: FileSignature, color: "#1A73E8" },
     { key: "job", label: t('fields.job'), icon: ClipboardList, color: "#E65100" },
     { key: "position", label: t('fields.position'), icon: Navigation, color: "#00897B" },
@@ -1575,7 +2566,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
 
   const renderAdminApparence = () => {
           const THEME_PRESETS = [
-            { name: "Illizeo Pink", color: "#C2185B" },
+            { name: "Illizeo Pink", color: "#E41076" },
             { name: "Ocean Blue", color: "#1A73E8" },
             { name: "Forest Green", color: "#2E7D32" },
             { name: "Royal Purple", color: "#7B5EA7" },
@@ -1645,7 +2636,6 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
             { code: "IR", label: "Iran", flag: "🇮🇷", currency: "IRR" },
             { code: "IQ", label: "Irak", flag: "🇮🇶", currency: "IQD" },
             { code: "IE", label: "Irlande", flag: "🇮🇪", currency: "EUR" },
-            { code: "IL", label: "Israël", flag: "🇮🇱", currency: "ILS" },
             { code: "IT", label: "Italie", flag: "🇮🇹", currency: "EUR" },
             { code: "JM", label: "Jamaïque", flag: "🇯🇲", currency: "JMD" },
             { code: "JP", label: "Japon", flag: "🇯🇵", currency: "JPY" },
@@ -1676,6 +2666,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
             { code: "NO", label: "Norvège", flag: "🇳🇴", currency: "NOK" },
             { code: "OM", label: "Oman", flag: "🇴🇲", currency: "OMR" },
             { code: "PK", label: "Pakistan", flag: "🇵🇰", currency: "PKR" },
+            { code: "PS", label: "Palestine", flag: "🇵🇸", currency: "ILS" },
             { code: "PA", label: "Panama", flag: "🇵🇦", currency: "PAB" },
             { code: "PY", label: "Paraguay", flag: "🇵🇾", currency: "PYG" },
             { code: "PE", label: "Pérou", flag: "🇵🇪", currency: "PEN" },
@@ -2180,14 +3171,9 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 {equipTab === "inventaire" && <button onClick={() => { resetTr(); setEquipPanel({ mode: "create", data: { equipment_type_id: equipTypes[0]?.id || "", nom: "", numero_serie: "", marque: "", modele: "", etat: "disponible", date_achat: "", valeur: "", notes: "" } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.add')}</button>}
-                {equipTab === "packages" && <button onClick={() => { resetTr(); setPkgPanel({ mode: "create", data: { nom: "", description: "", icon: "package", couleur: "#C2185B", items: [{ equipment_type_id: equipTypes[0]?.id || "", quantite: 1, notes: "" }] } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.new_package')}</button>}
+                {equipTab === "packages" && <button onClick={() => { resetTr(); setPkgPanel({ mode: "create", data: { nom: "", description: "", icon: "package", couleur: "#E41076", items: [{ equipment_type_id: equipTypes[0]?.id || "", quantite: 1, notes: "" }] } }); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.new_package')}</button>}
                 {equipTab === "types" && <button onClick={() => {
-                  showPrompt(t('equip.type_prompt'), (nom) => {
-                    if (!nom) return;
-                    showPrompt(t('equip.cat_prompt'), async (cat) => {
-                      try { await apiCreateEquipType({ nom, categorie: cat === "licence" ? "licence" : "materiel", icon: cat === "licence" ? "key" : "package" }); reloadEquip(); addToast_admin(t('equip.type_created')); } catch { addToast_admin(t('toast.error')); }
-                    }, { label: t('equip.cat_label'), defaultValue: "materiel" });
-                  });
+                  setEquipPanel({ mode: "type" as any, data: { nom: "", description: "", icon: "package", categorie: "materiel", actif: true } });
                 }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('equip.new_type')}</button>}
               </div>
             </div>
@@ -2268,7 +3254,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
                         }} title={t('equip.assign')} style={{ background: C.blueLight, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><UserPlus size={12} color={C.blue} /></button>
                       )}
                       {eq.etat === "attribue" && (
-                        <button onClick={() => apiUnassignEquip(eq.id).then(reloadEquip).catch(() => addToast_admin(t('toast.error')))} title="Restituer" style={{ background: C.amberLight, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><RotateCcw size={12} color={C.amber} /></button>
+                        <button onClick={() => setEquipPanel({ mode: "return" as any, data: { id: eq.id, nom: eq.nom, collaborateur_name: eq.collaborateur ? `${eq.collaborateur.prenom} ${eq.collaborateur.nom}` : "", returned_at: new Date().toISOString().slice(0, 10), etat: "disponible", notes: "" } })} title="Restituer" style={{ background: C.amberLight, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><RotateCcw size={12} color={C.amber} /></button>
                       )}
                       <button onClick={() => { setContentTranslations((eq as any).translations || {}); setEquipPanel({ mode: "edit", data: { ...eq, equipment_type_id: eq.equipment_type_id } }); }} title="Modifier" style={{ background: C.bg, border: "none", borderRadius: 6, padding: 4, cursor: "pointer" }}><FilePen size={12} color={C.textMuted} /></button>
                       <button onClick={() => showConfirm(`Supprimer "${eq.nom}" ?`, async () => { try { await apiDeleteEquip(eq.id); reloadEquip(); addToast_admin(t('toast.deleted')); } catch {} })} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}><Trash size={12} color={C.red} /></button>
@@ -2347,6 +3333,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
                               <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 6 }}>{et.description || "—"}</div>
                               {et.equipments_count !== undefined && <div style={{ fontSize: 10, color: C.textMuted }}>{et.equipments_count} {t('equip.in_inventory')}</div>}
                               <div style={{ display: "flex", gap: 4, justifyContent: "center", marginTop: 8 }}>
+                                <button onClick={() => setEquipPanel({ mode: "type_edit" as any, data: { id: et.id, nom: et.nom, description: et.description || "", icon: et.icon || "package", categorie: (et as any).categorie || "materiel", actif: et.actif } })} title="Modifier" style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><FilePen size={11} color={C.textMuted} /></button>
                                 <button onClick={() => showConfirm(`${t('common.delete')} "${et.nom}" ?`, async () => { try { await apiDeleteEquipType(et.id); reloadEquip(); addToast_admin(t('toast.deleted')); } catch { addToast_admin(t('toast.error')); } })} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><Trash size={11} color={C.red} /></button>
                               </div>
                             </div>
@@ -2359,8 +3346,128 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
               </div>
             )}
 
+            {/* Equipment Type Create/Edit Panel */}
+            {((equipPanel.mode as string) === "type" || (equipPanel.mode as string) === "type_edit") && (<>
+              <div onClick={() => setEquipPanel({ mode: "closed", data: {} })} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
+              <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 460, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
+                <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{(equipPanel.mode as string) === "type" ? "Nouveau type de matériel" : "Modifier le type"}</h2>
+                  <button onClick={() => setEquipPanel({ mode: "closed", data: {} })} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
+                </div>
+                <div style={{ flex: 1, padding: 24, overflow: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom du type *</label>
+                    <input value={equipPanel.data.nom || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, nom: e.target.value } }))} placeholder="Ex: Ordinateur portable, Badge, Licence Office 365..." style={sInput} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Description</label>
+                    <TranslatableField multiline rows={3} value={equipPanel.data.description || ""} onChange={v => setEquipPanel(p => ({ ...p, data: { ...p.data, description: v } }))} placeholder="Description du type de matériel, usage, remarques..." currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.equip_description} onTranslationsChange={tr => setTr("equip_description", tr)} style={{ minHeight: 70 }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Catégorie *</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[
+                        { value: "materiel", label: "Matériel physique", icon: Package, color: C.text },
+                        { value: "licence", label: "Licence / Logiciel", icon: KeyRound, color: C.blue },
+                      ].map(opt => (
+                        <button key={opt.value} onClick={() => setEquipPanel(p => ({ ...p, data: { ...p.data, categorie: opt.value, icon: opt.value === "licence" ? "key" : (p.data.icon === "key" ? "package" : p.data.icon) } }))}
+                          style={{ flex: 1, padding: "12px 10px", borderRadius: 10, border: `2px solid ${equipPanel.data.categorie === opt.value ? opt.color : C.border}`, background: equipPanel.data.categorie === opt.value ? (opt.value === "licence" ? C.blueLight : C.bg) : C.white, cursor: "pointer", fontFamily: font, fontSize: 12, fontWeight: equipPanel.data.categorie === opt.value ? 600 : 400, color: equipPanel.data.categorie === opt.value ? opt.color : C.textLight, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                          <opt.icon size={14} /> {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Icône</label>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {Object.entries(EQUIP_ICON_MAP).map(([key, Icon]) => (
+                        <button key={key} onClick={() => setEquipPanel(p => ({ ...p, data: { ...p.data, icon: key } }))}
+                          style={{ width: 40, height: 40, borderRadius: 8, border: `2px solid ${equipPanel.data.icon === key ? C.pink : C.border}`, background: equipPanel.data.icon === key ? C.pinkBg : C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <Icon size={18} color={equipPanel.data.icon === key ? C.pink : C.textMuted} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text }}>Actif</label>
+                    <div onClick={() => setEquipPanel(p => ({ ...p, data: { ...p.data, actif: !p.data.actif } }))} style={{ width: 40, height: 22, borderRadius: 11, background: equipPanel.data.actif ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s" }}>
+                      <div style={{ width: 18, height: 18, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: equipPanel.data.actif ? 20 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                    </div>
+                    <span style={{ fontSize: 11, color: C.textMuted }}>{equipPanel.data.actif ? "Visible dans l'inventaire" : "Masqué"}</span>
+                  </div>
+                </div>
+                <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  {(equipPanel.mode as string) === "type_edit" && equipPanel.data.id && (
+                    <button onClick={() => showConfirm(`Supprimer "${equipPanel.data.nom}" ?`, async () => { try { await apiDeleteEquipType(equipPanel.data.id); reloadEquip(); setEquipPanel({ mode: "closed", data: {} }); addToast_admin(t('toast.deleted')); } catch { addToast_admin(t('toast.error')); } })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, marginRight: "auto" }}>{t('common.delete')}</button>
+                  )}
+                  <button onClick={() => setEquipPanel({ mode: "closed", data: {} })} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
+                  <button disabled={!equipPanel.data.nom?.trim()} onClick={async () => {
+                    try {
+                      const payload = { nom: equipPanel.data.nom, description: equipPanel.data.description || null, icon: equipPanel.data.icon || "package", actif: equipPanel.data.actif, categorie: equipPanel.data.categorie || "materiel" };
+                      if ((equipPanel.mode as string) === "type_edit" && equipPanel.data.id) await apiUpdateEquipType(equipPanel.data.id, payload);
+                      else await apiCreateEquipType(payload);
+                      reloadEquip(); setEquipPanel({ mode: "closed", data: {} }); addToast_admin((equipPanel.mode as string) === "type" ? t('equip.type_created') : t('toast.saved'));
+                    } catch { addToast_admin(t('toast.error')); }
+                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), opacity: !equipPanel.data.nom?.trim() ? 0.5 : 1 }}>{(equipPanel.mode as string) === "type" ? "Créer le type" : t('common.save')}</button>
+                </div>
+              </div>
+            </>)}
+
+            {/* Equipment Return Modal */}
+            {(equipPanel.mode as string) === "return" && (<>
+              <div onClick={() => setEquipPanel({ mode: "closed", data: {} })} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div onClick={e => e.stopPropagation()} style={{ width: 440, background: C.white, borderRadius: 16, padding: "28px 32px", boxShadow: "0 20px 60px rgba(0,0,0,.2)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>Restitution de matériel</h2>
+                    <button onClick={() => setEquipPanel({ mode: "closed", data: {} })} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
+                  </div>
+                  <div style={{ padding: "12px 16px", background: C.bg, borderRadius: 10, marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+                    <RotateCcw size={18} color={C.amber} />
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600 }}>{equipPanel.data.nom}</div>
+                      <div style={{ fontSize: 12, color: C.textMuted }}>Attribué à {equipPanel.data.collaborateur_name}</div>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Date de retour *</label>
+                    <input type="date" value={equipPanel.data.returned_at || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, returned_at: e.target.value } }))} style={sInput} />
+                  </div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>État à la restitution *</label>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {[
+                        { value: "disponible", label: "Bon état", color: C.green, bg: C.greenLight },
+                        { value: "en_reparation", label: "À réparer", color: C.amber, bg: C.amberLight },
+                        { value: "retire", label: "Hors service", color: C.red, bg: C.redLight },
+                      ].map(opt => (
+                        <button key={opt.value} onClick={() => setEquipPanel(p => ({ ...p, data: { ...p.data, etat: opt.value } }))}
+                          style={{ flex: 1, padding: "10px 8px", borderRadius: 8, border: `2px solid ${equipPanel.data.etat === opt.value ? opt.color : C.border}`, background: equipPanel.data.etat === opt.value ? opt.bg : C.white, cursor: "pointer", fontFamily: font, fontSize: 12, fontWeight: equipPanel.data.etat === opt.value ? 600 : 400, color: equipPanel.data.etat === opt.value ? opt.color : C.textLight, transition: "all .15s" }}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Notes de restitution</label>
+                    <textarea value={equipPanel.data.notes || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, notes: e.target.value } }))} placeholder="État constaté, accessoires manquants, remarques..." style={{ ...sInput, minHeight: 80, resize: "vertical" }} />
+                  </div>
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <button onClick={() => setEquipPanel({ mode: "closed", data: {} })} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
+                    <button onClick={async () => {
+                      try {
+                        await apiUnassignEquip(equipPanel.data.id, { returned_at: equipPanel.data.returned_at, etat: equipPanel.data.etat, notes: equipPanel.data.notes || undefined });
+                        reloadEquip();
+                        setEquipPanel({ mode: "closed", data: {} });
+                        addToast_admin("Matériel restitué");
+                      } catch { addToast_admin(t('toast.error')); }
+                    }} className="iz-btn-pink" style={sBtn("pink")}>Confirmer la restitution</button>
+                  </div>
+                </div>
+              </div>
+            </>)}
+
             {/* Equipment Create/Edit Panel */}
-            {equipPanel.mode !== "closed" && (<>
+            {equipPanel.mode !== "closed" && (equipPanel.mode as string) !== "return" && (<>
               <div onClick={() => setEquipPanel({ mode: "closed", data: {} })} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 1000 }} />
               <div className="iz-panel" style={{ position: "fixed", top: 0, right: 0, width: 480, height: "100vh", background: C.white, boxShadow: "-4px 0 24px rgba(0,0,0,.1)", zIndex: 1001, display: "flex", flexDirection: "column" }}>
                 <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -2373,29 +3480,59 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
                       {equipTypes.map(t => <option key={t.id} value={t.id}>{t.nom}</option>)}
                     </select>
                   </div>
+                  {(() => {
+                    const selectedType = equipTypes.find(t => t.id === equipPanel.data.equipment_type_id);
+                    const isLicence = (selectedType as any)?.categorie === "licence";
+                    return (<>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.name_label')} *</label>
-                    <TranslatableField value={equipPanel.data.nom || ""} onChange={v => setEquipPanel(p => ({ ...p, data: { ...p.data, nom: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder="Ex: MacBook Pro 14 pouces" />
+                    <TranslatableField value={equipPanel.data.nom || ""} onChange={v => setEquipPanel(p => ({ ...p, data: { ...p.data, nom: v } }))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.nom} onTranslationsChange={tr => setTr("nom", tr)} style={sInput} placeholder={isLicence ? "Ex: Licence Microsoft 365 — Jean Dupont" : "Ex: MacBook Pro 14 pouces"} />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.brand')}</label>
-                      <input value={equipPanel.data.marque || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, marque: e.target.value } }))} style={sInput} placeholder="Apple" /></div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.model')}</label>
-                      <input value={equipPanel.data.modele || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, modele: e.target.value } }))} style={sInput} placeholder="M3 Pro" /></div>
-                  </div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.serial_number')}</label>
-                    <input value={equipPanel.data.numero_serie || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, numero_serie: e.target.value } }))} style={sInput} placeholder="SN-XXXXX" /></div>
+
+                  {!isLicence && (<>
+                    {/* ── Champs matériel physique ── */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.brand')}</label>
+                        <input value={equipPanel.data.marque || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, marque: e.target.value } }))} style={sInput} placeholder="Apple" /></div>
+                      <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.model')}</label>
+                        <input value={equipPanel.data.modele || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, modele: e.target.value } }))} style={sInput} placeholder="M3 Pro" /></div>
+                    </div>
+                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.serial_number')}</label>
+                      <input value={equipPanel.data.numero_serie || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, numero_serie: e.target.value } }))} style={sInput} placeholder="SN-XXXXX" /></div>
+                  </>)}
+
+                  {isLicence && (<>
+                    {/* ── Champs licence / logiciel ── */}
+                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Clé de licence / N° de compte</label>
+                      <input value={equipPanel.data.numero_serie || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, numero_serie: e.target.value } }))} style={sInput} placeholder="XXXXX-XXXXX-XXXXX ou ID de compte" /></div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Fournisseur</label>
+                        <input value={equipPanel.data.marque || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, marque: e.target.value } }))} style={sInput} placeholder="Microsoft, Atlassian..." /></div>
+                      <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Plan / Édition</label>
+                        <input value={equipPanel.data.modele || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, modele: e.target.value } }))} style={sInput} placeholder="Business Premium, Pro..." /></div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Date d'expiration</label>
+                        <input type="date" value={equipPanel.data.date_expiration || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, date_expiration: e.target.value } }))} style={sInput} /></div>
+                      <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Nombre de sièges</label>
+                        <input type="number" value={equipPanel.data.nombre_sieges || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, nombre_sieges: e.target.value } }))} style={sInput} placeholder="25" /></div>
+                    </div>
+                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>Coût de renouvellement (CHF/an)</label>
+                      <input type="number" value={equipPanel.data.cout_renouvellement || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, cout_renouvellement: e.target.value } }))} style={sInput} placeholder="0.00" /></div>
+                  </>)}
+
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                     <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.state')}</label>
                       <select value={equipPanel.data.etat || "disponible"} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, etat: e.target.value } }))} style={sInput}>
                         {Object.entries(ETAT_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                       </select></div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.purchase_date')}</label>
+                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{isLicence ? "Date d'achat / souscription" : t('equip.purchase_date')}</label>
                       <input type="date" value={equipPanel.data.date_achat || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, date_achat: e.target.value } }))} style={sInput} /></div>
                   </div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.value')}</label>
+                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{isLicence ? "Coût de la licence (CHF)" : t('equip.value')}</label>
                     <input type="number" value={equipPanel.data.valeur || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, valeur: e.target.value } }))} style={sInput} placeholder="0.00" /></div>
                   <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('equip.notes')}</label>
-                    <textarea value={equipPanel.data.notes || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, notes: e.target.value } }))} style={{ ...sInput, minHeight: 60, resize: "vertical" }} /></div>
+                    <textarea value={equipPanel.data.notes || ""} onChange={e => setEquipPanel(p => ({ ...p, data: { ...p.data, notes: e.target.value } }))} style={{ ...sInput, minHeight: 60, resize: "vertical" }} placeholder={isLicence ? "Conditions, restrictions, informations de connexion..." : ""} /></div>
+                    </>); })()}
                 </div>
                 <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
                   {equipPanel.mode === "edit" && equipPanel.data.id && (
@@ -2450,7 +3587,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
                     const validItems = (pkgPanel.data.items || []).filter((i: any) => i.equipment_type_id);
                     if (validItems.length === 0) { addToast_admin("Ajoutez au moins un élément"); return; }
                     try {
-                      const payload = { nom: pkgPanel.data.nom, description: pkgPanel.data.description || null, icon: pkgPanel.data.icon || "package", couleur: pkgPanel.data.couleur || "#C2185B", items: validItems, translations: buildTranslationsPayload() };
+                      const payload = { nom: pkgPanel.data.nom, description: pkgPanel.data.description || null, icon: pkgPanel.data.icon || "package", couleur: pkgPanel.data.couleur || "#E41076", items: validItems, translations: buildTranslationsPayload() };
                       if (pkgPanel.mode === "edit" && pkgPanel.data.id) await apiUpdatePkg(pkgPanel.data.id, payload);
                       else await apiCreatePkg(payload);
                       reloadEquip(); setPkgPanel({ mode: "closed", data: {} }); addToast_admin(pkgPanel.mode === "create" ? "Package créé" : "Package modifié");
@@ -2500,9 +3637,19 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
                   )}
                   <div onClick={async () => {
                     const newVal = !demoMode;
-                    setDemoMode(newVal); localStorage.setItem("illizeo_demo_mode", String(newVal));
-                    await updateCompanySettings({ demo_mode: String(newVal) }).catch(() => {});
-                    addToast_admin(newVal ? "Mode démo activé" : "Mode démo désactivé");
+                    if (newVal) {
+                      // Activate demo mode + seed demo data
+                      try {
+                        await seedDemoData();
+                        setDemoMode(true); localStorage.setItem("illizeo_demo_mode", "true");
+                        refetchCollaborateurs();
+                        addToast_admin("Mode démo activé — données de démonstration créées");
+                      } catch { addToast_admin("Erreur lors de la création des données démo"); }
+                    } else {
+                      setDemoMode(false); localStorage.setItem("illizeo_demo_mode", "false");
+                      await updateCompanySettings({ demo_mode: "false" }).catch(() => {});
+                      addToast_admin("Mode démo désactivé");
+                    }
                   }} style={{ width: 44, height: 24, borderRadius: 12, background: demoMode ? C.amber : C.border, cursor: "pointer", position: "relative", transition: "all .2s" }}>
                     <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 2, left: demoMode ? 22 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
                   </div>
@@ -2592,7 +3739,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
           const ROLE_COLORS: Record<string, { label: string; color: string; bg: string }> = {
             super_admin: { label: t('role.super_admin'), color: "#E53935", bg: C.redLight },
             admin: { label: t('role.admin'), color: "#7B5EA7", bg: C.purple + "15" },
-            admin_rh: { label: t('role.admin_rh'), color: "#C2185B", bg: C.pinkBg },
+            admin_rh: { label: t('role.admin_rh'), color: "#E41076", bg: C.pinkBg },
             manager: { label: t('role.manager'), color: "#1A73E8", bg: C.blueLight },
             onboardee: { label: t('role.onboardee'), color: "#4CAF50", bg: C.greenLight },
           };
@@ -2702,9 +3849,304 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
     return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
         <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{lang === "fr" ? "Sécurité — Politique de mot de passe" : "Security — Password Policy"}</h1>
-          <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>{lang === "fr" ? "Ces règles s'appliquent à tous les utilisateurs lors de l'inscription, la connexion et la réinitialisation." : "These rules apply to all users during sign-up, sign-in, and password reset."}</p>
+          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Sécurité</h1>
+          <p style={{ fontSize: 12, color: C.textLight, margin: "4px 0 0" }}>Gérez la politique de mot de passe et les restrictions d'accès IP.</p>
         </div>
+
+        {/* Security tabs */}
+        <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${C.border}`, marginBottom: 20 }}>
+          {([
+            { id: "password" as const, label: "Mot de passe" },
+            { id: "ip_whitelist" as const, label: "IP Whitelist" },
+            { id: "sessions" as const, label: "Sessions" },
+            { id: "login_history" as const, label: "Connexions" },
+            { id: "advanced" as const, label: "Avancé" },
+          ]).map(tab => (
+            <button key={tab.id} onClick={() => setSecuritySubTab(tab.id)} style={{ padding: "12px 20px", fontSize: 13, fontWeight: securitySubTab === tab.id ? 600 : 400, color: securitySubTab === tab.id ? C.blue : C.textLight, background: "none", border: "none", borderBottom: securitySubTab === tab.id ? `2px solid ${C.blue}` : "2px solid transparent", cursor: "pointer", fontFamily: font, marginBottom: -1 }}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ═══ IP Whitelist Tab ═══ */}
+        {securitySubTab === "ip_whitelist" && (() => {
+          if (!ipWhitelist) { getIpWhitelist().then(setIpWhitelist).catch(() => {}); }
+          const wl = ipWhitelist || { enabled: false, entries: [], current_ip: "" };
+          return (
+          <div>
+            {/* Current IP info */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 20px", background: C.blueLight, borderRadius: 10, marginBottom: 20 }}>
+              <Globe size={18} color={C.blue} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.blue }}>Votre adresse IP actuelle</div>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: "monospace" }}>{wl.current_ip || "..."}</div>
+              </div>
+              {wl.current_ip && !wl.entries.some((e: any) => e.ip_address === wl.current_ip) && (
+                <button onClick={async () => {
+                  try {
+                    await addIpWhitelist({ ip_address: wl.current_ip, label: "Mon IP actuelle" });
+                    addToast_admin("Votre IP a été ajoutée à la whitelist");
+                    getIpWhitelist().then(setIpWhitelist).catch(() => {});
+                  } catch (err: any) { addToast_admin(err.message || "Erreur"); }
+                }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 11, marginLeft: "auto" }}>
+                  Ajouter mon IP
+                </button>
+              )}
+              {wl.current_ip && wl.entries.some((e: any) => e.ip_address === wl.current_ip) && (
+                <span style={{ marginLeft: "auto", fontSize: 11, color: C.green, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}><CheckCircle size={14} /> Autorisée</span>
+              )}
+            </div>
+
+            {/* Toggle */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", border: `1px solid ${wl.enabled ? C.green : C.border}`, borderRadius: 10, marginBottom: 20, background: wl.enabled ? C.greenLight + "20" : C.white }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600 }}>Restriction par IP {wl.enabled && <span style={{ fontSize: 10, color: C.green, fontWeight: 700 }}>ACTIVÉE</span>}</div>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+                  {wl.enabled
+                    ? "Seules les adresses IP listées peuvent accéder à la plateforme."
+                    : "Toutes les adresses IP peuvent accéder à la plateforme."}
+                </div>
+              </div>
+              <button onClick={async () => {
+                try {
+                  const res = await toggleIpWhitelist(!wl.enabled);
+                  addToast_admin(res.message);
+                  getIpWhitelist().then(setIpWhitelist).catch(() => {});
+                } catch (err: any) { addToast_admin(err.error || err.message || "Erreur"); }
+              }} style={{
+                width: 50, height: 28, borderRadius: 14, border: "none", cursor: "pointer", position: "relative",
+                background: wl.enabled ? C.green : C.border, transition: "background 0.2s",
+              }}>
+                <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: wl.enabled ? 25 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+              </button>
+            </div>
+
+            {wl.enabled && wl.entries.length === 0 && (
+              <div style={{ padding: "14px 20px", background: C.amberLight, borderRadius: 10, marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+                <AlertTriangle size={18} color={C.amber} />
+                <div style={{ fontSize: 12, color: C.amber, fontWeight: 600 }}>Attention : la whitelist est activée mais aucune IP n'est listée. Tous les accès seront bloqués sauf les Super Admins Illizeo.</div>
+              </div>
+            )}
+
+            {/* Add IP form */}
+            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+              <input id="ip-input" placeholder="Adresse IP ou CIDR (ex: 192.168.1.0/24)" style={{ ...sInput, flex: 1 }} />
+              <input id="ip-label" placeholder="Label (ex: Bureau Nyon)" style={{ ...sInput, width: 200 }} />
+              <button onClick={async () => {
+                const ipEl = document.getElementById("ip-input") as HTMLInputElement;
+                const labelEl = document.getElementById("ip-label") as HTMLInputElement;
+                if (!ipEl?.value) return;
+                try {
+                  await addIpWhitelist({ ip_address: ipEl.value, label: labelEl?.value || undefined });
+                  addToast_admin("IP ajoutée");
+                  ipEl.value = ""; if (labelEl) labelEl.value = "";
+                  getIpWhitelist().then(setIpWhitelist).catch(() => {});
+                } catch (err: any) { addToast_admin(err.error || err.message || "Format IP invalide"); }
+              }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12 }}>Ajouter</button>
+            </div>
+
+            {/* IP list */}
+            {wl.entries.length === 0 ? (
+              <div style={{ padding: "40px 0", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucune adresse IP dans la whitelist</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {wl.entries.map((entry: any) => (
+                  <div key={entry.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.white }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Globe size={18} color={C.textMuted} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, fontFamily: "monospace" }}>{entry.ip_address}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted }}>{entry.label || "—"} · Ajouté par {entry.created_by?.name || "—"} · {fmtDateTime(entry.created_at)}</div>
+                    </div>
+                    {entry.ip_address === wl.current_ip && <span style={{ fontSize: 10, color: C.green, fontWeight: 600 }}>Votre IP</span>}
+                    <button onClick={async () => {
+                      try {
+                        await removeIpWhitelist(entry.id);
+                        addToast_admin("IP retirée");
+                        getIpWhitelist().then(setIpWhitelist).catch(() => {});
+                      } catch (err: any) { addToast_admin(err.error || err.message || "Erreur"); }
+                    }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 11 }}>Supprimer</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Info */}
+            <div style={{ marginTop: 24, padding: "14px 20px", background: C.bg, borderRadius: 8, fontSize: 12, color: C.textMuted }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>Notes :</div>
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                <li>Les Super Admins Illizeo ne sont jamais bloqués par la whitelist.</li>
+                <li>Les accès support temporaires ne sont pas affectés.</li>
+                <li>Utilisez la notation CIDR pour autoriser un réseau entier (ex: 10.0.0.0/8).</li>
+                <li>Les tentatives d'accès bloquées sont enregistrées dans le journal d'audit.</li>
+              </ul>
+            </div>
+          </div>
+          );
+        })()}
+
+        {/* ═══ Sessions Tab ═══ */}
+        {securitySubTab === "sessions" && (() => {
+          if (!secSessions) { getSecuritySessions().then((r: any) => setSecSessions(r.sessions || [])).catch(() => {}); }
+          return (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>Sessions actives</h2>
+                <p style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 0" }}>Gérez vos sessions de connexion sur tous vos appareils.</p>
+              </div>
+              <button onClick={async () => { try { const res = await revokeAllOtherSessions(); addToast_admin(res.message); setSecSessions(null); } catch {} }} style={{ ...sBtn("outline"), fontSize: 11, color: C.red, borderColor: C.red }}>Déconnecter toutes les autres sessions</button>
+            </div>
+            {!(secSessions || []).length ? <div style={{ padding: "30px 0", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Chargement...</div> : (secSessions || []).map((s: any) => (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", border: `1px solid ${s.is_current ? C.green : C.border}`, borderRadius: 8, marginBottom: 6, background: s.is_current ? C.greenLight + "20" : C.white }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {s.platform === "Windows" ? <Monitor size={20} color={C.textMuted} /> : s.platform === "macOS" ? <Laptop size={20} color={C.textMuted} /> : s.platform === "iOS" || s.platform === "Android" ? <Phone size={20} color={C.textMuted} /> : <Globe size={20} color={C.textMuted} />}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{s.device} {s.is_current && <span style={{ fontSize: 10, color: C.green, fontWeight: 600 }}>Session actuelle</span>}</div>
+                  <div style={{ fontSize: 11, color: C.textMuted }}>IP: {s.ip_address} · Dernière activité: {fmtDateTime(s.last_activity_at)}</div>
+                </div>
+                {!s.is_current && <button onClick={async () => { try { await apiRevokeSession(s.id); addToast_admin("Session révoquée"); setSecSessions(null); } catch {} }} style={{ ...sBtn("outline"), fontSize: 11, color: C.red, borderColor: C.red, padding: "4px 12px" }}>Révoquer</button>}
+              </div>
+            ))}
+          </div>
+          );
+        })()}
+
+        {/* ═══ Login History Tab ═══ */}
+        {securitySubTab === "login_history" && (() => {
+          if (!secLoginHistory) { getAllLoginHistory().then(setSecLoginHistory).catch(() => {}); }
+          return (
+          <div>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 16px" }}>Historique des connexions</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr 0.8fr", gap: 0, padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight }}>
+              <span>Date</span><span>Utilisateur</span><span>Appareil</span><span>IP</span><span>Méthode</span><span>Statut</span>
+            </div>
+            {!(secLoginHistory || []).length ? <div style={{ padding: "30px 0", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucune connexion enregistrée</div> : (secLoginHistory || []).map((h: any, i: number) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr 1fr 1fr 1fr 0.8fr", gap: 0, padding: "10px 0", borderBottom: `1px solid ${C.border}`, fontSize: 12, alignItems: "center" }}>
+                <span style={{ color: C.textMuted }}>{fmtDateTime(h.created_at)}</span>
+                <span style={{ fontWeight: 500 }}>{h.email || "—"}</span>
+                <span>{h.device || "—"}</span>
+                <span style={{ fontFamily: "monospace", fontSize: 11 }}>{h.ip_address}</span>
+                <span>{h.method === "password" ? "Mot de passe" : h.method === "sso" ? "SSO" : h.method === "support_token" ? "Support" : h.method}</span>
+                <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, justifySelf: "start", background: h.success ? C.greenLight : C.redLight, color: h.success ? C.green : C.red }}>{h.success ? "Succès" : h.failure_reason || "Échoué"}</span>
+              </div>
+            ))}
+          </div>
+          );
+        })()}
+
+        {/* ═══ Advanced Security Tab ═══ */}
+        {securitySubTab === "advanced" && (() => {
+          if (!secSettings) { getSecuritySettings().then(setSecSettings).catch(() => {}); }
+          const ss = secSettings || { force_sso: false, force_2fa: false, force_2fa_roles: [], session_timeout_minutes: 0, security_notifications: true, access_schedule_enabled: false, access_schedules: [] };
+          const TIMEOUT_OPTIONS = [{ v: 0, l: "Jamais" }, { v: 30, l: "30 min" }, { v: 60, l: "1 heure" }, { v: 240, l: "4 heures" }, { v: 480, l: "8 heures" }, { v: 1440, l: "24 heures" }];
+          const DAY_LABELS = ["", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+          const saveSetting = async (key: string, value: any) => {
+            try { await updateSecuritySettings({ [key]: value }); setSecSettings({ ...ss, [key]: value }); addToast_admin("Paramètre mis à jour"); } catch { addToast_admin("Erreur"); }
+          };
+
+          return (
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {/* Session timeout */}
+            <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>Expiration de session</div>
+                  <div style={{ fontSize: 12, color: C.textMuted }}>Déconnecter automatiquement après une période d'inactivité.</div>
+                </div>
+                <select value={ss.session_timeout_minutes} onChange={e => saveSetting("session_timeout_minutes", Number(e.target.value))} style={{ ...sInput, width: 140 }}>
+                  {TIMEOUT_OPTIONS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Force 2FA */}
+            <div style={{ border: `1px solid ${ss.force_2fa ? C.green : C.border}`, borderRadius: 10, padding: "16px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>2FA obligatoire</div>
+                  <div style={{ fontSize: 12, color: C.textMuted }}>Tous les utilisateurs doivent activer l'authentification à deux facteurs.</div>
+                </div>
+                <button onClick={() => saveSetting("force_2fa", !ss.force_2fa)} style={{ width: 50, height: 28, borderRadius: 14, border: "none", cursor: "pointer", position: "relative", background: ss.force_2fa ? C.green : C.border }}>
+                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: ss.force_2fa ? 25 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                </button>
+              </div>
+            </div>
+
+            {/* Force SSO */}
+            <div style={{ border: `1px solid ${ss.force_sso ? C.green : C.border}`, borderRadius: 10, padding: "16px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>SSO obligatoire</div>
+                  <div style={{ fontSize: 12, color: C.textMuted }}>Désactiver la connexion par email/mot de passe. Seul le SSO Microsoft sera disponible.</div>
+                </div>
+                <button onClick={() => saveSetting("force_sso", !ss.force_sso)} style={{ width: 50, height: 28, borderRadius: 14, border: "none", cursor: "pointer", position: "relative", background: ss.force_sso ? C.green : C.border }}>
+                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: ss.force_sso ? 25 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                </button>
+              </div>
+            </div>
+
+            {/* Security notifications */}
+            <div style={{ border: `1px solid ${ss.security_notifications ? C.green : C.border}`, borderRadius: 10, padding: "16px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>Notifications de sécurité</div>
+                  <div style={{ fontSize: 12, color: C.textMuted }}>Email automatique en cas de : nouvelle IP, tentatives échouées, changement de mot de passe.</div>
+                </div>
+                <button onClick={() => saveSetting("security_notifications", !ss.security_notifications)} style={{ width: 50, height: 28, borderRadius: 14, border: "none", cursor: "pointer", position: "relative", background: ss.security_notifications ? C.green : C.border }}>
+                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: ss.security_notifications ? 25 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                </button>
+              </div>
+            </div>
+
+            {/* Access schedule */}
+            <div style={{ border: `1px solid ${ss.access_schedule_enabled ? C.green : C.border}`, borderRadius: 10, padding: "16px 20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: ss.access_schedule_enabled ? 16 : 0 }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>Restriction horaire</div>
+                  <div style={{ fontSize: 12, color: C.textMuted }}>Limiter l'accès à certaines plages horaires.</div>
+                </div>
+                <button onClick={() => saveSetting("access_schedule_enabled", !ss.access_schedule_enabled)} style={{ width: 50, height: 28, borderRadius: 14, border: "none", cursor: "pointer", position: "relative", background: ss.access_schedule_enabled ? C.green : C.border }}>
+                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: ss.access_schedule_enabled ? 25 : 3, transition: "left 0.2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                </button>
+              </div>
+              {ss.access_schedule_enabled && (
+                <div>
+                  {(ss.access_schedules || []).map((sched: any) => (
+                    <div key={sched.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", border: `1px solid ${C.border}`, borderRadius: 6, marginBottom: 6 }}>
+                      <span style={{ flex: 1, fontSize: 13 }}>{sched.label || "Plage"} — {(sched.days || []).map((d: number) => DAY_LABELS[d]).join(", ")} · {sched.start_time}–{sched.end_time} ({sched.timezone})</span>
+                      <button onClick={async () => { await deleteAccessSchedule(sched.id); setSecSettings(null); getSecuritySettings().then(setSecSettings).catch(() => {}); addToast_admin("Plage supprimée"); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 11 }}>Supprimer</button>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
+                    <input id="sched-label" placeholder="Label" style={{ ...sInput, width: 120 }} />
+                    <div style={{ display: "flex", gap: 2 }}>
+                      {[1,2,3,4,5,6,7].map(d => <button key={d} id={`day-${d}`} onClick={e => { const el = e.currentTarget; el.dataset.sel = el.dataset.sel === "1" ? "0" : "1"; el.style.background = el.dataset.sel === "1" ? C.blue : C.bg; el.style.color = el.dataset.sel === "1" ? "#fff" : C.text; }} data-sel={d <= 5 ? "1" : "0"} style={{ width: 28, height: 28, borderRadius: 4, border: "none", fontSize: 10, cursor: "pointer", background: d <= 5 ? C.blue : C.bg, color: d <= 5 ? "#fff" : C.text, fontFamily: font }}>{DAY_LABELS[d]}</button>)}
+                    </div>
+                    <input id="sched-start" type="time" defaultValue="07:00" style={{ ...sInput, width: 90 }} />
+                    <span style={{ fontSize: 13 }}>—</span>
+                    <input id="sched-end" type="time" defaultValue="20:00" style={{ ...sInput, width: 90 }} />
+                    <button onClick={async () => {
+                      const days = [1,2,3,4,5,6,7].filter(d => (document.getElementById(`day-${d}`) as any)?.dataset?.sel === "1");
+                      const start = (document.getElementById("sched-start") as HTMLInputElement)?.value;
+                      const end = (document.getElementById("sched-end") as HTMLInputElement)?.value;
+                      const label = (document.getElementById("sched-label") as HTMLInputElement)?.value;
+                      if (!days.length || !start || !end) { addToast_admin("Sélectionnez des jours et heures"); return; }
+                      try { await createAccessSchedule({ label, days, start_time: start, end_time: end }); setSecSettings(null); getSecuritySettings().then(setSecSettings).catch(() => {}); addToast_admin("Plage ajoutée"); } catch { addToast_admin("Erreur"); }
+                    }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 11, padding: "6px 12px" }}>Ajouter</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          );
+        })()}
+
+        {/* ═══ Password Policy Tab ═══ */}
+        {securitySubTab === "password" && (<div>
 
         {(() => {
           // Load password policy from API on first render
@@ -2820,6 +4262,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
             </div>
           );
         })()}
+        </div>)}
       </div>
     );
   };
@@ -2828,6 +4271,146 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
   const renderAdminOrgChart = createAdminOrgChart(ctx);
   const renderAdminBuddy = createAdminBuddy(ctx);
   const renderAdminAuditLog = createAdminAuditLog(ctx);
+
+  // ─── ADMIN ASSISTANT IA ─────────────────────────────────
+  const renderAdminAssistantIA = () => {
+    const { aiChatMessages, setAiChatMessages, aiChatInput, setAiChatInput, aiChatLoading, setAiChatLoading, aiChatEndRef, themeColor } = ctx;
+    const gradStart = themeColor || "#1a1a2e";
+    const gradEnd = C.pink;
+
+    const ADMIN_QUICK_PROMPTS = [
+      { icon: Users, label: "Collaborateurs en retard", prompt: "Quels collaborateurs sont en retard dans leur parcours ?" },
+      { icon: BarChart3, label: "Stats onboarding", prompt: "Donne-moi un résumé des statistiques d'onboarding ce mois." },
+      { icon: FileText, label: "Documents manquants", prompt: "Quels collaborateurs n'ont pas fourni tous leurs documents obligatoires ?" },
+      { icon: AlertTriangle, label: "Alertes & actions", prompt: "Y a-t-il des alertes ou des actions urgentes à traiter ?" },
+      { icon: Calendar, label: "Périodes d'essai", prompt: "Quels collaborateurs terminent leur période d'essai dans les 30 prochains jours ?" },
+      { icon: Target, label: "Taux de complétion", prompt: "Quel est le taux de complétion moyen des parcours actifs ?" },
+    ];
+
+    const handleSendAdminAiMessage = async (messageOverride?: string) => {
+      const content = messageOverride || aiChatInput.trim();
+      if (!content || aiChatLoading) return;
+      const userMsg = { role: "user" as const, content, timestamp: new Date().toISOString() };
+      const newMessages = [...aiChatMessages, userMsg];
+      setAiChatMessages(newMessages);
+      setAiChatInput("");
+      setAiChatLoading(true);
+      setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+
+      try {
+        const { postAdminAiChat } = await import('../api/endpoints');
+        const history = newMessages.map((m: any) => ({ role: m.role, content: m.content }));
+        const res = await postAdminAiChat(content, history);
+        setAiChatMessages((prev: any) => [...prev, { role: "assistant", content: res.reply, timestamp: new Date().toISOString() }]);
+      } catch {
+        setAiChatMessages((prev: any) => [...prev, { role: "assistant", content: "Désolé, l'assistant IA admin n'est pas disponible pour le moment. Vérifiez que le module IA est activé dans votre abonnement.", timestamp: new Date().toISOString() }]);
+      }
+      setAiChatLoading(false);
+      setTimeout(() => aiChatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    };
+
+    return (
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "calc(100vh - 60px)", background: C.bg }}>
+        <div style={{ flex: 1, overflow: "auto", padding: "20px 0" }}>
+          <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 24px" }}>
+            {aiChatMessages.length === 0 && (
+              <div className="iz-fade-up" style={{ textAlign: "center", paddingTop: 40 }}>
+                <div style={{ width: 72, height: 72, borderRadius: "50%", background: `linear-gradient(135deg, ${gradStart}, ${gradEnd})`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", boxShadow: "0 8px 32px rgba(194,24,91,.2)" }}>
+                  <Sparkles size={32} color="#fff" />
+                </div>
+                <h2 style={{ fontSize: 24, fontWeight: 700, color: C.text, margin: "0 0 8px" }}>Assistant IA — Administration</h2>
+                <p style={{ fontSize: 14, color: C.textLight, margin: "0 0 36px", maxWidth: 520, marginLeft: "auto", marginRight: "auto" }}>
+                  Posez vos questions sur vos collaborateurs, parcours, documents, statistiques. L'IA a accès aux données en temps réel.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, maxWidth: 720, margin: "0 auto" }}>
+                  {ADMIN_QUICK_PROMPTS.map((qp, i) => {
+                    const Icon = qp.icon;
+                    return (
+                      <button key={i} onClick={() => handleSendAdminAiMessage(qp.prompt)}
+                        className={`iz-card iz-fade-up iz-stagger-${i + 1}`}
+                        style={{ ...sCard, padding: "14px", cursor: "pointer", border: `1px solid ${C.border}`, textAlign: "left", display: "flex", alignItems: "flex-start", gap: 10, transition: "all .15s", background: C.white }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = C.pink; e.currentTarget.style.boxShadow = "0 4px 16px rgba(194,24,91,.08)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = "none"; }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Icon size={16} color={C.pink} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 2 }}>{qp.label}</div>
+                          <div style={{ fontSize: 10, color: C.textMuted, lineHeight: 1.4 }}>{qp.prompt}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {aiChatMessages.map((msg: any, i: number) => (
+              <div key={i} className="iz-fade-up" style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start", marginBottom: 16 }}>
+                {msg.role === "assistant" && (
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: `linear-gradient(135deg, ${gradStart}, ${gradEnd})`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginRight: 10, marginTop: 4 }}>
+                    <Sparkles size={14} color="#fff" />
+                  </div>
+                )}
+                <div style={{ maxWidth: "70%" }}>
+                  <div style={{
+                    padding: "12px 16px", borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+                    background: msg.role === "user" ? C.pink : C.white,
+                    color: msg.role === "user" ? "#fff" : C.text,
+                    border: msg.role === "user" ? "none" : `1px solid ${C.border}`,
+                    fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap",
+                    boxShadow: msg.role === "assistant" ? "0 2px 8px rgba(0,0,0,.04)" : "none",
+                  }}>{msg.content}</div>
+                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4, textAlign: msg.role === "user" ? "right" : "left" }}>
+                    {msg.role === "assistant" ? "Assistant Illizeo" : "Vous"} · {fmtDateTimeShort(msg.timestamp)}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {aiChatLoading && (
+              <div className="iz-fade-up" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: `linear-gradient(135deg, ${gradStart}, ${gradEnd})`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Sparkles size={14} color="#fff" />
+                </div>
+                <div style={{ padding: "12px 16px", borderRadius: "16px 16px 16px 4px", background: C.white, border: `1px solid ${C.border}`, display: "flex", gap: 4 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.textMuted, animation: "iz-typing 1.4s infinite", animationDelay: "0s" }} />
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.textMuted, animation: "iz-typing 1.4s infinite", animationDelay: "0.2s" }} />
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.textMuted, animation: "iz-typing 1.4s infinite", animationDelay: "0.4s" }} />
+                </div>
+              </div>
+            )}
+            <div ref={aiChatEndRef} />
+          </div>
+        </div>
+
+        <div style={{ borderTop: `1px solid ${C.border}`, background: C.white, padding: "16px 24px" }}>
+          <div style={{ maxWidth: 860, margin: "0 auto" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <input value={aiChatInput} onChange={e => setAiChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendAdminAiMessage(); } }}
+                placeholder="Posez votre question RH..." style={{ ...sInput, flex: 1, fontSize: 14, padding: "14px 18px", borderRadius: 12 }} />
+              <button onClick={() => handleSendAdminAiMessage()} disabled={!aiChatInput.trim() || aiChatLoading}
+                style={{ ...sBtn("pink"), padding: "12px 18px", borderRadius: 12, opacity: !aiChatInput.trim() || aiChatLoading ? 0.5 : 1, display: "flex", alignItems: "center", gap: 6 }}>
+                <Send size={18} />
+              </button>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+              <div style={{ fontSize: 10, color: C.textMuted }}>
+                <Sparkles size={10} style={{ display: "inline", verticalAlign: "middle", marginRight: 4 }} />
+                L'IA peut commettre des erreurs. Il est recommandé de vérifier les informations importantes.
+              </div>
+              {aiChatMessages.length > 0 && (
+                <button onClick={() => setAiChatMessages([])} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10, color: C.textMuted, display: "flex", alignItems: "center", gap: 4 }}>
+                  <RotateCcw size={10} /> Nouvelle conversation
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return {
     renderAdminGamification,
@@ -2845,6 +4428,7 @@ Le Client est informé préalablement de tout changement de sous-traitant et dis
     renderAdminOrgChart,
     renderAdminBuddy,
     renderAdminAuditLog,
+    renderAdminAssistantIA,
   };
 }
 /* END OF createAdminInlinePages — extracted pages are in ./pages/ */

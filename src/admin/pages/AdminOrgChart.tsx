@@ -1,14 +1,19 @@
 import { Fragment } from 'react';
 import { t } from '../../i18n';
-import { C, colorWithAlpha, font, sCard, sBtn, sInput } from '../../constants';
+import { C, colorWithAlpha, sCard, sBtn, sInput } from '../../constants';
 import {
-  Search, Users, Building2, ListChecks, ChevronLeft,
+  Search, Users, Building2, ListChecks, ChevronDown, ChevronRight, User,
 } from 'lucide-react';
 import type { Collaborateur } from '../../types';
 
+interface OrgNode {
+  collab: Collaborateur;
+  children: OrgNode[];
+}
+
 export function createAdminOrgChart(ctx: any) {
   const {
-    COLLABORATEURS, demoMode,
+    COLLABORATEURS,
     orgView, setOrgView, orgSearch, setOrgSearch,
     orgExpandedNodes, setOrgExpandedNodes,
     orgSortCol, setOrgSortCol, orgSortDir, setOrgSortDir,
@@ -17,54 +22,156 @@ export function createAdminOrgChart(ctx: any) {
   return function renderAdminOrgChart() {
     const collabs: Collaborateur[] = COLLABORATEURS;
 
-    // Group by department, first person per dept = manager
-    const deptMap: Record<string, Collaborateur[]> = {};
+    // ── Build real hierarchy from manager_id ──
+    const collabMap = new Map<number, Collaborateur>();
+    collabs.forEach(c => collabMap.set(c.id, c));
+
+    // Find children for each person
+    const childrenMap = new Map<number, Collaborateur[]>();
+    const hasParent = new Set<number>();
+
     collabs.forEach(c => {
-      if (!deptMap[c.departement]) deptMap[c.departement] = [];
-      deptMap[c.departement].push(c);
+      const mgrId = (c as any).manager_id;
+      if (mgrId && collabMap.has(mgrId)) {
+        hasParent.add(c.id);
+        if (!childrenMap.has(mgrId)) childrenMap.set(mgrId, []);
+        childrenMap.get(mgrId)!.push(c);
+      }
     });
-    const departments = Object.keys(deptMap);
-    const DEPT_COLORS: Record<string, string> = {};
+
+    // Root nodes = people without a manager (or whose manager is not in the list)
+    const roots = collabs.filter(c => !hasParent.has(c.id));
+
+    // Build tree recursively
+    const buildTree = (collab: Collaborateur): OrgNode => ({
+      collab,
+      children: (childrenMap.get(collab.id) || []).map(buildTree),
+    });
+    const tree: OrgNode[] = roots.map(buildTree);
+
+    // Department colors
+    const departments = [...new Set(collabs.map(c => c.departement).filter(Boolean))];
     const palette = ["#1A73E8", "#E53935", "#F9A825", "#4CAF50", "#7B5EA7", "#00897B", "#FF6B35", "#E91E8C", "#3F51B5", "#009688"];
+    const DEPT_COLORS: Record<string, string> = {};
     departments.forEach((d, i) => { DEPT_COLORS[d] = palette[i % palette.length]; });
 
+    // Search
     const search = orgSearch.toLowerCase();
     const matchesSearch = (c: Collaborateur) => !search || `${c.prenom} ${c.nom} ${c.poste} ${c.departement}`.toLowerCase().includes(search);
+
+    // Check if a node or any descendant matches search
+    const treeMatchesSearch = (node: OrgNode): boolean => {
+      if (matchesSearch(node.collab)) return true;
+      return node.children.some(treeMatchesSearch);
+    };
 
     const toggleNode = (id: string) => {
       setOrgExpandedNodes((prev: string[]) => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
 
-    const renderNodeCard = (c: Collaborateur, isManager: boolean = false) => {
+    // Count all reports (direct + indirect)
+    const countReports = (node: OrgNode): number => {
+      let count = node.children.length;
+      node.children.forEach(ch => { count += countReports(ch); });
+      return count;
+    };
+
+    // Get manager name for a collaborateur
+    const getManagerName = (c: Collaborateur): string | null => {
+      const mgrId = (c as any).manager_id;
+      if (!mgrId) return null;
+      const mgr = collabMap.get(mgrId);
+      return mgr ? `${mgr.prenom} ${mgr.nom}` : null;
+    };
+
+    // ── Render a tree node recursively ──
+    const renderTreeNode = (node: OrgNode, depth: number = 0, isLast: boolean = true) => {
+      const c = node.collab;
+      const nodeId = `node_${c.id}`;
+      const isExpanded = orgExpandedNodes.includes(nodeId);
+      const hasChildren = node.children.length > 0;
+      const totalReports = countReports(node);
+      const isRoot = depth === 0;
       const highlighted = search && matchesSearch(c);
+      const deptColor = DEPT_COLORS[c.departement] || C.blue;
+
+      if (search && !treeMatchesSearch(node)) return null;
+
       return (
-        <div key={c.id} style={{
-          background: C.white, borderRadius: 12, padding: "12px 16px", minWidth: 180,
-          border: `2px solid ${highlighted ? C.pink : C.border}`,
-          boxShadow: highlighted ? `0 0 12px ${colorWithAlpha(C.pink, 0.3)}` : "0 1px 4px rgba(0,0,0,0.06)",
-          display: "flex", flexDirection: "column", alignItems: "center", gap: 6, transition: "all 0.2s",
-        }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: "50%", background: c.color, display: "flex",
-            alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 14,
-            border: isManager ? `3px solid ${DEPT_COLORS[c.departement] || C.blue}` : "none",
-          }}>{c.initials}</div>
-          <div style={{ fontWeight: 600, fontSize: 13, textAlign: "center" }}>{c.prenom} {c.nom}</div>
-          <div style={{ fontSize: 11, color: C.textLight, textAlign: "center" }}>{c.poste}</div>
-          <span style={{
-            fontSize: 10, padding: "2px 8px", borderRadius: 99, fontWeight: 600,
-            background: colorWithAlpha(DEPT_COLORS[c.departement] || C.blue, 0.12),
-            color: DEPT_COLORS[c.departement] || C.blue,
-          }}>{c.departement}</span>
+        <div key={c.id} style={{ display: "flex", flexDirection: "column", alignItems: depth === 0 ? "center" : "flex-start" }}>
+          {/* Vertical connector from parent */}
+          {depth > 0 && <div style={{ width: 2, height: 16, background: C.border, marginLeft: 28 }} />}
+
+          {/* Node card */}
+          <div
+            onClick={() => hasChildren && toggleNode(nodeId)}
+            style={{
+              cursor: hasChildren ? "pointer" : "default",
+              background: isRoot ? `linear-gradient(135deg, ${C.pink}, ${C.blue})` : C.white,
+              borderRadius: 12, padding: isRoot ? "16px 24px" : "10px 16px",
+              minWidth: isRoot ? 220 : 200,
+              border: isRoot ? "none" : `2px solid ${highlighted ? C.pink : C.border}`,
+              boxShadow: highlighted ? `0 0 12px ${colorWithAlpha(C.pink, 0.3)}` : isRoot ? "0 4px 16px rgba(0,0,0,0.12)" : "0 1px 4px rgba(0,0,0,0.06)",
+              display: "flex", alignItems: "center", gap: 12, transition: "all 0.2s",
+              color: isRoot ? "#fff" : C.text,
+            }}
+          >
+            <div style={{
+              width: isRoot ? 44 : 36, height: isRoot ? 44 : 36, borderRadius: "50%", flexShrink: 0,
+              background: isRoot ? "rgba(255,255,255,0.25)" : c.color || deptColor,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontWeight: 700, fontSize: isRoot ? 16 : 12,
+              border: hasChildren && !isRoot ? `2px solid ${deptColor}` : "none",
+            }}>
+              {c.initials || `${(c.prenom || '')[0]}${(c.nom || '')[0]}`}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: isRoot ? 15 : 13 }}>{c.prenom} {c.nom}</div>
+              <div style={{ fontSize: 11, opacity: isRoot ? 0.85 : 1, color: isRoot ? "#fff" : C.textLight }}>{c.poste || c.departement}</div>
+              {hasChildren && (
+                <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                  {isExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                  {totalReports} collaborateur{totalReports > 1 ? 's' : ''}
+                </div>
+              )}
+            </div>
+            {!isRoot && c.departement && (
+              <span style={{
+                fontSize: 9, padding: "2px 6px", borderRadius: 99, fontWeight: 600, flexShrink: 0,
+                background: colorWithAlpha(deptColor, 0.12), color: deptColor,
+              }}>{c.departement}</span>
+            )}
+          </div>
+
+          {/* Children */}
+          {isExpanded && hasChildren && (
+            <div style={{ paddingLeft: depth === 0 ? 0 : 28, display: "flex", flexDirection: depth === 0 ? "row" : "column", gap: depth === 0 ? 16 : 0, flexWrap: "wrap", justifyContent: depth === 0 ? "center" : "flex-start", marginTop: depth === 0 ? 8 : 0 }}>
+              {depth === 0 && <div style={{ width: "100%", display: "flex", justifyContent: "center" }}><div style={{ width: 2, height: 16, background: C.border }} /></div>}
+              {node.children.map((child, i) => (
+                <Fragment key={child.collab.id}>
+                  {renderTreeNode(child, depth + 1, i === node.children.length - 1)}
+                </Fragment>
+              ))}
+            </div>
+          )}
         </div>
       );
     };
 
+    // ── View tabs ──
     const viewTabs: { key: "tree" | "list" | "dept"; label: string; icon: any }[] = [
       { key: "tree", label: t('org.view_tree'), icon: Users },
       { key: "list", label: t('org.view_list'), icon: ListChecks },
       { key: "dept", label: t('org.view_dept'), icon: Building2 },
     ];
+
+    // ── Department map for dept view ──
+    const deptMap: Record<string, Collaborateur[]> = {};
+    collabs.forEach(c => {
+      const d = c.departement || 'Sans département';
+      if (!deptMap[d]) deptMap[d] = [];
+      deptMap[d].push(c);
+    });
 
     return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
@@ -109,71 +216,29 @@ export function createAdminOrgChart(ctx: any) {
         )}
         {orgView === "tree" && collabs.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-            {/* CEO Node */}
-            <div onClick={() => toggleNode("ceo")} style={{ cursor: "pointer" }}>
-              <div style={{
-                background: `linear-gradient(135deg, ${C.pink}, ${C.blue})`, borderRadius: 14, padding: "16px 24px",
-                color: "#fff", textAlign: "center", minWidth: 200, boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-              }}>
-                <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(255,255,255,0.25)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", fontWeight: 700, fontSize: 18 }}>DG</div>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>Direction Generale</div>
-                <div style={{ fontSize: 11, opacity: 0.85 }}>CEO</div>
-                <div style={{ fontSize: 10, marginTop: 4, opacity: 0.7 }}>{departments.length} {t('org.direct_reports')}</div>
+            {tree.length === 0 ? (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>
+                Aucun collaborateur sans manager trouvé. Vérifiez les relations manager.
               </div>
-            </div>
+            ) : tree.length === 1 ? (
+              // Single root — clean single-tree display
+              renderTreeNode(tree[0], 0)
+            ) : (
+              // Multiple roots — show each as a separate tree
+              <div style={{ display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "center", alignItems: "flex-start" }}>
+                {tree.map(node => (
+                  <div key={node.collab.id}>
+                    {renderTreeNode(node, 0)}
+                  </div>
+                ))}
+              </div>
+            )}
 
-            {/* Connector line from CEO */}
-            {orgExpandedNodes.includes("ceo") && (
-              <>
-                <div style={{ width: 2, height: 24, background: C.border }} />
-                <div style={{ display: "flex", position: "relative", justifyContent: "center" }}>
-                  {/* Horizontal connector */}
-                  {departments.length > 1 && (
-                    <div style={{ position: "absolute", top: 0, left: "calc(50% - " + ((departments.length - 1) * 120) + "px)", right: "calc(50% - " + ((departments.length - 1) * 120) + "px)", height: 2, background: C.border }} />
-                  )}
-                </div>
-                <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center" }}>
-                  {departments.map(dept => {
-                    const members = deptMap[dept];
-                    const manager = members[0];
-                    const team = members.slice(1).filter(matchesSearch);
-                    const nodeId = `dept_${dept}`;
-                    const isExpanded = orgExpandedNodes.includes(nodeId);
-                    const managerMatches = matchesSearch(manager);
-                    if (search && !managerMatches && team.length === 0) return null;
-
-                    return (
-                      <div key={dept} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                        <div style={{ width: 2, height: 20, background: C.border }} />
-                        <div onClick={() => toggleNode(nodeId)} style={{ cursor: "pointer", position: "relative" }}>
-                          {renderNodeCard(manager, true)}
-                          {members.length > 1 && (
-                            <div style={{
-                              position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%)",
-                              background: C.pink, color: "#fff", borderRadius: 99, width: 20, height: 20,
-                              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700,
-                            }}>
-                              {isExpanded ? <ChevronLeft size={10} style={{ transform: "rotate(-90deg)" }} /> : members.length - 1}
-                            </div>
-                          )}
-                        </div>
-                        {isExpanded && team.length > 0 && (
-                          <>
-                            <div style={{ width: 2, height: 16, background: C.border }} />
-                            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-                              {team.map(m => (
-                                <Fragment key={m.id}>
-                                  {renderNodeCard(m)}
-                                </Fragment>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
+            {/* Info banner if no manager_id set */}
+            {collabs.length > 0 && collabs.every((c: any) => !c.manager_id) && (
+              <div style={{ marginTop: 24, padding: "12px 20px", borderRadius: 10, background: "#FFF3E0", border: "1px solid #FFE0B2", fontSize: 12, color: "#E65100", maxWidth: 500, textAlign: "center" }}>
+                <strong>Conseil :</strong> Assignez un manager à chaque collaborateur (champ "Manager" dans la fiche collaborateur) pour construire une hiérarchie réelle.
+              </div>
             )}
           </div>
         )}
@@ -193,23 +258,33 @@ export function createAdminOrgChart(ctx: any) {
             else { setOrgSortCol(col); setOrgSortDir("asc"); }
           };
           const cols = [
-            { key: "nom", label: "Name", render: (c: Collaborateur) => (
+            { key: "nom", label: "Nom", render: (c: Collaborateur) => (
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 28, height: 28, borderRadius: "50%", background: c.color, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 10 }}>{c.initials}</div>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: c.color || C.pink, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 10 }}>{c.initials || `${(c.prenom||'')[0]}${(c.nom||'')[0]}`}</div>
                 <span style={{ fontWeight: 600 }}>{c.prenom} {c.nom}</span>
               </div>
             )},
-            { key: "poste", label: "Poste", render: (c: Collaborateur) => c.poste },
-            { key: "departement", label: t('org.department'), render: (c: Collaborateur) => (
+            { key: "poste", label: "Poste", render: (c: Collaborateur) => c.poste || <span style={{ color: C.textMuted }}>—</span> },
+            { key: "departement", label: t('org.department'), render: (c: Collaborateur) => c.departement ? (
               <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600, background: colorWithAlpha(DEPT_COLORS[c.departement] || C.blue, 0.12), color: DEPT_COLORS[c.departement] || C.blue }}>{c.departement}</span>
-            )},
-            { key: "site", label: "Site", render: (c: Collaborateur) => c.site },
+            ) : <span style={{ color: C.textMuted }}>—</span> },
+            { key: "site", label: "Site", render: (c: Collaborateur) => c.site || <span style={{ color: C.textMuted }}>—</span> },
             { key: "manager", label: "Manager", render: (c: Collaborateur) => {
-              const mgr = deptMap[c.departement]?.[0];
-              return mgr && mgr.id !== c.id ? `${mgr.prenom} ${mgr.nom}` : <span style={{ color: C.textMuted, fontStyle: "italic" }}>{t('org.no_manager')}</span>;
+              const name = getManagerName(c);
+              return name ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <User size={11} color={C.textMuted} />
+                  <span>{name}</span>
+                </div>
+              ) : <span style={{ color: C.textMuted, fontStyle: "italic" }}>{t('org.no_manager')}</span>;
             }},
-            { key: "status", label: "Status", render: (c: Collaborateur) => {
-              const colors: Record<string, { bg: string; fg: string; label: string }> = { en_cours: { bg: "#E3F2FD", fg: "#1A73E8", label: "En cours" }, en_retard: { bg: "#FFF3E0", fg: "#E65100", label: "En retard" }, termine: { bg: "#E8F5E9", fg: "#2E7D32", label: "Termine" } };
+            { key: "status", label: "Statut", render: (c: Collaborateur) => {
+              const colors: Record<string, { bg: string; fg: string; label: string }> = {
+                pre_onboarding: { bg: "#F3E5F5", fg: "#7B1FA2", label: "Pré-onboarding" },
+                en_cours: { bg: "#E3F2FD", fg: "#1A73E8", label: "En cours" },
+                en_retard: { bg: "#FFF3E0", fg: "#E65100", label: "En retard" },
+                termine: { bg: "#E8F5E9", fg: "#2E7D32", label: "Terminé" },
+              };
               const s = colors[c.status] || colors.en_cours;
               return <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 99, fontWeight: 600, background: s.bg, color: s.fg }}>{s.label}</span>;
             }},
@@ -249,10 +324,15 @@ export function createAdminOrgChart(ctx: any) {
         {/* DEPARTMENT VIEW */}
         {orgView === "dept" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-            {departments.map(dept => {
+            {Object.keys(deptMap).map(dept => {
               const members = deptMap[dept].filter(matchesSearch);
               if (search && members.length === 0) return null;
               const deptColor = DEPT_COLORS[dept] || C.blue;
+              // Find actual managers in this department (those who have direct reports)
+              const deptManagerIds = new Set<number>();
+              members.forEach(m => {
+                if (childrenMap.has(m.id)) deptManagerIds.add(m.id);
+              });
               return (
                 <div key={dept} className="iz-card" style={{ ...sCard, overflow: "hidden" }}>
                   <div style={{ padding: "14px 20px", background: colorWithAlpha(deptColor, 0.08), borderBottom: `2px solid ${deptColor}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -262,25 +342,30 @@ export function createAdminOrgChart(ctx: any) {
                     </div>
                     <span style={{ fontSize: 12, color: C.textMuted }}>{members.length} {t('org.employees')}</span>
                   </div>
-                  <div style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
-                    {members.map((c, idx) => (
-                      <div key={c.id} style={{
-                        background: C.white, borderRadius: 10, padding: "14px 16px", border: `1px solid ${C.border}`,
-                        display: "flex", alignItems: "center", gap: 12,
-                        boxShadow: idx === 0 ? `0 0 0 2px ${colorWithAlpha(deptColor, 0.3)}` : "none",
-                      }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: "50%", background: c.color, display: "flex",
-                          alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 12,
-                          border: idx === 0 ? `2px solid ${deptColor}` : "none",
-                        }}>{c.initials}</div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 13 }}>{c.prenom} {c.nom}</div>
-                          <div style={{ fontSize: 11, color: C.textLight }}>{c.poste}</div>
-                          {idx === 0 && <div style={{ fontSize: 10, color: deptColor, fontWeight: 600, marginTop: 2 }}>Manager</div>}
+                  <div style={{ padding: 16, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
+                    {members.map(c => {
+                      const isManager = deptManagerIds.has(c.id);
+                      const mgrName = getManagerName(c);
+                      return (
+                        <div key={c.id} style={{
+                          background: C.white, borderRadius: 10, padding: "14px 16px", border: `1px solid ${C.border}`,
+                          display: "flex", alignItems: "center", gap: 12,
+                          boxShadow: isManager ? `0 0 0 2px ${colorWithAlpha(deptColor, 0.3)}` : "none",
+                        }}>
+                          <div style={{
+                            width: 36, height: 36, borderRadius: "50%", background: c.color || deptColor, display: "flex",
+                            alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 12,
+                            border: isManager ? `2px solid ${deptColor}` : "none",
+                          }}>{c.initials || `${(c.prenom||'')[0]}${(c.nom||'')[0]}`}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{c.prenom} {c.nom}</div>
+                            <div style={{ fontSize: 11, color: C.textLight }}>{c.poste}</div>
+                            {isManager && <div style={{ fontSize: 10, color: deptColor, fontWeight: 600, marginTop: 1 }}>Manager</div>}
+                            {!isManager && mgrName && <div style={{ fontSize: 10, color: C.textMuted, marginTop: 1 }}>→ {mgrName}</div>}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               );
