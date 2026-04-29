@@ -467,10 +467,17 @@ export function createAuthPages(ctx: any) {
       <div aria-hidden style={{ position: "absolute", top: 60, right: -40, width: 200, height: 200, opacity: .15, background: "radial-gradient(circle, #fff 0%, transparent 60%)", pointerEvents: "none" }} />
       <div aria-hidden style={{ position: "absolute", bottom: 80, left: -60, width: 240, height: 240, opacity: .12, background: "radial-gradient(circle, #fff 0%, transparent 60%)", pointerEvents: "none" }} />
 
-      {/* Top bar */}
+      {/* Top bar — Illizeo brand logo HARDCODED, bypasses any tenant custom_logo
+          override. The auth shell is the public brand surface; tenants only get
+          their own logo *after* login (in the app sidebar), never here. */}
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 56px", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, filter: "brightness(0) invert(1)" }}>
-          <IllizeoLogoFull height={28} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, filter: "brightness(0) invert(1)" }}>
+            <img src={ILLIZEO_FULL_LOGO_URI} alt="Illizeo" style={{ height: 30, objectFit: "contain", display: "block" }} />
+          </div>
+          <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: 1.8, textTransform: "uppercase", color: "rgba(255,255,255,.85)", paddingLeft: 38 }}>
+            The all-in-one HR solution
+          </span>
         </div>
         <a href="https://illizeo.com" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 18px", borderRadius: 999, border: "1px solid rgba(255,255,255,.5)", color: C.white, fontSize: 12, fontWeight: 600, textDecoration: "none", letterSpacing: 1, textTransform: "uppercase" }}>
           <ArrowRight size={12} style={{ transform: "rotate(-45deg)" }} /> ILLIZEO.COM
