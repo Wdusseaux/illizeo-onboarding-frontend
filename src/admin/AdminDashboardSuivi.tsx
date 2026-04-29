@@ -690,10 +690,10 @@ export function createAdminDashboardSuivi(ctx: any) {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>{lang === "fr" ? "Votre espace n'est pas encore configuré" : "Your space is not yet configured"}</div>
-                    <div style={{ fontSize: 12, color: C.textMuted }}>{lang === "fr" ? `L'IA peut vous guider à travers les ${SETUP_STEPS.length} étapes en 8 minutes.` : `AI can guide you through the ${SETUP_STEPS.length} steps in 8 minutes.`} · {doneReq}/{totalReq} {t('wiz.required_steps')} · {pct}%</div>
+                    <div style={{ fontSize: 12, color: C.textMuted }}>{lang === "fr" ? `${SETUP_STEPS.length} étapes guidées en 8 minutes.` : `${SETUP_STEPS.length} guided steps in 8 minutes.`} · {doneReq}/{totalReq} {t('wiz.required_steps')} · {pct}%</div>
                   </div>
                   <button onClick={() => { setShowSetupWizard(true); setSetupStep(SETUP_STEPS.findIndex(s => !setupCompleted.includes(s.id)) || 0); }} style={{ padding: "9px 18px", borderRadius: 999, background: C.pink, color: C.white, border: "none", fontSize: 12, fontFamily: font, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                    <Sparkles size={13} /> {lang === "fr" ? "Configurer avec l'IA" : "Configure with AI"}
+                    <Sparkles size={13} /> {lang === "fr" ? "Configurer mon espace" : "Configure my space"}
                   </button>
                 </div>
               </div>
