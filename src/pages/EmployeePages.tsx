@@ -196,7 +196,7 @@ export function createEmployeeRenders(ctx: any) {
     modalSubtasks, setModalSubtasks, phases, setPhases, selectedPhaseId, setSelectedPhaseId, messageCanal, setMessageCanal,
     messageBody, setMessageBody, showWelcomeModal, setShowWelcomeModal, showDocPanel, setShowDocPanel, showDocCategory, setShowDocCategory,
     showActionDetail, setShowActionDetail, sigActionAck, setSigActionAck, sigActionLoading, setSigActionLoading, sigContratData, setSigContratData, actionTab, setActionTab, showProfile, setShowProfile, showTeamModal, setShowTeamModal, selectedTeamMember, setSelectedTeamMember,
-    profileTab, setProfileTab, formData, setFormData, passwordVisible, setPasswordVisible, acceptCGU, setAcceptCGU,
+    profileTab, setProfileTab, profileForm, setProfileForm, formData, setFormData, passwordVisible, setPasswordVisible, acceptCGU, setAcceptCGU,
     employeeDocs, setEmployeeDocs, completedActions, setCompletedActions, sharedTimeline, setSharedTimeline, toasts, setToasts,
     auth, _needsPlan, isDemo, apiEnabled, COLLABORATEURS, refetchCollaborateurs, PARCOURS_TEMPLATES, refetchParcours,
     ACTION_TEMPLATES, refetchActions, GROUPES, refetchGroupes, PHASE_DEFAULTS, refetchPhases, WORKFLOW_RULES, EMAIL_TEMPLATES,
@@ -3178,11 +3178,15 @@ export function createEmployeeRenders(ctx: any) {
     ];
     return (
       <div className="iz-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-        <div className="iz-modal" style={{ background: C.white, borderRadius: 16, width: 900, maxHeight: "85vh", overflow: "auto", position: "relative" }}>
-          <div style={{ padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {/* overflow:hidden + flex column ensures the rounded corners clip the
+            inner scrollbar properly. Without ça, le scrollbar natif bleed
+            jusqu'au bord droit et écrase l'arrondi. */}
+        <div className="iz-modal" style={{ background: C.white, borderRadius: 16, width: 900, maxHeight: "85vh", overflow: "hidden", position: "relative", display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.pink, letterSpacing: 1 }}>illizeo</div>
             <button onClick={() => setShowProfile(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={22} color={C.textLight} /></button>
           </div>
+          <div style={{ flex: 1, overflow: "auto" }}>
           <div style={{ textAlign: "center", padding: "0 40px 24px" }}>
             <h1 style={{ fontSize: 36, fontWeight: 300, color: C.text, margin: "0 0 24px" }}>{(`${formData.prenom || ""} ${formData.nom || ""}`).trim() || auth.user?.name || "Mon profil"}</h1>
             <div style={{ display: "flex", justifyContent: "center", gap: 32, borderBottom: `2px solid ${C.border}` }}>
@@ -3194,17 +3198,24 @@ export function createEmployeeRenders(ctx: any) {
           <div style={{ padding: "24px 56px 40px" }}>
             {profileTab === "infos" && (
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px 32px" }}>
-                {[
-                  { label: "Prénom", value: formData.prenom },
-                  { label: "Nom de famille", value: formData.nom },
-                  { label: "Numéro de téléphone", value: "6********", hasPrefix: true },
-                  { label: "Date de naissance", value: formData.dateNaissance, optional: true },
-                ].map((f, i) => (
-                  <div key={i}>
-                    <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{f.label} {f.optional && <span style={{ color: C.textMuted, fontWeight: 400 }}>Optionnel</span>}</label>
-                    <input value={f.value} readOnly style={{ ...sInput, marginTop: 6 }} />
-                  </div>
-                ))}
+                {/* Prénom + Nom — éditables, bindés sur profileForm. À la
+                    sauvegarde, concaténés en user.name. */}
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Prénom</label>
+                  <input value={profileForm.prenom || ""} onChange={e => setProfileForm((p: any) => ({ ...p, prenom: e.target.value }))} style={{ ...sInput, marginTop: 6 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Nom de famille</label>
+                  <input value={profileForm.nom || ""} onChange={e => setProfileForm((p: any) => ({ ...p, nom: e.target.value }))} style={{ ...sInput, marginTop: 6 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Email</label>
+                  <input type="email" value={profileForm.email || ""} onChange={e => setProfileForm((p: any) => ({ ...p, email: e.target.value }))} style={{ ...sInput, marginTop: 6 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Date de naissance <span style={{ color: C.textMuted, fontWeight: 400 }}>Optionnel</span></label>
+                  <input value={formData.dateNaissance || ""} readOnly style={{ ...sInput, marginTop: 6 }} />
+                </div>
                 <div style={{ gridColumn: "1 / -1" }}>
                   <label style={{ fontSize: 13, fontWeight: 600, color: C.text }}>Genre *</label>
                   <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
@@ -3242,13 +3253,19 @@ export function createEmployeeRenders(ctx: any) {
             )}
             {profileTab === "password" && (
               <div>
-                {["Mot de passe actuel *", "Nouveau mot de passe *", "Confirmer le nouveau mot de passe*"].map((label, i) => (
-                  <div key={i} style={{ marginBottom: 24 }}>
+                {/* 3 inputs password bindés sur profileForm. Submit = POST
+                    /change-password (verifie current_password + applique). */}
+                {[
+                  { key: "password_current", label: "Mot de passe actuel *", placeholder: "Saisissez votre mot de passe actuel" },
+                  { key: "password_new", label: "Nouveau mot de passe *", placeholder: "Saisissez votre nouveau mot de passe", hint: true },
+                  { key: "password_confirm", label: "Confirmer le nouveau mot de passe*", placeholder: "Répétez le nouveau mot de passe" },
+                ].map(field => (
+                  <div key={field.key} style={{ marginBottom: 24 }}>
                     <label style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
-                      {label} {i === 1 && <span style={{ fontWeight: 400, fontSize: 12, color: C.textLight }}>(Le mot de passe doit comporter au moins 8 caractères, 1 chiffre et 1 caractère spécial)</span>}
+                      {field.label} {field.hint && <span style={{ fontWeight: 400, fontSize: 12, color: C.textLight }}>(Le mot de passe doit comporter au moins 8 caractères, 1 chiffre et 1 caractère spécial)</span>}
                     </label>
                     <div style={{ position: "relative", marginTop: 8 }}>
-                      <input type="password" placeholder={i === 0 ? "Saisissez votre mot de passe actuel" : "Saisissez votre nouveau mot de passe"} style={sInput} />
+                      <input type="password" value={profileForm[field.key] || ""} onChange={e => setProfileForm((p: any) => ({ ...p, [field.key]: e.target.value }))} placeholder={field.placeholder} style={sInput} autoComplete={field.key === "password_current" ? "current-password" : "new-password"} />
                       <Eye size={18} color={C.textLight} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", cursor: "pointer" }} />
                     </div>
                   </div>
@@ -3266,24 +3283,64 @@ export function createEmployeeRenders(ctx: any) {
                   <span style={{ width: 120, textAlign: "center", fontSize: 12, fontWeight: 600, color: C.textMuted }}>E-MAIL</span>
                   <span style={{ width: 120, textAlign: "center", fontSize: 12, fontWeight: 600, color: C.textMuted }}>SMS</span>
                 </div>
-                {(profileTab === "notifs" ? NOTIFICATIONS_LIST : NOTIF_RESOURCES).map((n, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", padding: "12px 16px", background: i % 2 === 0 ? C.bg : C.white, borderRadius: 6 }}>
-                    <span style={{ flex: 1, fontSize: 14, color: C.text }}>{n}</span>
-                    <div style={{ width: 120, textAlign: "center" }}>
-                      <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${C.green}`, background: C.greenLight, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-                        <Check size={12} color={C.green} />
-                      </div>
+                {(profileTab === "notifs" ? NOTIFICATIONS_LIST : NOTIF_RESOURCES).map((n, i) => {
+                  // Cabling : profileForm.notif_prefs[notifId] = { email: bool, sms: bool }
+                  // Defaults email=true, sms=false comme avant.
+                  const notifId = (profileTab === "notifs" ? "n" : "r") + "_" + i;
+                  const cur = (profileForm.notif_prefs && profileForm.notif_prefs[notifId]) || { email: true, sms: false };
+                  const toggle = (channel: "email" | "sms") => setProfileForm((p: any) => ({
+                    ...p,
+                    notif_prefs: { ...(p.notif_prefs || {}), [notifId]: { ...cur, [channel]: !cur[channel] } },
+                  }));
+                  const Box = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
+                    <div onClick={onClick} style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${on ? C.green : C.border}`, background: on ? C.greenLight : "transparent", display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                      {on && <Check size={12} color={C.green} />}
                     </div>
-                    <div style={{ width: 120, textAlign: "center" }}>
-                      <div style={{ width: 20, height: 20, borderRadius: 4, border: `2px solid ${C.border}`, display: "inline-block" }} />
+                  );
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", padding: "12px 16px", background: i % 2 === 0 ? C.bg : C.white, borderRadius: 6 }}>
+                      <span style={{ flex: 1, fontSize: 14, color: C.text }}>{n}</span>
+                      <div style={{ width: 120, textAlign: "center" }}><Box on={!!cur.email} onClick={() => toggle("email")} /></div>
+                      <div style={{ width: 120, textAlign: "center" }}><Box on={!!cur.sms} onClick={() => toggle("sms")} /></div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             <div style={{ textAlign: "center", marginTop: 32 }}>
-              <button style={sBtn("pink")}>Sauvegarder</button>
+              <button onClick={async () => {
+                // Save handler par tab — câblé sur de vrais endpoints.
+                try {
+                  if (profileTab === "infos") {
+                    const ep = await import('../api/endpoints');
+                    const fullName = `${profileForm.prenom || ''} ${profileForm.nom || ''}`.trim();
+                    if (!fullName) { addToast?.('Prénom et nom requis', 'error'); return; }
+                    await ep.updateMyProfile({
+                      name: fullName,
+                      email: profileForm.email || auth.user?.email,
+                      preferred_language: lang,
+                    });
+                    addToast?.('Profil mis à jour', 'success');
+                  } else if (profileTab === "password") {
+                    if (!profileForm.password_current || !profileForm.password_new) { addToast?.('Renseignez les mots de passe', 'error'); return; }
+                    if (profileForm.password_new !== profileForm.password_confirm) { addToast?.('Les nouveaux mots de passe ne correspondent pas', 'error'); return; }
+                    const ep = await import('../api/endpoints');
+                    await ep.changeMyPassword({ current_password: profileForm.password_current, password: profileForm.password_new, password_confirmation: profileForm.password_confirm });
+                    addToast?.('Mot de passe modifié', 'success');
+                    setProfileForm((p: any) => ({ ...p, password_current: '', password_new: '', password_confirm: '' }));
+                  } else if (profileTab === "notifs" || profileTab === "notifs_res") {
+                    const ep = await import('../api/endpoints');
+                    await ep.updateMyNotificationPreferences(profileForm.notif_prefs || {});
+                    addToast?.('Préférences notifications enregistrées', 'success');
+                  }
+                } catch (e: any) {
+                  let msg = e?.message || 'Erreur de sauvegarde';
+                  try { const parsed = JSON.parse(msg); msg = parsed.message || msg; } catch {}
+                  addToast?.(msg, 'error');
+                }
+              }} style={sBtn("pink")}>Sauvegarder</button>
             </div>
+          </div>
           </div>
         </div>
       </div>

@@ -1327,6 +1327,25 @@ export async function updateCompanySettings(settings: Record<string, any>) {
   return apiFetch<{ message: string }>('/company-settings', { method: 'PUT', body: JSON.stringify({ settings }) });
 }
 
+// ─── Mon compte ────────────────────────────────────────────
+// Endpoints "Mon compte" pour l'utilisateur authentifié (Mon profil, change
+// password, préférences notifications). Voir MeController.php côté backend.
+export async function getMyProfile() {
+  return apiFetch<{ id: number; name: string; email: string; preferred_language: string | null; roles: string[] }>('/me/profile');
+}
+export async function updateMyProfile(data: { name?: string; email?: string; preferred_language?: string | null }) {
+  return apiFetch<{ id: number; name: string; email: string }>('/me/profile', { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function changeMyPassword(data: { current_password: string; password: string; password_confirmation: string }) {
+  return apiFetch<{ message: string }>('/change-password', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function getMyNotificationPreferences() {
+  return apiFetch<Record<string, any>>('/me/notification-preferences');
+}
+export async function updateMyNotificationPreferences(prefs: Record<string, any>) {
+  return apiFetch<{ ok: boolean; prefs: Record<string, any> }>('/me/notification-preferences', { method: 'PUT', body: JSON.stringify(prefs) });
+}
+
 // Avatar/banner endpoints accessible to all authenticated users (employees too).
 // Use these instead of updateCompanySettings({ avatar_<id>: ... }) which requires admin role.
 export async function saveMyAvatar(dataUrl: string) {

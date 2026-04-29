@@ -859,6 +859,14 @@ export default function OnboardingModule() {
   }, [consoMonth.year, consoMonth.month]);
   useEffect(() => { if (subTab === "consommation") loadConsumption(); }, [consoMonth.year, consoMonth.month, subTab]);
   const [profileTab, setProfileTab] = useState("infos");
+  // profileForm — état dédié au ProfileModal (Mon compte). Distinct de formData
+  // qui sert à l'onboarding employé. Hydraté depuis auth.user + getMyProfile()
+  // + getMyNotificationPreferences() à l'ouverture du modal.
+  const [profileForm, setProfileForm] = useState<any>({
+    prenom: "", nom: "", email: "",
+    password_current: "", password_new: "", password_confirm: "",
+    notif_prefs: {} as Record<string, any>,
+  });
   const [formData, setFormData] = useState({
     prenom: "", nom: "", dateNaissance: "", genre: "",
     nationalite: "", metier: "", site: "",
@@ -931,6 +939,28 @@ export default function OnboardingModule() {
     if (adminPage !== "admin_suivi" && adminPage !== "admin_dashboard") return;
     getCompanySettings().then(s => setAllCompanySettings(s || {})).catch(() => {});
   }, [adminPage, auth.isAuthenticated, auth.isAdmin]);
+
+  // ─── Hydrate profileForm à l'ouverture du ProfileModal ─────
+  // Lit auth.user pour name/email et fetch les prefs notifs depuis le backend.
+  // Comme ça les inputs du modal "Mon compte" sont pré-remplis avec la vraie
+  // valeur courante, et le bouton Sauvegarder envoie un update qui marche.
+  useEffect(() => {
+    if (!showProfile) return;
+    const userName = auth.user?.name || "";
+    const parts = userName.trim().split(/\s+/);
+    const prenom = parts[0] || "";
+    const nom = parts.slice(1).join(" ");
+    setProfileForm((prev: any) => ({
+      ...prev,
+      prenom: prev.prenom || prenom,
+      nom: prev.nom || nom,
+      email: prev.email || auth.user?.email || "",
+    }));
+    // Charger les prefs notifs (best-effort, silencieux si endpoint manquant)
+    import('./api/endpoints').then(ep => ep.getMyNotificationPreferences()).then((prefs: any) => {
+      setProfileForm((prev: any) => ({ ...prev, notif_prefs: prefs || {} }));
+    }).catch(() => {});
+  }, [showProfile]);
 
   // ─── AI-blocked global listener ─────────────────────────────
   // Triggered by api/client.ts when any AI call returns 402 (spending cap, quota
@@ -1384,7 +1414,7 @@ export default function OnboardingModule() {
     editingInfoSection, setEditingInfoSection, editInfoData, setEditInfoData, protectionOpenSection, setProtectionOpenSection,
     generateContrat, setGenerateContrat, generateCollabId, setGenerateCollabId, generateData, setGenerateData, generateLoading, setGenerateLoading,
     consoData, setConsoData, consoMonth, setConsoMonth, consoLoading, setConsoLoading, consoFilter, setConsoFilter, consoSearch, setConsoSearch, loadConsumption,
-    profileTab, setProfileTab,
+    profileTab, setProfileTab, profileForm, setProfileForm,
     formData, setFormData,
     passwordVisible, setPasswordVisible,
     acceptCGU, setAcceptCGU,
