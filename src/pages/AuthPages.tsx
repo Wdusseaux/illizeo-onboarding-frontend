@@ -19,7 +19,7 @@ import {
   Moon, Sun
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode } from '../constants';
+import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, fontDisplay, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode } from '../constants';
 import type { OnboardingStep, DashboardPage, DashboardTab, UserRole, AdminPage, AdminModal, Collaborateur, ParcoursCategorie, ParcourTemplate, ActionTemplate, ActionType, AssignTarget, GroupePersonnes, DocCategory, WorkflowRule, EmailTemplate, TeamMember } from '../types';
 import RichEditor from '../components/RichEditor';
 import TranslatableField, { type Translations } from '../components/TranslatableField';
@@ -83,6 +83,21 @@ import {
   checkDossier, validateDossier, exportDossier, resetDossier, type DossierCheck,
 } from "../api/endpoints";
 import { apiFetch } from "../api/client";
+
+// ─── Recent tenants tracking ─────────────────────────────────
+// Stored as JSON array [{slug, lastSeen, members?}] in localStorage. Fed by every
+// successful tenant-check + every authenticated session boot. Keeps last 5.
+type RecentTenant = { slug: string; lastSeen: number; members?: number };
+const RECENT_KEY = 'illizeo_recent_tenants';
+function getRecentTenants(): RecentTenant[] {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') as RecentTenant[]; } catch { return []; }
+}
+export function addRecentTenant(slug: string, members?: number) {
+  if (!slug) return;
+  const list = getRecentTenants().filter(r => r.slug !== slug);
+  list.unshift({ slug, lastSeen: Date.now(), ...(typeof members === 'number' ? { members } : {}) });
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 5)));
+}
 
 /**
  * Factory that creates auth page render functions.
@@ -206,94 +221,112 @@ export function createAuthPages(ctx: any) {
 
   const renderResetPassword = () => {
     loadPwdPolicy();
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
-        <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
-        <div className="iz-scale-in" style={{ width: 400, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 48, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: C.dark, margin: 0 }}>Nouveau mot de passe</h1>
-            <p style={{ fontSize: 13, color: C.textLight, marginTop: 4 }}>Choisissez un nouveau mot de passe pour {resetEmail}</p>
-          </div>
-          {resetDone ? (
-            <div style={{ textAlign: "center" }}>
-              <CheckCircle size={32} color={C.green} style={{ marginBottom: 12 }} />
-              <div style={{ fontSize: 16, fontWeight: 600, color: C.green, marginBottom: 8 }}>Mot de passe modifié !</div>
-              <div style={{ fontSize: 13, color: C.textLight, marginBottom: 20 }}>Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.</div>
-              <button onClick={() => { setResetMode(false); setResetDone(false); }} className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%" }}>Se connecter</button>
-            </div>
-          ) : (
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!allPwdRulesMet(resetPassword, pwdPolicy)) return;
-              if (resetPassword !== resetConfirm) return;
-              setResetLoading(true);
-              try {
-                await apiFetch('/reset-password', { method: 'POST', body: JSON.stringify({ email: resetEmail, token: resetToken, password: resetPassword, password_confirmation: resetConfirm }) });
-                setResetDone(true);
-              } catch { setResetDone(false); }
-              finally { setResetLoading(false); }
-            }}>
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nouveau mot de passe</label>
-                <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder={`Minimum ${pwdPolicy?.min_length ?? 8} caract\u00e8res`} required
-                  style={{ ...sInput, background: C.bg }} />
-                {resetPassword && renderPwdChecklist(resetPassword, pwdPolicy)}
-              </div>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Confirmer le mot de passe</label>
-                <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} placeholder="R\u00e9p\u00e9tez le mot de passe" required
-                  style={{ ...sInput, background: C.bg }} />
-                {resetConfirm && resetPassword !== resetConfirm && <div style={{ fontSize: 11, color: C.red, marginTop: 4 }}>Les mots de passe ne correspondent pas</div>}
-              </div>
-              <button type="submit" disabled={resetLoading || !allPwdRulesMet(resetPassword, pwdPolicy) || resetPassword !== resetConfirm}
-                className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", padding: "12px 0", fontSize: 15, opacity: resetLoading ? 0.6 : 1 }}>
-                {resetLoading ? "Enregistrement..." : "Enregistrer le mot de passe"}
-              </button>
-              <div style={{ textAlign: "center", marginTop: 12 }}>
-                <button type="button" onClick={() => setResetMode(false)} style={{ background: "none", border: "none", color: C.pink, fontSize: 13, cursor: "pointer", fontFamily: font }}>Retour à la connexion</button>
-              </div>
-            </form>
-          )}
+    const leftBody = resetDone ? (
+      <div style={{ maxWidth: 540, padding: "28px 30px", borderRadius: 16, background: "rgba(0,0,0,.18)", border: "1px solid rgba(255,255,255,.18)" }}>
+        <CheckCircle size={32} color="#A8FFD2" style={{ marginBottom: 14 }} />
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Mot de passe modifié !</div>
+        <div style={{ fontSize: 13, color: "rgba(255,255,255,.8)", marginBottom: 22, lineHeight: 1.5 }}>Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.</div>
+        <button onClick={() => { setResetMode(false); setResetDone(false); }} style={sShellPrimaryBtn(false)}>
+          Se connecter <ArrowRight size={18} />
+        </button>
+      </div>
+    ) : (
+      <form onSubmit={async (e) => {
+        e.preventDefault();
+        if (!allPwdRulesMet(resetPassword, pwdPolicy)) return;
+        if (resetPassword !== resetConfirm) return;
+        setResetLoading(true);
+        try {
+          await apiFetch('/reset-password', { method: 'POST', body: JSON.stringify({ email: resetEmail, token: resetToken, password: resetPassword, password_confirmation: resetConfirm }) });
+          setResetDone(true);
+        } catch { setResetDone(false); }
+        finally { setResetLoading(false); }
+      }} style={{ maxWidth: 540 }}>
+        <div style={{ marginBottom: 14 }}>
+          <label style={sShellLabel}>Nouveau mot de passe</label>
+          <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder={`Min. ${pwdPolicy?.min_length ?? 8} caractères`} required style={sShellInput} />
         </div>
+        <div style={{ marginBottom: 14 }}>
+          <label style={sShellLabel}>Confirmer le mot de passe</label>
+          <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} placeholder="Répétez le mot de passe" required style={sShellInput} />
+        </div>
+        {resetPassword && (
+          <div style={{ marginBottom: 16, padding: "12px 14px", background: "rgba(0,0,0,.18)", borderRadius: 10, border: "1px solid rgba(255,255,255,.12)" }}>
+            {checkPwdRules(resetPassword, pwdPolicy).map(r => (
+              <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, lineHeight: 1.7, color: r.met ? "#A8FFD2" : "rgba(255,255,255,.7)" }}>
+                {r.met ? <Check size={12} /> : <X size={12} />}<span>{r.label}</span>
+              </div>
+            ))}
+            {resetConfirm && resetPassword !== resetConfirm && (
+              <div style={{ fontSize: 11, color: "#FFD0D0", marginTop: 4 }}>Les mots de passe ne correspondent pas</div>
+            )}
+          </div>
+        )}
+        <button type="submit" disabled={resetLoading || !allPwdRulesMet(resetPassword, pwdPolicy) || resetPassword !== resetConfirm}
+          style={sShellPrimaryBtn(resetLoading || !allPwdRulesMet(resetPassword, pwdPolicy) || resetPassword !== resetConfirm)}>
+          {resetLoading ? "Enregistrement…" : "Enregistrer le mot de passe"} <ArrowRight size={18} />
+        </button>
+      </form>
+    );
+
+    const rightPanel = (
+      <div style={{ background: "rgba(0,0,0,.18)", border: "1px solid rgba(255,255,255,.18)", borderRadius: 18, padding: "28px 30px", backdropFilter: "blur(8px)" }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.85)", marginBottom: 18 }}>↳ Conseils sécurité</div>
+        {[
+          "Choisissez un mot de passe unique, jamais réutilisé sur un autre service.",
+          "Mélangez majuscules, minuscules, chiffres et caractères spéciaux.",
+          "Activez la double authentification (2FA) une fois connecté pour plus de sécurité.",
+          "Ne partagez jamais votre mot de passe par email ou message.",
+        ].map((line, idx) => (
+          <div key={idx} style={{ display: "flex", gap: 10, marginBottom: 12, fontSize: 13, lineHeight: 1.5, color: "rgba(255,255,255,.85)" }}>
+            <span style={{ color: "#A8FFD2", flexShrink: 0 }}>✓</span>
+            <span>{line}</span>
+          </div>
+        ))}
       </div>
     );
+
+    return renderAuthShell({
+      badge: `Réinitialisation · ${resetEmail || ''}`,
+      title: <>NOUVEAU<br /><span style={{ color: "rgba(255,255,255,.55)" }}>MOT DE</span><br />PASSE.</>,
+      subtitle: "Choisissez un mot de passe robuste pour protéger votre espace Illizeo.",
+      leftBody,
+      rightPanel,
+      backLink: { label: "Retour à la connexion", onClick: () => setResetMode(false) },
+    });
   };
 
   const renderTwoFactorVerify = () => {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
-        <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
-        <div className="iz-scale-in" style={{ width: 400, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 48, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
-            <div style={{ width: 56, height: 56, borderRadius: "50%", background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "16px auto" }}><ShieldCheck size={28} color={C.pink} /></div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: C.dark, margin: 0 }}>Vérification 2FA</h1>
-            <p style={{ fontSize: 13, color: C.textLight, marginTop: 4 }}>Entrez le code de votre application d'authentification</p>
-          </div>
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            try { await auth.verifyTwoFactor(twoFactorCode); } catch { setTwoFactorCode(""); }
-          }}>
-            <div style={{ marginBottom: 20 }}>
-              <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={twoFactorCode} onChange={e => setTwoFactorCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="000000" autoFocus
-                style={{ ...sInput, textAlign: "center", fontSize: 28, fontWeight: 700, letterSpacing: 12, padding: "16px", background: C.bg }} />
-            </div>
-            {auth.error && <div style={{ fontSize: 12, color: C.red, textAlign: "center", marginBottom: 12 }}>{auth.error}</div>}
-            <button type="submit" disabled={twoFactorCode.length !== 6} className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", padding: "12px 0", fontSize: 15, opacity: twoFactorCode.length !== 6 ? 0.5 : 1 }}>
-              Vérifier
-            </button>
-            <div style={{ textAlign: "center", marginTop: 16 }}>
-              <p style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>Vous pouvez aussi utiliser un code de récupération</p>
-              <button type="button" onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `/${tid}` : "/"; }); }} style={{ background: "none", border: "none", color: C.pink, fontSize: 13, cursor: "pointer", fontFamily: font }}>Retour à la connexion</button>
-            </div>
-          </form>
+    const leftBody = (
+      <form onSubmit={async (e) => {
+        e.preventDefault();
+        try { await auth.verifyTwoFactor(twoFactorCode); } catch { setTwoFactorCode(""); }
+      }} style={{ maxWidth: 540 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 999, border: "1px solid rgba(255,255,255,.25)", background: "rgba(0,0,0,.18)", fontSize: 12, marginBottom: 22 }}>
+          <ShieldCheck size={14} /> Authentification à deux facteurs requise
         </div>
-      </div>
+        <div style={{ marginBottom: 18 }}>
+          <label style={sShellLabel}>Code à 6 chiffres</label>
+          <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={twoFactorCode} onChange={e => setTwoFactorCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" autoFocus
+            style={{ ...sShellInput, textAlign: "center", fontSize: 28, fontWeight: 700, letterSpacing: 12, padding: "20px" }} />
+        </div>
+        {auth.error && <div style={{ fontSize: 12, color: "#FFD0D0", marginBottom: 12 }}>{auth.error}</div>}
+        <button type="submit" disabled={twoFactorCode.length !== 6} style={sShellPrimaryBtn(twoFactorCode.length !== 6)}>
+          Vérifier <ArrowRight size={18} />
+        </button>
+        <div style={{ marginTop: 14, fontSize: 12, color: "rgba(255,255,255,.7)" }}>
+          Vous pouvez aussi utiliser un code de récupération à la place du code 2FA.
+        </div>
+      </form>
     );
+
+    return renderAuthShell({
+      badge: "Vérification 2FA",
+      title: <>SÉCURITÉ<br /><span style={{ color: "rgba(255,255,255,.55)" }}>DOUBLE</span><br />AUTHENTIFICATION.</>,
+      subtitle: "Entrez le code à 6 chiffres généré par votre application d'authentification.",
+      leftBody,
+      backLink: { label: "Retour à la connexion", onClick: () => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `/${tid}` : "/"; }); } },
+    });
   };
 
   const renderPricing = () => {
@@ -413,268 +446,421 @@ export function createAuthPages(ctx: any) {
     );
   };
 
-  // Default Illizeo gradient — used for tenant selection page (not customizable by clients)
-  const ILLIZEO_DEFAULT_GRADIENT = "linear-gradient(135deg, #1a1a2e 0%, #2D1B3D 50%, #E41076 100%)";
+  // ─── Auth shell — full-screen magenta layout shared by all auth pages ──
+  // Mirrors the illizeo.com aesthetic: solid C.pink background, white wordmark
+  // top-left, ".COM" link top-right, big display title + form on the left,
+  // contextual right panel, footer line. Tenants do NOT customize this layer
+  // — it is the public Illizeo brand surface, before any tenant context.
+  const ILLIZEO_BG = C.pink; // solid magenta — no gradient, no image
+  const renderAuthShell = (opts: {
+    badge?: string;
+    title: React.ReactNode;
+    subtitle?: string;
+    leftBody: React.ReactNode;
+    rightPanel?: React.ReactNode;
+    backLink?: { label: string; onClick: () => void };
+  }) => (
+    <div style={{ minHeight: "100vh", background: ILLIZEO_BG, fontFamily: font, color: C.white, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
+      <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+      {/* Decorative corner sparks (visual flourish from the design) */}
+      <div aria-hidden style={{ position: "absolute", top: 60, right: -40, width: 200, height: 200, opacity: .15, background: "radial-gradient(circle, #fff 0%, transparent 60%)", pointerEvents: "none" }} />
+      <div aria-hidden style={{ position: "absolute", bottom: 80, left: -60, width: 240, height: 240, opacity: .12, background: "radial-gradient(circle, #fff 0%, transparent 60%)", pointerEvents: "none" }} />
 
-  const renderTenantSelection = () => {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: ILLIZEO_DEFAULT_GRADIENT }}>
-        <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
-        <div className="iz-scale-in" style={{ width: 440, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 48, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: C.dark, margin: 0 }}>Bienvenue</h1>
-            <p style={{ fontSize: 13, color: C.textLight, marginTop: 4 }}>Entrez le nom de votre espace pour continuer</p>
-          </div>
-          <form onSubmit={async e => {
-            e.preventDefault();
-            const slug = tenantInput.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "");
-            if (!slug) return;
-            setTenantError("");
-            setTenantChecking(true);
-            try {
-              const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8001/api/v1";
-              const res = await fetch(`${baseUrl}/tenant-check`, { headers: { "X-Tenant": slug, "Accept": "application/json" } });
-              if (!res.ok) throw new Error();
-              const data = await res.json();
-              if (data.status === "ok") {
-                localStorage.setItem("illizeo_tenant_id", slug);
-                pushTenantRoot(slug);
-                setTenantResolved(true);
-              } else { throw new Error(); }
-            } catch {
-              setTenantError(`L'espace "${slug}" n'existe pas. Vérifiez le nom ou créez un nouvel espace.`);
-            } finally { setTenantChecking(false); }
-          }}>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Votre espace</label>
-              <div style={{ display: "flex", alignItems: "center", borderRadius: 8, border: `1px solid ${C.border}`, overflow: "hidden", background: C.bg }}>
-                <input value={tenantInput} onChange={e => { setTenantInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")); setTenantError(""); }} placeholder="mon-entreprise" required
-                  style={{ flex: 1, padding: "12px 14px", border: "none", outline: "none", background: "transparent", fontSize: 15, fontFamily: font, color: C.text, fontWeight: 600 }} />
-                <span style={{ padding: "12px 14px", fontSize: 13, color: C.textMuted, background: C.white, borderLeft: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>.onboarding.illizeo.com</span>
-              </div>
-              {tenantInput && !tenantError && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6 }}>Vous serez connecté à <span style={{ fontWeight: 600, color: C.pink }}>{tenantInput}.onboarding.illizeo.com</span></div>}
-              {tenantError && <div style={{ fontSize: 12, color: C.red, marginTop: 8, padding: "8px 12px", background: C.redLight, borderRadius: 8 }}>{tenantError}</div>}
+      {/* Top bar */}
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 56px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, filter: "brightness(0) invert(1)" }}>
+          <IllizeoLogoFull height={28} />
+        </div>
+        <a href="https://illizeo.com" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 18px", borderRadius: 999, border: "1px solid rgba(255,255,255,.5)", color: C.white, fontSize: 12, fontWeight: 600, textDecoration: "none", letterSpacing: 1, textTransform: "uppercase" }}>
+          <ArrowRight size={12} style={{ transform: "rotate(-45deg)" }} /> ILLIZEO.COM
+        </a>
+      </header>
+
+      {/* Main 2-column grid */}
+      <main style={{ flex: 1, display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 60, padding: "20px 56px 24px", maxWidth: 1480, width: "100%", margin: "0 auto", boxSizing: "border-box" }}>
+        {/* Left column */}
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 620 }}>
+          {opts.badge && (
+            <div style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 8, padding: "6px 14px", borderRadius: 999, border: "1px solid rgba(255,255,255,.4)", background: "rgba(255,255,255,.08)", fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 28 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />
+              {opts.badge}
             </div>
-            <button type="submit" disabled={!tenantInput.trim() || tenantChecking} className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", padding: "12px 0", fontSize: 15, opacity: !tenantInput.trim() || tenantChecking ? 0.5 : 1 }}>
-              {tenantChecking ? "Vérification..." : "Continuer"}
+          )}
+          <h1 style={{ fontFamily: fontDisplay, fontSize: "clamp(48px, 6.5vw, 88px)", fontWeight: 800, lineHeight: 0.95, letterSpacing: "-0.02em", margin: "0 0 24px", color: C.white }}>
+            {opts.title}
+          </h1>
+          {opts.subtitle && <p style={{ fontSize: 16, lineHeight: 1.5, color: "rgba(255,255,255,.85)", maxWidth: 520, margin: "0 0 36px" }}>{opts.subtitle}</p>}
+          <div>{opts.leftBody}</div>
+          {opts.backLink && (
+            <button onClick={opts.backLink.onClick} style={{ background: "none", border: "none", color: "rgba(255,255,255,.85)", fontSize: 13, cursor: "pointer", fontFamily: font, fontWeight: 500, marginTop: 16, alignSelf: "flex-start", padding: 0 }}>
+              ← {opts.backLink.label}
             </button>
-          </form>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0" }}>
-            <div style={{ flex: 1, height: 1, background: C.border }} />
-            <span style={{ fontSize: 11, color: C.textMuted }}>{t('login.or')}</span>
-            <div style={{ flex: 1, height: 1, background: C.border }} />
-          </div>
-          <button onClick={() => setShowRegister(true)} style={{ width: "100%", padding: "11px 0", borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontFamily: font, fontSize: 14, fontWeight: 500, color: C.text, transition: "all .15s" }}
-            onMouseEnter={e => (e.currentTarget.style.background = C.bg)} onMouseLeave={e => (e.currentTarget.style.background = C.white)}>
-            Créer un nouvel espace
+          )}
+        </div>
+
+        {/* Right column */}
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+          {opts.rightPanel}
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer style={{ padding: "22px 56px", display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,.7)", letterSpacing: 1, textTransform: "uppercase", borderTop: "1px solid rgba(255,255,255,.15)", flexShrink: 0 }}>
+        <span>© ILLIZEO · {new Date().getFullYear()}</span>
+        <span>+1 200 entreprises · ont choisi illizeo</span>
+      </footer>
+    </div>
+  );
+
+  // Helper: build the right-side "recent spaces" panel used by the tenant selector
+  const renderRecentSpacesPanel = () => {
+    const recents = getRecentTenants();
+    return (
+      <div style={{ background: "rgba(0,0,0,.18)", border: "1px solid rgba(255,255,255,.18)", borderRadius: 18, padding: "26px 28px", backdropFilter: "blur(8px)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.85)" }}>↳ Vos espaces récents</span>
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,.65)", letterSpacing: 1, textTransform: "uppercase" }}>{recents.length} accès</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {recents.length === 0 && (
+            <div style={{ padding: "20px 4px", fontSize: 13, color: "rgba(255,255,255,.7)", lineHeight: 1.5 }}>
+              Aucun espace consulté récemment. Entrez le nom de votre espace pour commencer.
+            </div>
+          )}
+          {recents.map((r, idx) => {
+            const initial = r.slug.charAt(0).toUpperCase();
+            const num = String(idx + 1).padStart(2, '0');
+            return (
+              <button key={r.slug} onClick={() => {
+                localStorage.setItem("illizeo_tenant_id", r.slug);
+                pushTenantRoot(r.slug);
+                setTenantResolved(true);
+              }} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.06)", color: C.white, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,.12)"; e.currentTarget.style.transform = "translateX(2px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,.06)"; e.currentTarget.style.transform = "translateX(0)"; }}>
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: "rgba(0,0,0,.25)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{initial}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.2, marginBottom: 2 }}>{r.slug.charAt(0).toUpperCase() + r.slug.slice(1).replace(/-/g, ' ')}</div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.slug}.onboarding.illizeo.com{r.members ? ` · ${r.members} pers.` : ''}</div>
+                </div>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,.5)", letterSpacing: 1 }}>{num}</span>
+                <ArrowRight size={16} color="rgba(255,255,255,.7)" />
+              </button>
+            );
+          })}
+          <button onClick={() => setShowRegister(true)} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 12, border: "1px dashed rgba(255,255,255,.25)", background: "transparent", color: C.white, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s" }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,.08)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+            <div style={{ width: 36, height: 36, borderRadius: 8, border: "1px dashed rgba(255,255,255,.4)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Plus size={18} /></div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>Créer un nouvel espace</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)" }}>Lancez Illizeo pour votre entreprise</div>
+            </div>
+            <ArrowRight size={16} color="rgba(255,255,255,.7)" />
           </button>
-          <div style={{ textAlign: "center", marginTop: 12 }}>
-            <button onClick={() => setShowPricing(true)} style={{ background: "none", border: "none", color: C.pink, fontSize: 13, cursor: "pointer", fontFamily: font, fontWeight: 500 }}>Voir les tarifs</button>
-          </div>
         </div>
       </div>
     );
+  };
+
+  const renderTenantSelection = () => {
+    const submit = async (e?: React.FormEvent) => {
+      e?.preventDefault();
+      const slug = tenantInput.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-|-$/g, "");
+      if (!slug) return;
+      setTenantError("");
+      setTenantChecking(true);
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8001/api/v1";
+        const res = await fetch(`${baseUrl}/tenant-check`, { headers: { "X-Tenant": slug, "Accept": "application/json" } });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (data.status === "ok") {
+          localStorage.setItem("illizeo_tenant_id", slug);
+          addRecentTenant(slug, data.members);
+          pushTenantRoot(slug);
+          setTenantResolved(true);
+        } else { throw new Error(); }
+      } catch {
+        setTenantError(`L'espace "${slug}" n'existe pas. Vérifiez le nom ou créez un nouvel espace.`);
+      } finally { setTenantChecking(false); }
+    };
+
+    const leftBody = (
+      <form onSubmit={submit} style={{ maxWidth: 540 }}>
+        <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase", color: "rgba(255,255,255,.8)", display: "block", marginBottom: 10 }}>Votre espace</label>
+        <div style={{ display: "flex", alignItems: "stretch", borderRadius: 10, overflow: "hidden", background: "rgba(0,0,0,.22)", border: "1px solid rgba(255,255,255,.18)", marginBottom: 14 }}>
+          <input value={tenantInput} autoFocus onChange={e => { setTenantInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")); setTenantError(""); }} placeholder="acme-corp" required
+            style={{ flex: 1, padding: "16px 18px", border: "none", outline: "none", background: "transparent", fontSize: 16, fontFamily: font, color: C.white, fontWeight: 700 }} />
+          <span style={{ padding: "16px 18px", fontSize: 13, color: "rgba(255,255,255,.6)", background: "rgba(0,0,0,.15)", whiteSpace: "nowrap", display: "flex", alignItems: "center" }}>.onboarding.illizeo.com</span>
+        </div>
+        {tenantError && <div style={{ fontSize: 12, color: "#FFE0E0", marginBottom: 12, padding: "8px 12px", background: "rgba(0,0,0,.25)", borderRadius: 8, border: "1px solid rgba(255,255,255,.2)" }}>{tenantError}</div>}
+        <button type="submit" disabled={!tenantInput.trim() || tenantChecking}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", padding: "18px 0", borderRadius: 10, border: "none", background: C.white, color: C.dark, fontSize: 15, fontWeight: 700, fontFamily: font, cursor: !tenantInput.trim() || tenantChecking ? "not-allowed" : "pointer", opacity: !tenantInput.trim() || tenantChecking ? 0.6 : 1, letterSpacing: 1, textTransform: "uppercase", transition: "transform .15s" }}
+          onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.transform = "translateY(-1px)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}>
+          {tenantChecking ? "Vérification…" : "Continuer"} <ArrowRight size={18} />
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 18, fontSize: 13 }}>
+          <button type="button" onClick={() => addToast_admin("Saisissez l'URL fournie par votre administrateur, ou contactez votre RH.")} style={{ background: "none", border: "none", color: "rgba(255,255,255,.85)", cursor: "pointer", fontFamily: font, padding: 0, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 14, height: 14, borderRadius: "50%", border: "1px solid currentColor", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9 }}>?</span> J'ai oublié l'URL de mon espace
+          </button>
+          <span style={{ width: 1, height: 12, background: "rgba(255,255,255,.3)" }} />
+          <button type="button" onClick={() => setShowPricing(true)} style={{ background: "none", border: "none", color: "rgba(255,255,255,.85)", cursor: "pointer", fontFamily: font, padding: 0 }}>
+            Voir les tarifs
+          </button>
+          <button type="button" onClick={() => window.open("mailto:support@illizeo.com", "_blank")} style={{ background: "none", border: "none", color: "rgba(255,255,255,.85)", cursor: "pointer", fontFamily: font, padding: 0 }}>
+            Besoin d'aide ?
+          </button>
+        </div>
+      </form>
+    );
+
+    return renderAuthShell({
+      badge: "Bienvenue · +1 200 entreprises",
+      title: <>VOS RH,<br /><span style={{ color: "rgba(255,255,255,.55)" }}>EN UN SEUL</span><br />ESPACE.</>,
+      subtitle: "La solution RH tout-en-un. Onboarding, paie, congés et talents — réunis pour vos équipes.",
+      leftBody,
+      rightPanel: renderRecentSpacesPanel(),
+    });
   };
 
   // Default policy for tenant registration (no tenant context yet)
   const defaultPolicy: PasswordPolicy = { min_length: 8, uppercase: true, lowercase: true, number: true, special: false, no_common: true, no_name: false, max_attempts: 5, history_count: 3, expiry_days: 0 };
 
-  const renderRegister = () => {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)` }}>
-        <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
-        <div className="iz-scale-in" style={{ width: 480, background: C.white, borderRadius: 16, padding: "36px 40px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
-          <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 44, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: C.dark, margin: 0 }}>Créer votre espace</h1>
-            <p style={{ fontSize: 13, color: C.textLight, marginTop: 4 }}>Lancez votre plateforme d'onboarding en quelques secondes</p>
-          </div>
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            setRegLoading(true);
-            try {
-              const res = await registerTenant({ ...regData, admin_name: `${regData.admin_prenom} ${regData.admin_nom}`.trim() });
-              // Store tenant ID, mark trial start, skip to subscription page
-              localStorage.setItem("illizeo_tenant_id", res.tenant_id);
-              localStorage.setItem("illizeo_trial_start", new Date().toISOString());
-              localStorage.setItem("illizeo_needs_plan", "true");
-              // Navigate with tenant param to skip tenant selection
-              window.location.href = `/${res.tenant_id}`;
-            } catch (err: any) {
-              let msg = "Erreur lors de la création";
-              try { const parsed = JSON.parse(err?.message || ""); msg = parsed?.message || msg; } catch {}
-              addToast_admin(msg);
-            } finally { setRegLoading(false); }
-          }}>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom de l'entreprise *</label>
-              <input value={regData.company_name} onChange={e => {
-                const v = e.target.value;
-                setRegData(p => ({ ...p, company_name: v }));
-                // Check slug availability with debounce
-                const slug = v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-                setRegTenantSlug(slug);
-              }} placeholder="Ex: Acme Corp" required style={sInput} />
-              {regTenantSlug && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Votre espace : <span style={{ fontWeight: 600, color: C.pink }}>{regTenantSlug}</span>.onboarding.illizeo.com</div>}
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Prénom *</label>
-                <input value={regData.admin_prenom} onChange={e => setRegData(p => ({ ...p, admin_prenom: e.target.value }))} placeholder="Ex: Jean-Pierre" required style={sInput} />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Nom *</label>
-                <input value={regData.admin_nom} onChange={e => setRegData(p => ({ ...p, admin_nom: e.target.value }))} placeholder="Ex: De La Fontaine" required style={sInput} />
-              </div>
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Email professionnel *</label>
-              <input type="email" value={regData.admin_email} onChange={e => setRegData(p => ({ ...p, admin_email: e.target.value }))} placeholder="vous@entreprise.com" required style={sInput} />
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Mot de passe *</label>
-                  <input type="password" value={regData.password} onChange={e => setRegData(p => ({ ...p, password: e.target.value }))} placeholder={`Min. ${defaultPolicy.min_length} caract\u00e8res`} required style={sInput} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Confirmer *</label>
-                  <input type="password" value={regData.password_confirmation} onChange={e => setRegData(p => ({ ...p, password_confirmation: e.target.value }))} placeholder="R\u00e9p\u00e9ter" required style={sInput} />
-                  {regData.password_confirmation && regData.password !== regData.password_confirmation && <div style={{ fontSize: 10, color: C.red, marginTop: 2 }}>Non identiques</div>}
-                </div>
-              </div>
-              {regData.password && renderPwdChecklist(regData.password, defaultPolicy)}
-            </div>
-            <button type="submit" disabled={regLoading || !regData.company_name || !regData.admin_prenom || !regData.admin_nom || !regData.admin_email || !allPwdRulesMet(regData.password, defaultPolicy) || regData.password !== regData.password_confirmation}
-              className="iz-btn-pink" style={{ ...sBtn("pink"), width: "100%", padding: "12px 0", fontSize: 15, opacity: regLoading ? 0.6 : 1 }}>
-              {regLoading ? "Création en cours..." : "Créer mon espace Illizeo"}
-            </button>
-            <div style={{ textAlign: "center", marginTop: 16, fontSize: 13 }}>
-              <span style={{ color: C.textMuted }}>Déjà un compte ? </span>
-              <button type="button" onClick={() => setShowRegister(false)} style={{ background: "none", border: "none", color: C.pink, fontWeight: 600, cursor: "pointer", fontFamily: font, fontSize: 13 }}>Se connecter</button>
-            </div>
-          </form>
+  // Dark inputs styled for the magenta auth shell
+  const sShellInput: React.CSSProperties = {
+    width: "100%", padding: "14px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,.22)",
+    background: "rgba(0,0,0,.22)", outline: "none", fontSize: 14, fontFamily: font, color: C.white,
+    fontWeight: 500, boxSizing: "border-box",
+  };
+  const sShellLabel: React.CSSProperties = {
+    fontSize: 11, fontWeight: 600, letterSpacing: 1.5, textTransform: "uppercase",
+    color: "rgba(255,255,255,.8)", display: "block", marginBottom: 8,
+  };
+  const sShellPrimaryBtn = (disabled?: boolean): React.CSSProperties => ({
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+    width: "100%", padding: "16px 0", borderRadius: 10, border: "none",
+    background: C.white, color: C.dark, fontSize: 14, fontWeight: 700, fontFamily: font,
+    cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.55 : 1,
+    letterSpacing: 1, textTransform: "uppercase",
+  });
+
+  const renderRegisterFormLeft = () => (
+    <form onSubmit={async (e) => {
+      e.preventDefault();
+      setRegLoading(true);
+      try {
+        const res = await registerTenant({ ...regData, admin_name: `${regData.admin_prenom} ${regData.admin_nom}`.trim() });
+        localStorage.setItem("illizeo_tenant_id", res.tenant_id);
+        localStorage.setItem("illizeo_trial_start", new Date().toISOString());
+        localStorage.setItem("illizeo_needs_plan", "true");
+        addRecentTenant(res.tenant_id);
+        window.location.href = `/${res.tenant_id}`;
+      } catch (err: any) {
+        let msg = "Erreur lors de la création";
+        try { const parsed = JSON.parse(err?.message || ""); msg = parsed?.message || msg; } catch {}
+        addToast_admin(msg);
+      } finally { setRegLoading(false); }
+    }} style={{ maxWidth: 540 }}>
+      <div style={{ marginBottom: 14 }}>
+        <label style={sShellLabel}>Nom de l'entreprise *</label>
+        <input value={regData.company_name} onChange={e => {
+          const v = e.target.value;
+          setRegData((p: any) => ({ ...p, company_name: v }));
+          const slug = v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+          setRegTenantSlug(slug);
+        }} placeholder="Acme Corp" required style={sShellInput} />
+        {regTenantSlug && <div style={{ fontSize: 11, color: "rgba(255,255,255,.7)", marginTop: 6 }}>Votre espace : <span style={{ fontWeight: 700, color: C.white }}>{regTenantSlug}</span>.onboarding.illizeo.com</div>}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div>
+          <label style={sShellLabel}>Prénom *</label>
+          <input value={regData.admin_prenom} onChange={e => setRegData((p: any) => ({ ...p, admin_prenom: e.target.value }))} placeholder="Jean-Pierre" required style={sShellInput} />
+        </div>
+        <div>
+          <label style={sShellLabel}>Nom *</label>
+          <input value={regData.admin_nom} onChange={e => setRegData((p: any) => ({ ...p, admin_nom: e.target.value }))} placeholder="Dupont" required style={sShellInput} />
         </div>
       </div>
-    );
-  };
+      <div style={{ marginBottom: 14 }}>
+        <label style={sShellLabel}>Email professionnel *</label>
+        <input type="email" value={regData.admin_email} onChange={e => setRegData((p: any) => ({ ...p, admin_email: e.target.value }))} placeholder="vous@entreprise.com" required style={sShellInput} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div>
+          <label style={sShellLabel}>Mot de passe *</label>
+          <input type="password" value={regData.password} onChange={e => setRegData((p: any) => ({ ...p, password: e.target.value }))} placeholder={`Min. ${defaultPolicy.min_length} caractères`} required style={sShellInput} />
+        </div>
+        <div>
+          <label style={sShellLabel}>Confirmer *</label>
+          <input type="password" value={regData.password_confirmation} onChange={e => setRegData((p: any) => ({ ...p, password_confirmation: e.target.value }))} placeholder="Répéter" required style={sShellInput} />
+        </div>
+      </div>
+      {regData.password && (
+        <div style={{ marginBottom: 16, padding: "12px 14px", background: "rgba(0,0,0,.18)", borderRadius: 10, border: "1px solid rgba(255,255,255,.12)" }}>
+          {checkPwdRules(regData.password, defaultPolicy).map(r => (
+            <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, lineHeight: 1.7, color: r.met ? "#A8FFD2" : "rgba(255,255,255,.7)" }}>
+              {r.met ? <Check size={12} /> : <X size={12} />}<span>{r.label}</span>
+            </div>
+          ))}
+          {regData.password_confirmation && regData.password !== regData.password_confirmation && (
+            <div style={{ fontSize: 11, color: "#FFD0D0", marginTop: 4 }}>Les mots de passe ne correspondent pas</div>
+          )}
+        </div>
+      )}
+      <button type="submit" disabled={regLoading || !regData.company_name || !regData.admin_prenom || !regData.admin_nom || !regData.admin_email || !allPwdRulesMet(regData.password, defaultPolicy) || regData.password !== regData.password_confirmation}
+        style={sShellPrimaryBtn(regLoading || !regData.company_name || !regData.admin_prenom || !regData.admin_nom || !regData.admin_email || !allPwdRulesMet(regData.password, defaultPolicy) || regData.password !== regData.password_confirmation)}>
+        {regLoading ? "Création en cours…" : "Créer mon espace Illizeo"} <ArrowRight size={18} />
+      </button>
+    </form>
+  );
+
+  const renderRegisterRightPanel = () => (
+    <div style={{ background: "rgba(0,0,0,.18)", border: "1px solid rgba(255,255,255,.18)", borderRadius: 18, padding: "28px 30px", backdropFilter: "blur(8px)" }}>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.85)", marginBottom: 22 }}>↳ Tout inclus dès le 1er jour</div>
+      {[
+        { icon: Sparkles, title: "Essai 14 jours offerts", desc: "Aucune carte requise. Annulez à tout moment." },
+        { icon: Users, title: "Onboarding & Offboarding", desc: "Workflows complets, parcours, signatures, documents." },
+        { icon: Zap, title: "IA intégrée", desc: "OCR, génération de contrats, chatbot RH." },
+        { icon: ShieldCheck, title: "Conforme RGPD & Suisse", desc: "Hébergement Suisse, audit complet." },
+      ].map(({ icon: Icon, title, desc }) => (
+        <div key={title} style={{ display: "flex", gap: 14, marginBottom: 18 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255,255,255,.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon size={18} /></div>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>{title}</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,.7)", lineHeight: 1.5 }}>{desc}</div>
+          </div>
+        </div>
+      ))}
+      <button onClick={() => setShowPricing(true)} style={{ marginTop: 8, padding: "10px 20px", borderRadius: 999, border: "1px solid rgba(255,255,255,.45)", background: "transparent", color: C.white, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font, letterSpacing: 1, textTransform: "uppercase" }}>
+        Voir les tarifs détaillés →
+      </button>
+    </div>
+  );
+
+  const renderRegister = () => renderAuthShell({
+    badge: "Créer un espace · Essai 14 jours",
+    title: <>LANCEZ<br /><span style={{ color: "rgba(255,255,255,.55)" }}>VOTRE ESPACE</span><br />ILLIZEO.</>,
+    subtitle: "Quelques minutes pour configurer votre plateforme RH. Pas de carte bancaire, pas d'engagement.",
+    leftBody: renderRegisterFormLeft(),
+    rightPanel: renderRegisterRightPanel(),
+    backLink: { label: "Déjà un compte ? Se connecter", onClick: () => setShowRegister(false) },
+  });
 
   const renderLogin = () => {
-    const loginBg = loginBgImage
-      ? `url(${loginBgImage}) center/cover no-repeat`
-      : `linear-gradient(135deg, ${loginGradientStart || C.dark} 0%, ${loginGradientEnd || C.pink} 100%)`;
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: font, background: loginBg }}>
-        <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
-        <div className="iz-scale-in" style={{ width: 400, background: C.white, borderRadius: 16, padding: "40px 40px 36px", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <div style={{ marginBottom: 8 }}><img src={getLogoFullUri()} alt="Illizeo" style={{ height: 48, objectFit: "contain", display: "block", margin: "0 auto" }} /></div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, color: C.dark, margin: 0 }}>{t('login.title')}</h1>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 6 }}>
-              <span style={{ fontSize: 12, color: C.textMuted }}>{t('login.space')}</span>
-              <span style={{ fontSize: 12, fontWeight: 600, color: C.pink }}>{localStorage.getItem("illizeo_tenant_id") || "illizeo"}</span>
-              <button onClick={() => { localStorage.removeItem("illizeo_tenant_id"); window.history.replaceState({}, "", "/"); setTenantResolved(false); }} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 11, cursor: "pointer", fontFamily: font, textDecoration: "underline" }}>{t('login.change')}</button>
-            </div>
-          </div>
-          {auth.error && (
-            <div className="iz-fade-up" style={{ padding: "10px 14px", borderRadius: 8, background: C.redLight, color: C.red, fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-              <AlertTriangle size={14} /> {auth.error}
-            </div>
-          )}
-          <form onSubmit={async (e) => {
-            e.preventDefault();
-            setLoginLoading(true);
-            try {
-              await auth.login(loginEmail, loginPassword);
-              // Ensure tenant ID is saved for logout redirect
-              const currentTid = new URLSearchParams(window.location.search).get("tenant") || localStorage.getItem("illizeo_tenant_id");
-              if (currentTid) localStorage.setItem("illizeo_tenant_id", currentTid);
-            } catch {} finally { setLoginLoading(false); }
-          }}>
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Email</label>
-              <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="votre@email.com" required
-                style={{ ...sInput, background: C.bg }} />
-            </div>
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Mot de passe</label>
-              <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" required
-                style={{ ...sInput, background: C.bg }} />
-            </div>
-            <button type="submit" disabled={loginLoading} className="iz-btn-pink"
-              style={{ ...sBtn("pink"), width: "100%", padding: "12px 0", fontSize: 15, opacity: loginLoading ? 0.7 : 1 }}>
-              {loginLoading ? "Connexion..." : "Se connecter"}
-            </button>
-          </form>
-          {/* SSO Microsoft */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "16px 0" }}>
-            <div style={{ flex: 1, height: 1, background: C.border }} />
-            <span style={{ fontSize: 11, color: C.textMuted }}>{t('login.or')}</span>
-            <div style={{ flex: 1, height: 1, background: C.border }} />
-          </div>
-          <button onClick={async () => {
-            try {
-              addToast_admin("Redirection vers Microsoft...");
-              const res = await apiFetch<{ redirect_url: string }>('/auth/microsoft/redirect');
-              if (res.redirect_url) {
-                window.location.href = res.redirect_url;
-              } else {
-                addToast_admin("SSO non configuré");
-              }
-            } catch (err: any) {
-              console.error("SSO error:", err);
-              addToast_admin("Erreur SSO : " + (err?.message || "connexion impossible"));
-              setLoginLoading(false);
-            }
-          }} style={{ width: "100%", padding: "11px 0", borderRadius: 8, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontFamily: font, fontSize: 14, fontWeight: 500, color: C.text, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "all .15s" }}
-            onMouseEnter={e => (e.currentTarget.style.background = C.bg)} onMouseLeave={e => (e.currentTarget.style.background = C.white)}>
-            <Globe size={18} color="#0078D4" /> {t('login.sso_microsoft')}
-          </button>
-          <div style={{ textAlign: "center", marginTop: 12 }}>
-            <button onClick={() => { setForgotMode(true); setForgotEmail(loginEmail); setForgotSent(false); }} style={{ background: "none", border: "none", color: C.pink, fontSize: 13, cursor: "pointer", fontFamily: font, fontWeight: 500 }}>Mot de passe oublié ?</button>
-          </div>
-          {forgotMode && (
-            <div style={{ marginTop: 16, padding: "16px", background: C.bg, borderRadius: 10 }}>
-              {forgotSent ? (
-                <div style={{ textAlign: "center" }}>
-                  <CheckCircle size={24} color={C.green} style={{ marginBottom: 8 }} />
-                  <div style={{ fontSize: 14, fontWeight: 600, color: C.green, marginBottom: 4 }}>Email envoyé !</div>
-                  <div style={{ fontSize: 12, color: C.textLight }}>Vérifiez votre boîte de réception pour réinitialiser votre mot de passe.</div>
-                  <button onClick={() => setForgotMode(false)} style={{ ...sBtn("outline"), fontSize: 12, padding: "6px 16px", marginTop: 12 }}>Retour à la connexion</button>
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 8 }}>Réinitialiser le mot de passe</div>
-                  <div style={{ fontSize: 12, color: C.textLight, marginBottom: 12 }}>Entrez votre email, vous recevrez un lien de réinitialisation.</div>
-                  <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="votre@email.com" style={{ ...sInput, marginBottom: 10 }} />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => setForgotMode(false)} style={{ ...sBtn("outline"), fontSize: 12, flex: 1 }}>{t('common.cancel')}</button>
-                    <button disabled={forgotLoading || !forgotEmail.trim()} onClick={async () => {
-                      setForgotLoading(true);
-                      try {
-                        await apiFetch('/forgot-password', { method: 'POST', body: JSON.stringify({ email: forgotEmail }) });
-                        setForgotSent(true);
-                      } catch { setForgotSent(true); /* Don't reveal if email exists */ }
-                      finally { setForgotLoading(false); }
-                    }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, flex: 1, opacity: forgotLoading ? 0.6 : 1 }}>
-                      {forgotLoading ? "Envoi..." : "Envoyer"}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-          <div style={{ textAlign: "center", marginTop: 20, fontSize: 13 }}>
-            <span style={{ color: C.textMuted }}>{t('login.no_account')} </span>
-            <button onClick={() => setShowRegister(true)} style={{ background: "none", border: "none", color: C.pink, fontWeight: 600, cursor: "pointer", fontFamily: font, fontSize: 13 }}>{t('login.create_space')}</button>
-          </div>
+    const tenantId = localStorage.getItem("illizeo_tenant_id") || "illizeo";
+    const submit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoginLoading(true);
+      try {
+        await auth.login(loginEmail, loginPassword);
+        const currentTid = new URLSearchParams(window.location.search).get("tenant") || localStorage.getItem("illizeo_tenant_id");
+        if (currentTid) { localStorage.setItem("illizeo_tenant_id", currentTid); addRecentTenant(currentTid); }
+      } catch {} finally { setLoginLoading(false); }
+    };
+
+    const leftBody = (
+      <div style={{ maxWidth: 540 }}>
+        {/* Current space chip */}
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 999, border: "1px solid rgba(255,255,255,.25)", background: "rgba(0,0,0,.18)", fontSize: 12, marginBottom: 22 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#A8FFD2" }} />
+          <span style={{ color: "rgba(255,255,255,.8)" }}>{t('login.space')}</span>
+          <span style={{ fontWeight: 700 }}>{tenantId}</span>
+          <button onClick={() => { localStorage.removeItem("illizeo_tenant_id"); window.history.replaceState({}, "", "/"); setTenantResolved(false); }}
+            style={{ background: "none", border: "none", color: "rgba(255,255,255,.7)", fontSize: 11, cursor: "pointer", fontFamily: font, textDecoration: "underline" }}>{t('login.change')}</button>
         </div>
+
+        {auth.error && (
+          <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(0,0,0,.25)", border: "1px solid rgba(255,255,255,.25)", color: "#FFE0E0", fontSize: 13, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertTriangle size={14} /> {auth.error}
+          </div>
+        )}
+
+        <form onSubmit={submit}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={sShellLabel}>Email</label>
+            <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="votre@email.com" required autoFocus style={sShellInput} />
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <label style={sShellLabel}>Mot de passe</label>
+            <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" required style={sShellInput} />
+          </div>
+          <button type="submit" disabled={loginLoading} style={sShellPrimaryBtn(loginLoading)}>
+            {loginLoading ? "Connexion…" : "Se connecter"} <ArrowRight size={18} />
+          </button>
+        </form>
+
+        {/* SSO */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "20px 0", color: "rgba(255,255,255,.55)" }}>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.2)" }} />
+          <span style={{ fontSize: 11, letterSpacing: 1, textTransform: "uppercase" }}>{t('login.or')}</span>
+          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.2)" }} />
+        </div>
+        <button onClick={async () => {
+          try {
+            addToast_admin("Redirection vers Microsoft…");
+            const res = await apiFetch<{ redirect_url: string }>('/auth/microsoft/redirect');
+            if (res.redirect_url) { window.location.href = res.redirect_url; } else { addToast_admin("SSO non configuré"); }
+          } catch (err: any) {
+            addToast_admin("Erreur SSO : " + (err?.message || "connexion impossible"));
+            setLoginLoading(false);
+          }
+        }} style={{ width: "100%", padding: "14px 0", borderRadius: 10, border: "1px solid rgba(255,255,255,.3)", background: "rgba(255,255,255,.08)", color: C.white, fontFamily: font, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, letterSpacing: 1, textTransform: "uppercase" }}>
+          <Globe size={16} /> {t('login.sso_microsoft')}
+        </button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 18, fontSize: 13 }}>
+          <button onClick={() => { setForgotMode(true); setForgotEmail(loginEmail); setForgotSent(false); }}
+            style={{ background: "none", border: "none", color: "rgba(255,255,255,.85)", cursor: "pointer", fontFamily: font, padding: 0 }}>
+            Mot de passe oublié ?
+          </button>
+          <span style={{ width: 1, height: 12, background: "rgba(255,255,255,.3)" }} />
+          <button onClick={() => setShowRegister(true)} style={{ background: "none", border: "none", color: "rgba(255,255,255,.85)", cursor: "pointer", fontFamily: font, padding: 0 }}>
+            {t('login.create_space')}
+          </button>
+        </div>
+
+        {forgotMode && (
+          <div style={{ marginTop: 18, padding: "18px 20px", background: "rgba(0,0,0,.22)", border: "1px solid rgba(255,255,255,.18)", borderRadius: 12 }}>
+            {forgotSent ? (
+              <div style={{ textAlign: "center" }}>
+                <CheckCircle size={24} color="#A8FFD2" style={{ marginBottom: 8 }} />
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#A8FFD2", marginBottom: 4 }}>Email envoyé !</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)" }}>Vérifiez votre boîte de réception.</div>
+                <button onClick={() => setForgotMode(false)} style={{ marginTop: 12, padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(255,255,255,.4)", background: "transparent", color: C.white, fontSize: 12, cursor: "pointer", fontFamily: font }}>Retour à la connexion</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Réinitialiser le mot de passe</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,.75)", marginBottom: 12 }}>Entrez votre email pour recevoir un lien.</div>
+                <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="votre@email.com" style={{ ...sShellInput, marginBottom: 10 }} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setForgotMode(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1px solid rgba(255,255,255,.3)", background: "transparent", color: C.white, fontSize: 12, cursor: "pointer", fontFamily: font }}>{t('common.cancel')}</button>
+                  <button disabled={forgotLoading || !forgotEmail.trim()} onClick={async () => {
+                    setForgotLoading(true);
+                    try { await apiFetch('/forgot-password', { method: 'POST', body: JSON.stringify({ email: forgotEmail }) }); setForgotSent(true); }
+                    catch { setForgotSent(true); }
+                    finally { setForgotLoading(false); }
+                  }} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: C.white, color: C.dark, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font, opacity: forgotLoading ? 0.6 : 1 }}>
+                    {forgotLoading ? "Envoi…" : "Envoyer"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     );
+
+    return renderAuthShell({
+      badge: `Connexion · ${tenantId}.onboarding.illizeo.com`,
+      title: <>BIENVENUE,<br /><span style={{ color: "rgba(255,255,255,.55)" }}>RECONNECTEZ-VOUS</span><br />À VOTRE ESPACE.</>,
+      subtitle: "Retrouvez vos collaborateurs, parcours, signatures et tous vos outils RH au même endroit.",
+      leftBody,
+      rightPanel: renderRecentSpacesPanel(),
+    });
   };
 
   const renderEmailInvitation = () => {
