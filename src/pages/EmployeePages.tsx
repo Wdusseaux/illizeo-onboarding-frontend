@@ -3247,8 +3247,8 @@ export function createEmployeeRenders(ctx: any) {
                     <span style={{ fontSize: 14, textDecoration: "underline", cursor: "pointer", color: C.text }}>Importer</span>
                   </div>
                 </div>
-                <div><button style={{ ...sBtn("outline"), width: "100%" }}>Accéder aux CGU d'Illizeo</button></div>
-                <div><button style={{ ...sBtn("outline"), width: "100%" }}>Accès à la politique de confidentialité d'Illizeo</button></div>
+                <div><button onClick={() => window.open("https://illizeo.com/mentions-legales-et-conditions-dutilisation/", "_blank", "noopener,noreferrer")} style={{ ...sBtn("outline"), width: "100%" }}>Accéder aux CGU d'Illizeo</button></div>
+                <div><button onClick={() => window.open("https://illizeo.com/politique-de-confidentialite/", "_blank", "noopener,noreferrer")} style={{ ...sBtn("outline"), width: "100%" }}>Accès à la politique de confidentialité d'Illizeo</button></div>
               </div>
             )}
             {profileTab === "password" && (
