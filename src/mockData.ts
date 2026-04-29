@@ -93,7 +93,7 @@ export const _MOCK_ACTION_TEMPLATES: ActionTemplate[] = [
   { id: 11, titre: "Quiz culture d'entreprise", type: "questionnaire", phase: "3 premiers mois", delaiRelatif: "J+30", obligatoire: false, description: "Testez vos connaissances sur Illizeo après 1 mois", assignation: { mode: "parcours", valeurs: ["Onboarding Standard"] }, parcours: "Onboarding Cadres" },
   { id: 12, titre: "Rapport d'étonnement", type: "entretien", phase: "3 premiers mois", delaiRelatif: "J+60", obligatoire: false, description: "Entretien structuré pour recueillir les impressions du collaborateur après 2 mois", assignation: { mode: "contrat", valeurs: ["CDI"] }, parcours: "Onboarding Standard" },
   // Onboarding — new actions
-  { id: 13, titre: "Provisioning IT — Accès & matériel", type: "checklist_it", phase: "Avant le premier jour", delaiRelatif: "J-7", obligatoire: true, description: "Préparer l'ensemble des accès et du matériel pour le nouveau collaborateur", assignation: { mode: "tous", valeurs: [] }, parcours: "Onboarding Standard" },
+  { id: 13, titre: "Provisioning IT — Accès & matériel", type: "checklist_it", phase: "Avant le premier jour", delaiRelatif: "J-7", obligatoire: true, description: "Préparer l'ensemble des accès et du matériel pour le nouveau collaborateur", assignation: { mode: "groupe", valeurs: ["Équipe IT"] }, parcours: "Onboarding Standard" },
   { id: 14, titre: "Rencontrer son buddy", type: "visite", phase: "Premier jour", delaiRelatif: "J+0", obligatoire: true, description: "Premier contact avec le parrain/marraine d'intégration", assignation: { mode: "tous", valeurs: [] }, dureeEstimee: "30 min", parcours: "Onboarding Standard" },
   { id: 15, titre: "Déjeuner d'équipe", type: "visite", phase: "Premier jour", delaiRelatif: "J+0", obligatoire: false, description: "Déjeuner informel avec l'équipe pour faire connaissance", assignation: { mode: "groupe", valeurs: ["Nouveaux arrivants Genève"] }, dureeEstimee: "1h", parcours: "Onboarding Standard" },
   { id: 16, titre: "Point de suivi J+15", type: "entretien", phase: "Première semaine", delaiRelatif: "J+15", obligatoire: true, description: "Entretien de suivi avec le manager après 2 semaines", assignation: { mode: "tous", valeurs: [] }, dureeEstimee: "30 min", parcours: "Onboarding Standard" },
@@ -127,6 +127,7 @@ export const _MOCK_GROUPES: GroupePersonnes[] = [
   { id: 3, nom: "CDI France & Suisse", description: "Tous les contrats CDI", membres: ["Nadia Ferreira", "Antoine Morel", "Inès Carpentier"], couleur: "#4CAF50", critereAuto: { type: "contrat", valeur: "CDI" } },
   { id: 4, nom: "Managers Suisse", description: "Managers sur les sites suisses", membres: ["Mehdi Kessler"], couleur: "#F9A825" },
   { id: 5, nom: "Stagiaires & Alternants", description: "Contrats stage et alternance", membres: [], couleur: "#7B5EA7", critereAuto: { type: "contrat", valeur: "Stage" } },
+  { id: 6, nom: "Équipe IT", description: "Équipe IT/SI en charge du provisioning matériel et des accès", membres: ["Antoine Morel", "Youssef Hadj"], couleur: "#0D47A1", critereAuto: { type: "departement", valeur: "IT" } },
 ];
 
 export const ACTION_TYPE_META: Record<ActionType, { label: string; description: string; Icon: React.FC<{ size?: number; color?: string }>; bg: string; color: string }> = {

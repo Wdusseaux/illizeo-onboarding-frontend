@@ -300,7 +300,17 @@ export function createAdminPanels(ctx: any) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
                   <div>
                     <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Type *</label>
-                    <select value={actionPanelData.type} onChange={e => setActionPanelData(prev => ({ ...prev, type: e.target.value as ActionType }))} style={{ ...sInput, cursor: "pointer" }}>
+                    <select value={actionPanelData.type} onChange={e => {
+                      const newType = e.target.value as ActionType;
+                      setActionPanelData(prev => ({ ...prev, type: newType }));
+                      // Checklist IT belongs to the IT team, not the onboardee — auto-target
+                      // the "Équipe IT" group so the action shows up in their queue, not the
+                      // collaborateur's parcours.
+                      if (newType === "checklist_it") {
+                        const itGroup = (GROUPES as any[])?.find(g => g.nom === "Équipe IT");
+                        if (itGroup) { setAssignMode("groupe"); setAssignSelected([itGroup.nom]); }
+                      }
+                    }} style={{ ...sInput, cursor: "pointer" }}>
                       {(Object.entries(ACTION_TYPE_META) as [ActionType, any][]).map(([slug, meta]) => (
                         <option key={slug} value={slug}>{meta.label}</option>
                       ))}
@@ -434,12 +444,25 @@ export function createAdminPanels(ctx: any) {
                     <div>
                       <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Champs du formulaire</label>
                       {(actionPanelData.options.champs || []).map((ch: any, i: number) => (
-                        <div key={i} style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-                          <input value={ch.label || ""} onChange={e => { const arr = [...(actionPanelData.options.champs || [])]; arr[i] = { ...arr[i], label: e.target.value }; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, champs: arr } })); }} placeholder="Label" style={{ ...sInput, flex: 2, padding: "6px 10px", fontSize: 12 }} />
-                          <select value={ch.type || "texte"} onChange={e => { const arr = [...(actionPanelData.options.champs || [])]; arr[i] = { ...arr[i], type: e.target.value }; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, champs: arr } })); }} style={{ ...sInput, flex: 1, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>
-                            <option value="texte">Texte</option><option value="nombre">Nombre</option><option value="date">Date</option><option value="email">Email</option><option value="choix">Choix</option><option value="textarea">Zone texte</option>
-                          </select>
-                          <button onClick={() => { const arr = (actionPanelData.options.champs || []).filter((_: any, j: number) => j !== i); setActionPanelData(prev => ({ ...prev, options: { ...prev.options, champs: arr } })); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red }}><X size={14} /></button>
+                        <div key={i} style={{ marginBottom: 6 }}>
+                          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                            <input value={ch.label || ""} onChange={e => { const arr = [...(actionPanelData.options.champs || [])]; arr[i] = { ...arr[i], label: e.target.value }; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, champs: arr } })); }} placeholder="Label" style={{ ...sInput, flex: 2, padding: "6px 10px", fontSize: 12 }} />
+                            <select value={ch.type || "texte"} onChange={e => { const arr = [...(actionPanelData.options.champs || [])]; arr[i] = { ...arr[i], type: e.target.value }; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, champs: arr } })); }} style={{ ...sInput, flex: 1, padding: "6px 10px", fontSize: 12, cursor: "pointer" }}>
+                              <option value="texte">Texte</option><option value="nombre">Nombre</option><option value="date">Date</option><option value="email">Email</option><option value="choix">Choix</option><option value="textarea">Zone texte</option><option value="fichier">Fichier</option>
+                            </select>
+                            <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: C.textMuted, cursor: "pointer", whiteSpace: "nowrap" as const }}>
+                              <input type="checkbox" checked={!!ch.required} onChange={e => { const arr = [...(actionPanelData.options.champs || [])]; arr[i] = { ...arr[i], required: e.target.checked }; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, champs: arr } })); }} /> Obligatoire
+                            </label>
+                            <button onClick={() => { const arr = (actionPanelData.options.champs || []).filter((_: any, j: number) => j !== i); setActionPanelData(prev => ({ ...prev, options: { ...prev.options, champs: arr } })); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.red }}><X size={14} /></button>
+                          </div>
+                          {ch.type === "choix" && (
+                            <input
+                              value={Array.isArray(ch.options) ? ch.options.join(", ") : ""}
+                              onChange={e => { const arr = [...(actionPanelData.options.champs || [])]; arr[i] = { ...arr[i], options: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) }; setActionPanelData(prev => ({ ...prev, options: { ...prev.options, champs: arr } })); }}
+                              placeholder="Choix possibles, séparés par des virgules : Oui, Non, Peut-être"
+                              style={{ ...sInput, marginTop: 4, padding: "6px 10px", fontSize: 11, width: "100%", boxSizing: "border-box" as const }}
+                            />
+                          )}
                         </div>
                       ))}
                       <button onClick={() => setActionPanelData(prev => ({ ...prev, options: { ...prev.options, champs: [...(prev.options.champs || []), { label: "", type: "texte" }] } }))} style={{ fontSize: 11, color: C.pink, background: "none", border: "none", cursor: "pointer", fontWeight: 600, fontFamily: font, padding: "4px 0" }}>+ Ajouter un champ</button>

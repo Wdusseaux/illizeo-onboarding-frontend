@@ -187,7 +187,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
       admin_2fa: "sso",
       admin_provisioning: "provisioning",
     };
-    const isEditorTenant = (localStorage.getItem("illizeo_tenant_id") || "illizeo") === "illizeo";
+    const isEditorTenant = ["illizeo", "illizeo2"].includes(localStorage.getItem("illizeo_tenant_id") || "illizeo");
     const trialStart = localStorage.getItem("illizeo_trial_start");
     const isInTrial = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) <= 14 * 24 * 60 * 60 * 1000;
     const trialExpired = trialStart && !isInTrial;
@@ -1011,6 +1011,22 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.order')}</label>
                   <input type="number" value={editBlock.ordre} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, ordre: Number(e.target.value) } : b))} style={{ ...sInput, width: 80 }} />
                 </div>
+                {/* Mission highlight (Positive Innovation–style annotation) */}
+                {editBlock.type === "mission" && (
+                  <div style={{ marginBottom: 16, padding: 14, border: `1px solid ${C.border}`, borderRadius: 8, background: C.pinkBg + "30" }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{lang === "fr" ? "Annotation (encadré rose)" : "Annotation (pink callout)"}</label>
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>{lang === "fr" ? "Titre de l'annotation" : "Annotation title"}</label>
+                      <input value={editBlock.data?.highlight_title || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, highlight_title: e.target.value } } : b))} placeholder={lang === "fr" ? "Ex : Positive Innovation" : "Ex: Positive Innovation"} style={{ ...sInput, fontSize: 12 }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 10, color: C.textMuted, display: "block", marginBottom: 4 }}>{lang === "fr" ? "Texte de l'annotation" : "Annotation text"}</label>
+                      <textarea value={editBlock.data?.highlight_text || ""} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, data: { ...b.data, highlight_text: e.target.value } } : b))} placeholder={lang === "fr" ? "Description de l'annotation…" : "Annotation description…"} rows={3} style={{ ...sInput, fontSize: 12, resize: "vertical" }} />
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textMuted, marginTop: 8, fontStyle: "italic" }}>{lang === "fr" ? "Laissez le titre vide pour masquer l'annotation." : "Leave title empty to hide the annotation."}</div>
+                  </div>
+                )}
+
                 {/* Video items editor — only for video blocks */}
                 {editBlock.type === "video" && (
                   <div style={{ marginBottom: 16 }}>

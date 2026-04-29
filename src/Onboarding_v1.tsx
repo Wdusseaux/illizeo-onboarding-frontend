@@ -85,7 +85,7 @@ import {
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
-import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode } from './constants';
+import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, fontDisplay, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode } from './constants';
 import type { OnboardingStep, DashboardPage, DashboardTab, UserRole, AdminPage, AdminModal, Collaborateur, ParcoursCategorie, ParcourTemplate, ActionTemplate, ActionType, AssignTarget, GroupePersonnes, DocCategory, WorkflowRule, EmailTemplate, TeamMember } from './types';
 import RichEditor from './components/RichEditor';
 import AdminQuotesPage from './admin/AdminQuotesPage';
@@ -225,6 +225,9 @@ export default function OnboardingModule() {
   const [badgeTemplates, setBadgeTemplates] = useState<BadgeTemplate[]>([]);
   const [myBadges, setMyBadges] = useState<Badge[]>([]);
   const [badgeTplPanel, setBadgeTplPanel] = useState<{ mode: "closed" | "create" | "edit"; data: any }>({ mode: "closed", data: {} });
+  // Badge celebration (confetti modal when a new badge is earned)
+  const [celebrationBadge, setCelebrationBadge] = useState<Badge | null>(null);
+  const [celebrationQueue, setCelebrationQueue] = useState<Badge[]>([]);
   // Employee NPS
   const [empSurveys, setEmpSurveys] = useState<any[]>([]);
   const [empNpsAnswers, setEmpNpsAnswers] = useState<Record<string, any>>({});
@@ -258,7 +261,8 @@ export default function OnboardingModule() {
   // Employee cooptation
   const [empCampaigns, setEmpCampaigns] = useState<CooptationCampaign[]>([]);
   const [empCooptations, setEmpCooptations] = useState<Cooptation[]>([]);
-  const [empCooptForm, setEmpCooptForm] = useState<{ open: boolean; campaign_id: number | null; candidate_name: string; candidate_email: string; candidate_poste: string; telephone: string; linkedin_url: string; message: string }>({ open: false, campaign_id: null, candidate_name: "", candidate_email: "", candidate_poste: "", telephone: "", linkedin_url: "", message: "" });
+  const [empCooptForm, setEmpCooptForm] = useState<{ open: boolean; campaign_id: number | null; candidate_name: string; candidate_email: string; candidate_poste: string; telephone: string; linkedin_url: string; message: string; step?: 1 | 2; source?: "linkedin" | "manual" | null; reward?: number | null }>({ open: false, campaign_id: null, candidate_name: "", candidate_email: "", candidate_poste: "", telephone: "", linkedin_url: "", message: "", step: 1, source: null, reward: null });
+  const [shareModal, setShareModal] = useState<{ open: boolean; campaign: any | null }>({ open: false, campaign: null });
   // Notifications config
   const [notifConfig, setNotifConfig] = useState<Record<string, { email: boolean; push: boolean; inapp: boolean }>>(() => {
     const saved = localStorage.getItem("illizeo_notif_config");
@@ -517,6 +521,12 @@ export default function OnboardingModule() {
   const [collabProfileId, setCollabProfileId] = useState<number | null>(null);
   const [collabProfileTab, setCollabProfileTab] = useState<"apercu" | "infos" | "documents" | "actions" | "equipe" | "messages" | "dossier">("apercu");
   const [dossierCheck, setDossierCheck] = useState<DossierCheck | null>(null);
+  // Relance email modal (manual reminder)
+  const [relanceCollabId, setRelanceCollabId] = useState<number | null>(null);
+  const [relanceDraft, setRelanceDraft] = useState<{ subject: string; body: string } | null>(null);
+  const [relanceSending, setRelanceSending] = useState(false);
+  // Cached company settings (so admin can resolve per-user avatar URLs from `avatar_${userId}` keys)
+  const [allCompanySettings, setAllCompanySettings] = useState<Record<string, any>>({});
   // Groupe CRUD panel
   const [groupePanelMode, setGroupePanelMode] = useState<"closed" | "create" | "edit">("closed");
   const [groupePanelData, setGroupePanelData] = useState<{
@@ -699,11 +709,14 @@ export default function OnboardingModule() {
   const [cooptPanelMode, setCooptPanelMode] = useState<"closed" | "create" | "edit">("closed");
   const [cooptPanelData, setCooptPanelData] = useState<any>({ referrer_name: "", referrer_email: "", candidate_name: "", candidate_email: "", candidate_poste: "", linkedin_url: "", telephone: "", type_recompense: "prime", montant_recompense: 500, mois_requis: 6, notes: "" });
   const [cooptSettingsOpen, setCooptSettingsOpen] = useState(false);
-  const [cooptTab, setCooptTab] = useState<"cooptations" | "campagnes" | "classement">("cooptations");
+  const [cooptTab, setCooptTab] = useState<"priorite" | "inbox" | "cooptations" | "campagnes" | "classement">("priorite");
+  const [inboxCategory, setInboxCategory] = useState<string>("boite");
+  const [inboxSelectedId, setInboxSelectedId] = useState<number | null>(null);
+  const [inboxSearch, setInboxSearch] = useState<string>("");
   const [campaigns, setCampaigns] = useState<CooptationCampaign[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [campaignPanelMode, setCampaignPanelMode] = useState<"closed" | "create" | "edit">("closed");
-  const [campaignPanelData, setCampaignPanelData] = useState<any>({ titre: "", description: "", departement: "", site: "", type_contrat: "CDI", type_recompense: "prime", montant_recompense: 500, mois_requis: 6, nombre_postes: 1, priorite: "normale", date_limite: "" });
+  const [campaignPanelData, setCampaignPanelData] = useState<any>({ titre: "", description: "", departement: "", site: "", type_contrat: "CDI", type_recompense: "prime", montant_recompense: 500, mois_requis: 6, nombre_postes: 1, priorite: "normale", date_limite: "", boost_active: false, boost_multiplier: 2, boost_label: "Urgent · besoin critique", boost_until: "" });
   // Company blocks
   const [companyBlocks, setCompanyBlocks] = useState<any[]>([]);
   const [editingBlockId, setEditingBlockId] = useState<number | null>(null);
@@ -821,6 +834,9 @@ export default function OnboardingModule() {
   const [aiUsageData, setAiUsageData] = useState<any>(null);
   const [aiInsights, setAiInsights] = useState<any>(null);
   const [aiInsightsModalOpen, setAiInsightsModalOpen] = useState(false);
+  const [aiBriefingHistory, setAiBriefingHistory] = useState<{ role: string; content: string }[]>([]);
+  const [aiBriefingReply, setAiBriefingReply] = useState<string>("");
+  const [aiBriefingLoading, setAiBriefingLoading] = useState(false);
   const [editingInfoSection, setEditingInfoSection] = useState<string | null>(null);
   const [editInfoData, setEditInfoData] = useState<Record<string, string>>({});
   const [protectionOpenSection, setProtectionOpenSection] = useState<string | null>(null);
@@ -893,7 +909,7 @@ export default function OnboardingModule() {
 
   const [sharedTimeline, setSharedTimeline] = useState<TimelineEntry[]>(demoMode ? [
     { date: "15/02/2026", heure: "10:30", event: "Parcours onboarding créé", type: "system", detail: "Parcours « Onboarding Standard » assigné par Admin RH" },
-    { date: "15/02/2026", heure: "10:31", event: "Email d'invitation envoyé", type: "email", detail: "Email envoyé à nadia.ferreira@gmail.com" },
+    { date: "15/02/2026", heure: "10:31", event: "Email d'invitation envoyé", type: "email", detail: `Email envoyé à ${auth.user?.email || "l'employé"}` },
   ] : []);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -904,6 +920,42 @@ export default function OnboardingModule() {
     setToasts(prev => [...prev, { id, message, type, role: targetRole || role }]);
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   }, [role]);
+
+  // ─── Refresh allCompanySettings when admin opens collab listings ─────
+  // Employees upload their avatar to company_settings[avatar_{userId}], but admin
+  // loads settings only once at auth time. Without this, an admin would keep
+  // seeing initials until next login. Refresh on entry to suivi / dashboard.
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.isAdmin) return;
+    if (adminPage !== "admin_suivi" && adminPage !== "admin_dashboard") return;
+    getCompanySettings().then(s => setAllCompanySettings(s || {})).catch(() => {});
+  }, [adminPage, auth.isAuthenticated, auth.isAdmin]);
+
+  // ─── AI-blocked global listener ─────────────────────────────
+  // Triggered by api/client.ts when any AI call returns 402 (spending cap, quota
+  // exceeded, or no AI plan). One toast per minute to avoid spam when the same
+  // page makes several blocked calls in a row.
+  const lastAiBlockToastRef = useRef(0);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail: any = (e as CustomEvent).detail || {};
+      const now = Date.now();
+      if (now - lastAiBlockToastRef.current < 60_000) return;
+      lastAiBlockToastRef.current = now;
+
+      let msg = detail.reply || detail.error || "Fonctionnalité IA temporairement indisponible";
+      if (detail.no_plan) {
+        msg = "Module IA non activé. Souscrivez un add-on IA pour utiliser cette fonctionnalité.";
+      } else if (detail.error === 'spending_cap') {
+        msg = `Plafond IA atteint (${detail.billed_chf} / ${detail.cap_chf} CHF). Augmentez le plafond ou achetez des crédits.`;
+      } else if (detail.quota_exceeded && detail.quota_status) {
+        msg = `Quota IA mensuel atteint (${detail.quota_status.used}/${detail.quota_status.effective_limit}). Achetez des crédits ou changez de plan.`;
+      }
+      addToast(msg, "warning");
+    };
+    window.addEventListener('illizeo:ai-blocked', handler);
+    return () => window.removeEventListener('illizeo:ai-blocked', handler);
+  }, [addToast]);
 
   const addTimelineEntry = useCallback((event: string, type: TimelineEntry["type"], detail: string) => {
     const now = new Date();
@@ -948,13 +1000,15 @@ export default function OnboardingModule() {
       addToast(`${formData.prenom} a complété : ${action.title.substring(0, 40)}...`, "info", "rh");
     }
     // Call API — use assignment ID if available, otherwise use action ID
-    const refreshLb = () => import('./api/endpoints').then(async m => {
+    const refreshAfter = () => import('./api/endpoints').then(async m => {
       try { const lb = await (m as any).getMyLeaderboard?.(); if (lb) setLeaderboardData(lb); } catch {}
+      // Refetch badges so newly-awarded ones trigger the celebration modal
+      try { const b = await (m as any).getMyBadges?.(); if (b) setMyBadges(b); } catch {}
     });
     if (assignmentId) {
-      apiCompleteMyAction(assignmentId).then(refreshLb).catch(() => {});
+      apiCompleteMyAction(assignmentId).then(refreshAfter).catch(() => {});
     } else {
-      apiCompleteByAction(actionId).then(refreshLb).catch(() => {});
+      apiCompleteByAction(actionId).then(refreshAfter).catch(() => {});
     }
   }, [formData.prenom, addTimelineEntry, addToast]);
 
@@ -1165,7 +1219,7 @@ export default function OnboardingModule() {
     collabPanelMode, setCollabPanelMode,
     collabPanelData, setCollabPanelData,
     collabPanelLoading, setCollabPanelLoading,
-    collabProfileId, setCollabProfileId,
+    collabProfileId, setCollabProfileId, relanceCollabId, setRelanceCollabId, relanceDraft, setRelanceDraft, relanceSending, setRelanceSending, allCompanySettings, setAllCompanySettings,
     collabProfileTab, setCollabProfileTab,
     dossierCheck, setDossierCheck,
     groupePanelMode, setGroupePanelMode,
@@ -1248,6 +1302,9 @@ export default function OnboardingModule() {
     cooptPanelData, setCooptPanelData,
     cooptSettingsOpen, setCooptSettingsOpen,
     cooptTab, setCooptTab,
+    inboxCategory, setInboxCategory,
+    inboxSelectedId, setInboxSelectedId,
+    inboxSearch, setInboxSearch,
     campaigns, setCampaigns,
     leaderboard, setLeaderboard,
     campaignPanelMode, setCampaignPanelMode,
@@ -1321,7 +1378,9 @@ export default function OnboardingModule() {
     aiParcoursModal, setAiParcoursModal, aiParcoursPrompt, setAiParcoursPrompt, aiParcoursLoading, setAiParcoursLoading, aiParcoursResult, setAiParcoursResult, aiParcoursError, setAiParcoursError,
     showTeamModal, setShowTeamModal, selectedTeamMember, setSelectedTeamMember,
     ocrModal, setOcrModal, ocrFile, setOcrFile, ocrPreview, setOcrPreview, ocrLoading, setOcrLoading, ocrResult, setOcrResult, ocrError, setOcrError, ocrWarning, setOcrWarning, ocrUsage, setOcrUsage,
-    saAiConfig, setSaAiConfig, saAiTenantUsage, setSaAiTenantUsage, aiUsageData, setAiUsageData, aiInsights, setAiInsights, aiInsightsModalOpen, setAiInsightsModalOpen, editingInfoSection, setEditingInfoSection, editInfoData, setEditInfoData, protectionOpenSection, setProtectionOpenSection,
+    saAiConfig, setSaAiConfig, saAiTenantUsage, setSaAiTenantUsage, aiUsageData, setAiUsageData, aiInsights, setAiInsights, aiInsightsModalOpen, setAiInsightsModalOpen,
+    aiBriefingHistory, setAiBriefingHistory, aiBriefingReply, setAiBriefingReply, aiBriefingLoading, setAiBriefingLoading,
+    editingInfoSection, setEditingInfoSection, editInfoData, setEditInfoData, protectionOpenSection, setProtectionOpenSection,
     generateContrat, setGenerateContrat, generateCollabId, setGenerateCollabId, generateData, setGenerateData, generateLoading, setGenerateLoading,
     consoData, setConsoData, consoMonth, setConsoMonth, consoLoading, setConsoLoading, consoFilter, setConsoFilter, consoSearch, setConsoSearch, loadConsumption,
     profileTab, setProfileTab,
@@ -1431,6 +1490,7 @@ export default function OnboardingModule() {
   useEffect(() => {
     if (auth.isAuthenticated) {
       getCompanySettings().then(s => {
+        setAllCompanySettings(s || {});
         if (s.theme_color) {
           // Migrate legacy burgundy color from DB to new Illizeo brand color
           const themeColor = s.theme_color === "#C2185B" ? "#E41076" : s.theme_color;
@@ -1569,6 +1629,33 @@ export default function OnboardingModule() {
       getMyNpsSurveys().then(setEmpSurveys).catch(() => getNpsSurveys().then(s => setEmpSurveys(s.map(sv => ({ survey: sv, token: null, completed: false, completed_at: null })))).catch(() => {}));
     }
   }, [auth.isAuthenticated, dashPage]);
+
+  // Detect newly-earned badges and queue confetti celebration
+  useEffect(() => {
+    if (!auth.isAuthenticated || auth.isAdmin) return;
+    if (!myBadges || myBadges.length === 0) return;
+    const userKey = `iz_celebrated_badges_${auth.user?.id || "anon"}`;
+    let celebrated: number[] = [];
+    try { celebrated = JSON.parse(localStorage.getItem(userKey) || "[]"); } catch {}
+    // First-ever load: mark existing badges as already seen so we don't replay history
+    if (celebrated.length === 0) {
+      localStorage.setItem(userKey, JSON.stringify(myBadges.map(b => b.id)));
+      return;
+    }
+    const fresh = myBadges.filter(b => !celebrated.includes(b.id));
+    if (fresh.length > 0) {
+      setCelebrationQueue(prev => [...prev, ...fresh]);
+      localStorage.setItem(userKey, JSON.stringify([...celebrated, ...fresh.map(b => b.id)]));
+    }
+  }, [myBadges, auth.isAuthenticated, auth.isAdmin, auth.user?.id]);
+
+  // Show next badge from the queue when modal is closed
+  useEffect(() => {
+    if (!celebrationBadge && celebrationQueue.length > 0) {
+      setCelebrationBadge(celebrationQueue[0]);
+      setCelebrationQueue(prev => prev.slice(1));
+    }
+  }, [celebrationBadge, celebrationQueue]);
 
   // ─── Documents effects ─────────────────────────────────────
   useEffect(() => {
@@ -1742,6 +1829,7 @@ export default function OnboardingModule() {
       { id: "organigramme" as const, label: "Mon équipe", icon: Users },
       { id: "mes_rdv" as const, label: "Mes RDV", icon: Calendar },
       { id: "mes_signatures" as const, label: "Mes signatures", icon: FileSignature, badge: docsBadge },
+      { id: "badges" as const, label: "Badges", icon: Award },
       ...(hasOfficeTour ? [{ id: "bureaux" as const, label: "Bureaux", icon: MapPin }] : []),
       { id: "satisfaction" as const, label: "Feedback", icon: MessageSquare },
     ]},
@@ -1784,8 +1872,8 @@ export default function OnboardingModule() {
     renderDashboard_admin, renderSuivi, renderCollabProfile, renderParcours,
     renderDocuments, renderWorkflows, renderTemplates, renderEquipes,
     renderNotifications_admin, renderEntreprise_admin, renderMessagerie_admin,
-    renderNPS, renderContrats, renderCooptation, renderIntegrations,
-    renderSidebar_admin: _renderSidebar_admin, renderSuperAdminPanel, renderOcrModal, PARCOURS_CAT_META, hasModule, isPageAccessible,
+    renderNPS, renderContrats, renderGenerateContratModal, renderCooptation, renderIntegrations,
+    renderSidebar_admin: _renderSidebar_admin, renderSuperAdminPanel, renderOcrModal, renderRelanceModal, PARCOURS_CAT_META, hasModule, isPageAccessible,
     isEditorTenant, isInTrial, trialExpired, hasActiveSub, SIDEBAR,
   } = adminRenders as any;
   const renderSidebar_admin = typeof _renderSidebar_admin === "function" ? _renderSidebar_admin : () => <div style={{ width: 220, minHeight: "100vh", background: "#fff", borderRight: "1px solid #e0e0e0" }} />;
@@ -1983,20 +2071,58 @@ export default function OnboardingModule() {
                 <p style={{ fontSize: 14, color: C.textLight, marginBottom: 28 }}>Cette photo sera visible par tes collègues. Tu peux aussi passer cette étape et l'ajouter plus tard.</p>
                 <div style={{ display: "flex", alignItems: "center", gap: 32, justifyContent: "center", marginBottom: 32 }}>
                   {/* Avatar preview */}
-                  <div style={{ width: 160, height: 160, borderRadius: "50%", background: formData.photoUploaded ? "linear-gradient(135deg, #E91E8C, #E41076)" : C.bg, display: "flex", alignItems: "center", justifyContent: "center", border: `4px solid ${formData.photoUploaded ? C.pink : C.border}`, transition: "all .3s" }}>
-                    {formData.photoUploaded ? (
-                      <span style={{ fontSize: 48, fontWeight: 700, color: C.white }}>NF</span>
+                  <div style={{ width: 160, height: 160, borderRadius: "50%", background: avatarImage ? "none" : (formData.photoUploaded ? "linear-gradient(135deg, #E91E8C, #E41076)" : C.bg), display: "flex", alignItems: "center", justifyContent: "center", border: `4px solid ${avatarImage || formData.photoUploaded ? C.pink : C.border}`, transition: "all .3s", overflow: "hidden" }}>
+                    {avatarImage ? (
+                      <img src={avatarImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : formData.photoUploaded ? (
+                      <span style={{ fontSize: 48, fontWeight: 700, color: C.white }}>
+                        {(auth.user?.name || `${formData.prenom} ${formData.nom}`).split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                      </span>
                     ) : (
                       <Users size={56} color={C.border} />
                     )}
                   </div>
                   {/* Upload zone */}
                   <div>
-                    <button onClick={() => setFormData({ ...formData, photoUploaded: true })} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                    <input id="setup-photo-upload" type="file" accept="image/jpeg,image/png" style={{ display: "none" }} onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => {
+                        const dataUrl = ev.target?.result as string;
+                        const img = new Image();
+                        img.onload = () => {
+                          const MAX = 256;
+                          const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
+                          const w = Math.round(img.width * ratio);
+                          const h = Math.round(img.height * ratio);
+                          const canvas = document.createElement("canvas");
+                          canvas.width = w; canvas.height = h;
+                          const cctx = canvas.getContext("2d");
+                          if (!cctx) { addToast("Erreur lors du traitement de l'image", "error"); return; }
+                          cctx.drawImage(img, 0, 0, w, h);
+                          const compressed = canvas.toDataURL("image/jpeg", 0.85);
+                          setAvatarImage(compressed);
+                          setAvatarZoom(100);
+                          setAvatarPos({ x: 50, y: 50 });
+                          localStorage.setItem("illizeo_avatar", compressed);
+                          if (auth.user?.id) {
+                            updateCompanySettings({ [`avatar_${auth.user.id}`]: compressed })
+                              .then(() => addToast("Photo enregistrée", "success"))
+                              .catch((err: any) => addToast("Échec de l'enregistrement : " + (err?.message || ""), "error"));
+                          }
+                          setFormData({ ...formData, photoUploaded: true });
+                        };
+                        img.onerror = () => addToast("Image invalide", "error");
+                        img.src = dataUrl;
+                      };
+                      reader.readAsDataURL(file);
+                    }} />
+                    <button onClick={() => document.getElementById("setup-photo-upload")?.click()} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                       <Upload size={16} /> Importer une photo
                     </button>
                     <p style={{ fontSize: 12, color: C.textMuted, maxWidth: 200, lineHeight: 1.5 }}>JPG ou PNG, max 5 Mo. Un cadrage centré sur le visage est recommandé.</p>
-                    {formData.photoUploaded && (
+                    {avatarImage && (
                       <div className="iz-fade-up" style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 8, color: C.green, fontSize: 13, fontWeight: 600 }}>
                         <CheckCircle size={16} /> Photo importée avec succès
                       </div>
@@ -2013,7 +2139,7 @@ export default function OnboardingModule() {
               {currentIdx === 0 && (
                 <button onClick={() => setStep("welcome_banner")} className="iz-btn-outline" style={sBtn("outline")}>{t('misc.return')}</button>
               )}
-              {step === "photo_profile" && !formData.photoUploaded && (
+              {step === "photo_profile" && !avatarImage && (
                 <button onClick={() => setShowPreboard(false)} className="iz-btn-outline" style={sBtn("outline")}>Passer</button>
               )}
               <button onClick={() => {
@@ -2041,7 +2167,7 @@ export default function OnboardingModule() {
   if (role === "rh") {
     return (
       <div style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: font, background: C.white, color: C.text }}>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" /><style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" /><style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
         {/* Setup Wizard overlay */}
         {showSetupWizard && renderSetupWizard()}
         {renderSidebar_admin()}
@@ -2727,6 +2853,8 @@ export default function OnboardingModule() {
         {/* (confirm modal unified with confirmDialog above) */}
         {adminPanels.renderPromptModal()}
         {typeof renderOcrModal === "function" && renderOcrModal()}
+        {typeof renderRelanceModal === "function" && renderRelanceModal()}
+        {typeof renderGenerateContratModal === "function" && renderGenerateContratModal()}
         {adminPanels.renderCollabPanel()}
         {adminPanels.renderParcoursPanel()}
         {adminPanels.renderPhasePanel()}
@@ -2738,7 +2866,7 @@ export default function OnboardingModule() {
   if (!isEditorTenant && !hasActiveSub && !isInTrial) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text, padding: "60px 40px", textAlign: "center" }}>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
         <div style={{ marginBottom: 24 }}><IllizeoLogoBrand style={{ height: 32 }} /></div>
         <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#FFF3E0", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
           <Lock size={28} color="#E65100" />
@@ -2752,7 +2880,7 @@ export default function OnboardingModule() {
   }
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text }}>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" /><style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
+      <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" /><style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
       {renderSidebar()}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
       {renderEmployeeTopbar()}
@@ -2769,78 +2897,246 @@ export default function OnboardingModule() {
           getCooptations().then(list => setEmpCooptations(list.filter(c => c.referrer_email === auth.user?.email))).catch(() => {});
           getCooptationCampaigns().then(setEmpCampaigns).catch(() => {});
         };
+        // Boost helpers: a campaign is "boosted live" if boost_active and the
+        // optional end date hasn't passed. Effective reward = base × multiplier.
+        const isBoosted = (c: any) => !!(c?.boost_active && (!c.boost_until || new Date(c.boost_until) >= new Date(new Date().toDateString())));
+        const effectiveReward = (c: any) => {
+          const base = Number(c?.montant_recompense) || 0;
+          return isBoosted(c) ? base * (Number(c.boost_multiplier) || 1) : base;
+        };
+        const daysUntil = (dateStr?: string | null) => {
+          if (!dateStr) return null;
+          const target = new Date(dateStr);
+          const today = new Date(new Date().toDateString());
+          return Math.max(0, Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+        };
+        const boostedCampaigns = activeCampaigns.filter(isBoosted);
+        const regularCampaigns = activeCampaigns.filter(c => !isBoosted(c));
+        // Total potential = sum of effective rewards across all open positions.
+        const totalPotential = activeCampaigns.reduce((sum, c) => sum + effectiveReward(c), 0);
+        // My recommendation stats (real data from the user's own cooptations).
+        const myActive = empCooptations.filter(c => c.statut === "en_attente" || c.statut === "embauche").length;
+        const myRewarded = empCooptations.filter(c => c.recompense_versee).length;
+        const openRecommend = (campaignId: number | null, poste: string, reward: number | null, prefill?: Partial<{ candidate_name: string; candidate_poste: string; linkedin_url: string }>) => {
+          setEmpCooptForm({
+            open: true,
+            campaign_id: campaignId,
+            candidate_name: prefill?.candidate_name || "",
+            candidate_email: "",
+            candidate_poste: prefill?.candidate_poste || poste,
+            telephone: "",
+            linkedin_url: prefill?.linkedin_url || "",
+            message: "",
+            step: 1,
+            source: null,
+            reward: reward,
+          });
+        };
         return (
         <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-            <div>
-              <h1 style={{ fontSize: 24, fontWeight: 600, color: C.text, margin: 0 }}>{t('admin.cooptation')}</h1>
-              <p style={{ fontSize: 13, color: C.textMuted, marginTop: 4 }}>{t('emp.referral_subtitle')}</p>
-            </div>
-          </div>
+          {/* ── Hero ── */}
+          <div className="iz-fade-up" style={{
+            position: "relative", overflow: "hidden",
+            borderRadius: 20, padding: "40px 48px",
+            background: `linear-gradient(135deg, ${C.pinkLight} 0%, ${C.pinkBg} 50%, ${C.pinkLight} 100%)`,
+            marginBottom: 28,
+          }}>
+            {/* Decorative network graph (right side) */}
+            <svg viewBox="0 0 320 240" style={{ position: "absolute", right: 24, top: "50%", transform: "translateY(-50%)", width: 360, height: 260, opacity: .92, pointerEvents: "none" }}>
+              <line x1="160" y1="120" x2="60" y2="48" stroke={C.pink} strokeWidth="1.5" strokeOpacity=".35" />
+              <line x1="160" y1="120" x2="280" y2="60" stroke={C.pink} strokeWidth="1.5" strokeOpacity=".35" />
+              <line x1="160" y1="120" x2="270" y2="170" stroke={C.pink} strokeWidth="1.5" strokeOpacity=".35" />
+              <line x1="160" y1="120" x2="60" y2="160" stroke={C.pink} strokeWidth="1.5" strokeOpacity=".35" />
+              <line x1="160" y1="120" x2="180" y2="200" stroke={C.pink} strokeWidth="1" strokeOpacity=".25" />
+              <line x1="160" y1="120" x2="220" y2="40" stroke={C.pink} strokeWidth="1" strokeOpacity=".25" />
+              <line x1="60" y1="48" x2="220" y2="40" stroke={C.pink} strokeWidth="1" strokeOpacity=".15" />
+              <line x1="280" y1="60" x2="270" y2="170" stroke={C.pink} strokeWidth="1" strokeOpacity=".15" />
+              <line x1="60" y1="160" x2="180" y2="200" stroke={C.pink} strokeWidth="1" strokeOpacity=".15" />
+              {/* central node = current user — photo if available, otherwise initials */}
+              <defs>
+                <clipPath id="coopt-me-clip"><circle cx="160" cy="120" r="22" /></clipPath>
+              </defs>
+              <circle cx="160" cy="120" r="34" fill={C.pink} fillOpacity=".15" />
+              {avatarImage ? (
+                <>
+                  <image href={avatarImage} x="138" y="98" width="44" height="44" clipPath="url(#coopt-me-clip)" preserveAspectRatio="xMidYMid slice" />
+                  <circle cx="160" cy="120" r="22" fill="none" stroke={C.pink} strokeWidth="2.5" />
+                </>
+              ) : (
+                <>
+                  <circle cx="160" cy="120" r="22" fill={C.pink} />
+                  <text x="160" y="125" textAnchor="middle" fontSize="11" fontWeight="700" fill="#fff" fontFamily={font}>{(auth.user?.name || "").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "MOI"}</text>
+                </>
+              )}
+              {/* peripheral nodes */}
+              <circle cx="60" cy="48" r="14" fill="#a78bfa" />
+              <circle cx="60" cy="48" r="20" fill="#a78bfa" fillOpacity=".18" />
+              <circle cx="280" cy="60" r="14" fill="#10b981" />
+              <circle cx="280" cy="60" r="20" fill="#10b981" fillOpacity=".18" />
+              <circle cx="270" cy="170" r="11" fill="#f59e0b" />
+              <circle cx="60" cy="160" r="11" fill="#3b82f6" />
+              <circle cx="60" cy="160" r="17" fill="#3b82f6" fillOpacity=".18" />
+              <circle cx="180" cy="200" r="8" fill="#cbd5e1" />
+              <circle cx="220" cy="40" r="8" fill="#cbd5e1" />
+            </svg>
 
-          {/* My cooptation stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
-            <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "20px" }}>
-              <Handshake size={24} color={C.pink} style={{ marginBottom: 8 }} />
-              <div style={{ fontSize: 24, fontWeight: 700, color: C.text }}>{empCooptations.length}</div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>{t('emp.my_referrals_count')}</div>
-            </div>
-            <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "20px" }}>
-              <CheckCircle size={24} color={C.green} style={{ marginBottom: 8 }} />
-              <div style={{ fontSize: 24, fontWeight: 700, color: C.green }}>{empCooptations.filter(c => c.statut === "embauche" || c.statut === "valide" || c.statut === "recompense_versee").length}</div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>{t('emp.hired')}</div>
-            </div>
-            <div className="iz-card" style={{ ...sCard, textAlign: "center", padding: "20px" }}>
-              <Gift size={24} color={C.amber} style={{ marginBottom: 8 }} />
-              <div style={{ fontSize: 24, fontWeight: 700, color: C.amber }}>{empCooptations.filter(c => c.recompense_versee).length}</div>
-              <div style={{ fontSize: 11, color: C.textMuted }}>{t('emp.rewards_received')}</div>
-            </div>
-          </div>
-
-          {/* Active campaigns */}
-          <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}><Target size={18} color={C.pink} /> {t('emp.open_positions')}</h2>
-          {activeCampaigns.length === 0 && <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13, marginBottom: 24 }}>{t('emp.no_open_positions')}</div>}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 32 }}>
-            {activeCampaigns.map(camp => (
-              <div key={camp.id} className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
-                <div style={{ padding: "16px 20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                    <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{camp.titre}</h3>
-                    <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: camp.priorite === "urgente" ? C.redLight : camp.priorite === "haute" ? C.amberLight : C.blueLight, color: camp.priorite === "urgente" ? C.red : camp.priorite === "haute" ? C.amber : C.blue }}>{camp.priorite}</span>
-                  </div>
-                  {camp.description && <p style={{ fontSize: 12, color: C.textLight, margin: "0 0 8px", lineHeight: 1.5 }}>{camp.description}</p>}
-                  <div style={{ display: "flex", gap: 12, fontSize: 11, color: C.textMuted }}>
-                    {camp.departement && <span>{camp.departement}</span>}
-                    {camp.site && <span>{camp.site}</span>}
-                    <span>{camp.type_contrat}</span>
-                  </div>
+            <div style={{ position: "relative", zIndex: 1, maxWidth: 580 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: 1.5, marginBottom: 14, textTransform: "uppercase" }}>{t('admin.cooptation') || 'Cooptation'}</div>
+              <h1 style={{ fontSize: 44, fontWeight: 800, color: C.text, lineHeight: 1.05, margin: "0 0 16px", fontFamily: fontDisplay, letterSpacing: -1 }}>
+                Recommandez,<br /><span style={{ color: C.pink }}>débloquez {fmtCurrency(totalPotential || 0)}</span>.
+              </h1>
+              <p style={{ fontSize: 14, color: C.textLight, lineHeight: 1.6, margin: "0 0 24px", maxWidth: 440 }}>
+                {activeCampaigns.length > 0
+                  ? `${activeCampaigns.length} poste${activeCampaigns.length > 1 ? "s" : ""} ouvert${activeCampaigns.length > 1 ? "s" : ""} attend${activeCampaigns.length > 1 ? "ent" : ""} votre recommandation. Une embauche issue de votre réseau, c'est une récompense versée.`
+                  : "Aucun poste ouvert pour l'instant. Revenez quand l'équipe RH lancera de nouvelles campagnes."}
+              </p>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ background: C.white, borderRadius: 12, padding: "12px 18px", minWidth: 130 }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: C.text, fontFamily: fontDisplay, letterSpacing: -0.4 }}>{activeCampaigns.length}</div>
+                  <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: .4, marginTop: 2 }}>postes ouverts</div>
                 </div>
-                <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ fontSize: 12 }}>
-                    <span style={{ fontWeight: 600, color: C.pink }}>{camp.type_recompense === "prime" ? fmtCurrency(camp.montant_recompense || 0) : camp.description_recompense || "Cadeau"}</span>
-                    <span style={{ color: C.textMuted }}> {t('emp.reward_label')}</span>
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => {
-                      const shareUrl = `${window.location.origin}/cooptation/${camp.share_token}`;
-                      navigator.clipboard.writeText(shareUrl).then(() => addToast_admin(t('emp.link_copied'))).catch(() => {
-                        // Fallback for clipboard API failure
-                        prompt(lang === "fr" ? "Copiez ce lien :" : "Copy this link:", shareUrl);
-                      });
-                    }} title={t('emp.share')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Link size={11} /> {t('emp.share')}</button>
-                    <button onClick={() => setEmpCooptForm({ open: true, campaign_id: camp.id, candidate_name: "", candidate_email: "", candidate_poste: camp.titre, telephone: "", linkedin_url: "", message: "" })} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "5px 14px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><UserPlus size={11} /> {t('emp.recommend')}</button>
-                  </div>
+                <div style={{ background: C.pinkLight, borderRadius: 12, padding: "12px 18px", minWidth: 130 }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: C.pink, fontFamily: fontDisplay, letterSpacing: -0.4 }}>{myActive}</div>
+                  <div style={{ fontSize: 10, color: C.pink, opacity: .8, textTransform: "uppercase", letterSpacing: .4, marginTop: 2 }}>recommandations en cours</div>
+                </div>
+                <div style={{ background: C.pinkLight, borderRadius: 12, padding: "12px 18px", minWidth: 130 }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: C.pink, fontFamily: fontDisplay, letterSpacing: -0.4 }}>{myRewarded}</div>
+                  <div style={{ fontSize: 10, color: C.pink, opacity: .8, textTransform: "uppercase", letterSpacing: .4, marginTop: 2 }}>récompenses reçues</div>
                 </div>
               </div>
-            ))}
+            </div>
           </div>
 
-          {/* My cooptations history */}
-          <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}><Clock size={18} color={C.blue} /> {t('emp.my_recommendations')}</h2>
+          {/* ── Boosted cooptations ── */}
+          {boostedCampaigns.length > 0 && (
+            <div style={{ marginBottom: 32 }}>
+              {boostedCampaigns.map(camp => {
+                const base = Number(camp.montant_recompense) || 0;
+                const mult = Number(camp.boost_multiplier) || 1;
+                const boosted = base * mult;
+                const days = daysUntil(camp.boost_until);
+                const tags = [camp.departement, camp.site, camp.type_contrat].filter(Boolean) as string[];
+                return (
+                  <div key={camp.id} className="iz-fade-up" style={{ marginBottom: 20 }}>
+                    {/* Outer banner */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: "linear-gradient(135deg, #f97316, #f59e0b)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(249,115,22,.35)" }}>
+                        <Rocket size={18} color="#fff" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{camp.boost_label || "Urgent · besoin critique"}</div>
+                        <div style={{ fontSize: 12, color: C.textMuted }}>Cooptation prioritaire — bonus ×{mult}{days != null ? ` pendant ${days} jour${days > 1 ? "s" : ""}` : ""}</div>
+                      </div>
+                    </div>
+                    {/* Dark gradient card */}
+                    <div style={{ position: "relative", borderRadius: 18, overflow: "hidden",
+                      background: "linear-gradient(135deg, #1a1a2e 0%, #2D1B3D 50%, #4a2a5a 100%)",
+                      color: "#fff", padding: "24px 28px",
+                      boxShadow: "0 12px 32px rgba(45,27,61,.35)" }}>
+                      {/* Decorative blob */}
+                      <div style={{ position: "absolute", right: -60, bottom: -60, width: 240, height: 240, borderRadius: "50%", background: `${C.pink}22`, pointerEvents: "none" }} />
+                      <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 6, background: "rgba(255,107,153,.18)", border: "1px solid rgba(255,107,153,.4)", fontSize: 10, fontWeight: 700, color: "#ff8fb8", letterSpacing: 1 }}>
+                            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#ff6b99" }} /> BONUS ×{mult}{days != null ? ` · ${days} JOUR${days > 1 ? "S" : ""}` : ""}
+                          </span>
+                          <h3 style={{ fontSize: 32, fontWeight: 800, color: "#fff", margin: "12px 0 10px", fontFamily: fontDisplay, letterSpacing: -0.8, lineHeight: 1.05 }}>{camp.titre}</h3>
+                          {camp.description && <p style={{ fontSize: 13, color: "rgba(255,255,255,.78)", lineHeight: 1.55, margin: "0 0 14px", maxWidth: 460 }}>{camp.description}</p>}
+                          {tags.length > 0 && (
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+                              {tags.map((tag, i) => (
+                                <span key={i} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.12)", fontSize: 11, color: "rgba(255,255,255,.85)" }}>{tag}</span>
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "rgba(255,255,255,.7)" }}>
+                            <div style={{ width: 28, height: 28, borderRadius: "50%", background: C.pink, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 }}>
+                              {(auth.user?.name || "RH").split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </div>
+                            <span>Hiring : <strong style={{ color: "#fff", fontWeight: 600 }}>{auth.user?.name || "Équipe RH"}</strong></span>
+                            {(camp.site || camp.type_contrat) && (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                <span style={{ opacity: .4 }}>·</span>
+                                <MapPin size={11} color={C.pink} />
+                                {[camp.site, camp.type_contrat].filter(Boolean).join(" · ")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Reward block */}
+                        <div style={{ textAlign: "right" as const, flexShrink: 0 }}>
+                          <div style={{ fontSize: 10, color: "#fbbf24", fontWeight: 700, letterSpacing: 1.5, marginBottom: 8 }}>RÉCOMPENSE × {mult}</div>
+                          <div style={{ fontSize: 42, fontWeight: 800, color: "#fff", lineHeight: 1, fontFamily: fontDisplay, letterSpacing: -1.2 }}>
+                            {boosted.toLocaleString('fr-CH')}<span style={{ fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,.7)", marginLeft: 4 }}>CHF</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", marginTop: 6, textDecoration: "line-through" }}>au lieu de {fmtCurrency(base)}</div>
+                          <div style={{ display: "flex", gap: 8, marginTop: 18, justifyContent: "flex-end" }}>
+                            <button onClick={() => openRecommend(camp.id, camp.titre, boosted)}
+                              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "11px 22px", borderRadius: 10, border: "none", background: C.pink, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: font, boxShadow: "0 4px 12px rgba(233,30,140,.4)" }}>
+                              <Plus size={14} /> Recommander
+                            </button>
+                            <button onClick={() => setShareModal({ open: true, campaign: camp })} style={{ padding: "11px 18px", borderRadius: 10, border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.06)", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: font }}>
+                              Partager
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Open positions ── */}
+          <div style={{ marginBottom: 32 }}>
+            <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8, color: C.text }}>
+              <Target size={18} color={C.pink} /> {t('emp.open_positions')}
+            </h2>
+            {regularCampaigns.length === 0 ? (
+              <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13, border: `1px dashed ${C.border}`, borderRadius: 12 }}>
+                {boostedCampaigns.length > 0 ? "Tous les autres postes sont actuellement boostés ci-dessus." : t('emp.no_open_positions')}
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+                {regularCampaigns.map(camp => (
+                  <div key={camp.id} className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
+                    <div style={{ padding: "16px 20px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 8 }}>
+                        <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: C.text }}>{camp.titre}</h3>
+                        <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: camp.priorite === "urgente" ? C.redLight : camp.priorite === "haute" ? C.amberLight : C.blueLight, color: camp.priorite === "urgente" ? C.red : camp.priorite === "haute" ? C.amber : C.blue }}>{camp.priorite}</span>
+                      </div>
+                      {camp.description && <p style={{ fontSize: 12, color: C.textLight, margin: "0 0 8px", lineHeight: 1.5 }}>{camp.description}</p>}
+                      <div style={{ display: "flex", gap: 12, fontSize: 11, color: C.textMuted, flexWrap: "wrap" }}>
+                        {camp.departement && <span>{camp.departement}</span>}
+                        {camp.site && <span>{camp.site}</span>}
+                        <span>{camp.type_contrat}</span>
+                      </div>
+                    </div>
+                    <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                      <div style={{ fontSize: 12 }}>
+                        <span style={{ fontWeight: 700, color: C.pink }}>{camp.type_recompense === "prime" ? fmtCurrency(camp.montant_recompense || 0) : camp.description_recompense || "Cadeau"}</span>
+                        <span style={{ color: C.textMuted, marginLeft: 4 }}>{t('emp.reward_label')}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button onClick={() => setShareModal({ open: true, campaign: camp })} title={t('emp.share')} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "5px 10px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><Link size={11} /> {t('emp.share')}</button>
+                        <button onClick={() => openRecommend(camp.id, camp.titre, camp.montant_recompense || null)} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "5px 14px", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><UserPlus size={11} /> {t('emp.recommend')}</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── My recommendations ── */}
+          <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8, color: C.text }}>
+            <Clock size={18} color={C.blue} /> {t('emp.my_recommendations')}
+          </h2>
           {empCooptations.length === 0 ? (
-            <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('emp.no_recommendation')}</div>
+            <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13, border: `1px dashed ${C.border}`, borderRadius: 12 }}>{t('emp.no_recommendation')}</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {empCooptations.map(c => {
                 const timelineSteps = [
                   { key: "en_attente", label: t('emp.timeline_recommended'), icon: UserPlus, date: c.date_cooptation },
@@ -2868,7 +3164,6 @@ export default function OnboardingModule() {
                       <span style={{ padding: "4px 12px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: C.blueLight, color: C.blue }}>{c.jours_restants} {t('emp.days_remaining')}</span>
                     ) : null}
                   </div>
-                  {/* Timeline */}
                   {c.statut !== "refuse" && (
                     <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 0 }}>
                       {timelineSteps.map((step, idx) => {
@@ -2897,74 +3192,274 @@ export default function OnboardingModule() {
             </div>
           )}
 
-          {/* Recommend form modal */}
-          {empCooptForm.open && (
-            <div style={{ position: "fixed", inset: 0, zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.35)" }} onClick={() => setEmpCooptForm(f => ({ ...f, open: false }))}>
-              <div className="iz-fade-up" onClick={e => e.stopPropagation()} style={{ background: C.white, borderRadius: 16, padding: "32px", width: 480, boxShadow: "0 12px 40px rgba(0,0,0,.18)", fontFamily: font }}>
-                <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{t('emp.recommend_candidate')}</h3>
-                <p style={{ fontSize: 12, color: C.textMuted, margin: "0 0 20px" }}>{t('emp.recommend_info')}</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('emp.candidate_name')} *</label><input value={empCooptForm.candidate_name} onChange={e => setEmpCooptForm(f => ({ ...f, candidate_name: e.target.value }))} style={sInput} placeholder={t('label.firstname') + " " + t('label.lastname')} /></div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('label.email')} *</label><input type="email" value={empCooptForm.candidate_email} onChange={e => setEmpCooptForm(f => ({ ...f, candidate_email: e.target.value }))} style={sInput} placeholder="email@exemple.com" /></div>
+          {/* ── 2-step recommend modal ── */}
+          {empCooptForm.open && (() => {
+            const step = empCooptForm.step ?? 1;
+            const reward = empCooptForm.reward ?? 0;
+            const close = () => setEmpCooptForm(f => ({ ...f, open: false, step: 1, source: null }));
+            const goNext = () => setEmpCooptForm(f => ({ ...f, step: 2 }));
+            const goBack = () => setEmpCooptForm(f => ({ ...f, step: 1 }));
+            const submit = async () => {
+              // Client-side guards before hitting the API — gives the user
+              // immediate feedback instead of a silent backend 422.
+              const name = empCooptForm.candidate_name.trim();
+              const email = empCooptForm.candidate_email.trim();
+              if (!name) { addToast("Le nom du candidat est requis", "warning"); setEmpCooptForm(f => ({ ...f, step: 1 })); return; }
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { addToast("L'email du candidat n'est pas valide", "warning"); setEmpCooptForm(f => ({ ...f, step: 1 })); return; }
+              try {
+                const created = await apiCreateCooptation({
+                  referrer_name: auth.user?.name || "",
+                  referrer_email: auth.user?.email || "",
+                  candidate_name: name,
+                  candidate_email: email,
+                  candidate_poste: empCooptForm.candidate_poste,
+                  linkedin_url: empCooptForm.linkedin_url || null,
+                  telephone: empCooptForm.telephone || null,
+                  campaign_id: empCooptForm.campaign_id,
+                  notes: empCooptForm.message,
+                  date_cooptation: new Date().toISOString().slice(0, 10),
+                  type_recompense: "prime",
+                  mois_requis: 6,
+                });
+                if ((empCooptForm as any)._cvFile && created?.id) {
+                  try { await uploadCooptationCv(created.id, (empCooptForm as any)._cvFile); } catch {}
+                }
+                close();
+                reloadEmpCoopt();
+                addToast(t('emp.recommendation_sent') || "Recommandation envoyée", "success");
+              } catch (err: any) {
+                // Surface the backend validation message if any (Laravel sends
+                // a JSON body with `errors`/`message` inside err.message).
+                let detail = "";
+                try { const body = err?.message ? JSON.parse(err.message) : null; if (body?.message) detail = body.message; if (body?.errors) detail = Object.values(body.errors).flat().join(" · "); } catch {}
+                addToast(detail || t('emp.send_error') || "Impossible d'envoyer la recommandation", "error");
+              }
+            };
+            // Field-level validation — drives the red border, error label
+            // under each input, and the disabled state on Continue/Submit.
+            const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const linkedinRe = /^(https?:\/\/)?([a-z]{2,3}\.)?linkedin\.com\/in\/[A-Za-z0-9\-_%]+\/?(\?.*)?$/i;
+            const trimmedEmail = empCooptForm.candidate_email.trim();
+            const trimmedLinkedin = (empCooptForm.linkedin_url || "").trim();
+            const emailValid = !trimmedEmail || emailRe.test(trimmedEmail);
+            const linkedinValid = !trimmedLinkedin || linkedinRe.test(trimmedLinkedin);
+            const canSubmit = empCooptForm.candidate_name.trim() && trimmedEmail && emailValid && linkedinValid;
+            const canContinue = !!(empCooptForm.candidate_name.trim() && trimmedEmail && emailValid && linkedinValid);
+            const fieldStyle = (ok: boolean) => ({ ...sInput, borderColor: ok ? C.border : C.red, boxShadow: ok ? undefined : `0 0 0 2px ${C.redLight}` });
+            return (
+              <div style={{ position: "fixed", inset: 0, zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.4)" }} onClick={close}>
+                <div className="iz-fade-up" onClick={e => e.stopPropagation()} style={{ background: C.white, borderRadius: 16, width: 540, maxWidth: "92vw", boxShadow: "0 20px 60px rgba(0,0,0,.25)", fontFamily: font, overflow: "hidden" }}>
+                  {/* Header */}
+                  <div style={{ padding: "24px 28px 18px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, ${C.pink}, #a855f7)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <UserPlus size={18} color="#fff" />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 style={{ fontSize: 17, fontWeight: 600, color: C.text, margin: 0, lineHeight: 1.3 }}>Recommander pour {empCooptForm.candidate_poste || "ce poste"}</h3>
+                        <p style={{ fontSize: 13, color: C.textMuted, margin: "4px 0 0" }}>Étape {step} sur 2 · récompense de <strong style={{ color: C.pink, fontWeight: 700 }}>{fmtCurrency(reward)}</strong></p>
+                      </div>
+                      <button onClick={close} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: C.textLight }}><X size={20} /></button>
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ height: 4, borderRadius: 2, background: C.bg, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: step === 1 ? "50%" : "100%", background: `linear-gradient(90deg, ${C.pink}, #a855f7)`, transition: "width .3s ease" }} />
+                    </div>
                   </div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('emp.recommended_position')}</label><div style={{ ...sInput, background: C.bg, color: C.text, cursor: "default" }}>{empCooptForm.candidate_poste || "—"}</div></div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}><Phone size={10} /> {t('label.phone')}</label><input value={empCooptForm.telephone || ""} onChange={e => setEmpCooptForm(f => ({ ...f, telephone: e.target.value }))} style={sInput} placeholder="+41 79 123 45 67" /></div>
-                    <div><label style={{ fontSize: 11, color: C.textLight, display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}><Linkedin size={10} /> LinkedIn</label><input value={empCooptForm.linkedin_url || ""} onChange={e => setEmpCooptForm(f => ({ ...f, linkedin_url: e.target.value }))} style={sInput} placeholder="https://linkedin.com/in/..." /></div>
-                  </div>
-                  <div><label style={{ fontSize: 11, color: C.textLight, display: "block", marginBottom: 4 }}>{t('emp.message_optional')}</label><textarea value={empCooptForm.message} onChange={e => setEmpCooptForm(f => ({ ...f, message: e.target.value }))} style={{ ...sInput, minHeight: 60, resize: "vertical" }} placeholder={t('emp.message_placeholder')} /></div>
-                  {/* CV Upload */}
-                  <div>
-                    <label style={{ fontSize: 11, color: C.textLight, display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}><Paperclip size={10} /> CV / Pièce jointe</label>
-                    {(empCooptForm as any)._cvFile ? (
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 8, background: C.greenLight, fontSize: 12 }}>
-                        <FileText size={14} color={C.green} />
-                        <span style={{ flex: 1, color: C.text, fontWeight: 500 }}>{((empCooptForm as any)._cvFile as File).name}</span>
-                        <button type="button" onClick={() => setEmpCooptForm(f => { const copy = { ...f }; delete (copy as any)._cvFile; return copy; })} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><X size={12} color={C.red} /></button>
+
+                  {/* Body */}
+                  <div style={{ padding: "8px 28px 24px" }}>
+                    {step === 1 ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                        <div>
+                          <label style={{ fontSize: 12, color: C.text, display: "block", marginBottom: 6, fontWeight: 500 }}>Nom complet *</label>
+                          <input value={empCooptForm.candidate_name} onChange={e => setEmpCooptForm(f => ({ ...f, candidate_name: e.target.value }))} style={sInput} placeholder="Prénom Nom" />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 12, color: C.text, display: "block", marginBottom: 6, fontWeight: 500 }}>Email *</label>
+                          <input type="email" value={empCooptForm.candidate_email} onChange={e => setEmpCooptForm(f => ({ ...f, candidate_email: e.target.value }))} style={fieldStyle(emailValid)} placeholder="email@exemple.com" />
+                          {!emailValid && <div style={{ fontSize: 11, color: C.red, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}><AlertTriangle size={11} /> Format d'email invalide</div>}
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 12, color: C.text, display: "block", marginBottom: 6, fontWeight: 500 }}>Téléphone</label>
+                          <input value={empCooptForm.telephone || ""} onChange={e => setEmpCooptForm(f => ({ ...f, telephone: e.target.value }))} style={sInput} placeholder="+41 79 ..." />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 12, color: C.text, display: "block", marginBottom: 6, fontWeight: 500 }}>LinkedIn (optionnel)</label>
+                          <input value={empCooptForm.linkedin_url || ""} onChange={e => setEmpCooptForm(f => ({ ...f, linkedin_url: e.target.value }))} style={fieldStyle(linkedinValid)} placeholder="linkedin.com/in/..." />
+                          {!linkedinValid && <div style={{ fontSize: 11, color: C.red, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}><AlertTriangle size={11} /> URL LinkedIn invalide (ex : linkedin.com/in/prenom-nom)</div>}
+                        </div>
                       </div>
                     ) : (
-                      <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 8, border: `1px dashed ${C.border}`, cursor: "pointer", fontSize: 12, color: C.textLight }}>
-                        <Upload size={14} /> Glisser ou cliquer pour ajouter un CV (PDF, DOC, max 5 Mo)
-                        <input type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (file) setEmpCooptForm(f => ({ ...f, _cvFile: file } as any));
-                        }} />
-                      </label>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                        {/* Candidate summary card (read-only — collected in step 1) */}
+                        <div style={{ padding: "14px 16px", borderRadius: 10, background: C.bg, border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: "50%", background: C.pink, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                            {(empCooptForm.candidate_name || "?").split(" ").map((p: string) => p[0]).join("").slice(0, 2).toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{empCooptForm.candidate_name || "—"}</div>
+                            <div style={{ fontSize: 12, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{empCooptForm.candidate_email || "—"}{empCooptForm.candidate_poste ? ` · ${empCooptForm.candidate_poste}` : ""}</div>
+                          </div>
+                          <button type="button" onClick={goBack} style={{ background: "none", border: "none", color: C.pink, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font, padding: "6px 10px" }}>Modifier</button>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 12, color: C.text, display: "block", marginBottom: 6, fontWeight: 500 }}>{t('emp.message_optional')}</label>
+                          <textarea value={empCooptForm.message} onChange={e => setEmpCooptForm(f => ({ ...f, message: e.target.value }))} style={{ ...sInput, minHeight: 80, resize: "vertical" }} placeholder={t('emp.message_placeholder') || "Expliquez en quelques mots pourquoi cette personne est un bon fit…"} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 12, color: C.text, display: "flex", alignItems: "center", gap: 6, marginBottom: 6, fontWeight: 500 }}><Paperclip size={12} /> CV / Pièce jointe</label>
+                          {(empCooptForm as any)._cvFile ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 8, background: C.greenLight, fontSize: 12 }}>
+                              <FileText size={14} color={C.green} />
+                              <span style={{ flex: 1, color: C.text, fontWeight: 500 }}>{((empCooptForm as any)._cvFile as File).name}</span>
+                              <button type="button" onClick={() => setEmpCooptForm(f => { const copy = { ...f }; delete (copy as any)._cvFile; return copy; })} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><X size={12} color={C.red} /></button>
+                            </div>
+                          ) : (
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 14px", borderRadius: 8, border: `1px dashed ${C.border}`, cursor: "pointer", fontSize: 12, color: C.textLight }}>
+                              <Upload size={14} /> Glisser ou cliquer pour ajouter un CV (PDF, DOC, max 5 Mo)
+                              <input type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }} onChange={e => {
+                                const file = e.target.files?.[0];
+                                if (file) setEmpCooptForm(f => ({ ...f, _cvFile: file } as any));
+                              }} />
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{ padding: "16px 28px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, background: C.bg }}>
+                    {step === 1 ? (
+                      <>
+                        <button onClick={close} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "10px 20px" }}>{t('common.cancel')}</button>
+                        <button disabled={!canContinue} onClick={goNext} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "10px 22px", display: "inline-flex", alignItems: "center", gap: 6, opacity: canContinue ? 1 : 0.5 }}>
+                          Continuer <ArrowRight size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={goBack} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "10px 18px", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <ChevronLeft size={14} /> Retour
+                        </button>
+                        <button disabled={!canSubmit} onClick={submit} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "10px 22px", display: "inline-flex", alignItems: "center", gap: 6, opacity: canSubmit ? 1 : 0.5 }}>
+                          <Send size={14} /> Envoyer la recommandation
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-                  <button onClick={() => setEmpCooptForm(f => ({ ...f, open: false }))} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>
-                  <button disabled={!empCooptForm.candidate_name.trim() || !empCooptForm.candidate_email.trim()} onClick={async () => {
-                    try {
-                      const created = await apiCreateCooptation({
-                        referrer_name: auth.user?.name || "",
-                        referrer_email: auth.user?.email || "",
-                        candidate_name: empCooptForm.candidate_name,
-                        candidate_email: empCooptForm.candidate_email,
-                        candidate_poste: empCooptForm.candidate_poste,
-                        linkedin_url: empCooptForm.linkedin_url || null,
-                        telephone: empCooptForm.telephone || null,
-                        campaign_id: empCooptForm.campaign_id,
-                        notes: empCooptForm.message,
-                        date_cooptation: new Date().toISOString().slice(0, 10),
-                        type_recompense: "prime",
-                        mois_requis: 6,
-                      });
-                      // Upload CV if attached
-                      if ((empCooptForm as any)._cvFile && created?.id) {
-                        try { await uploadCooptationCv(created.id, (empCooptForm as any)._cvFile); } catch {}
-                      }
-                      setEmpCooptForm({ open: false, campaign_id: null, candidate_name: "", candidate_email: "", candidate_poste: "", telephone: "", linkedin_url: "", message: "" });
-                      reloadEmpCoopt();
-                      addToast_admin(t('emp.recommendation_sent'));
-                    } catch { addToast_admin(t('emp.send_error')); }
-                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), opacity: !empCooptForm.candidate_name.trim() || !empCooptForm.candidate_email.trim() ? 0.5 : 1 }}>{t('emp.recommend')}</button>
+              </div>
+            );
+          })()}
+
+          {/* ── Share modal ── */}
+          {shareModal.open && shareModal.campaign && (() => {
+            const camp = shareModal.campaign;
+            const close = () => setShareModal({ open: false, campaign: null });
+            const reward = effectiveReward(camp);
+            const baseReward = Number(camp.montant_recompense) || 0;
+            // Public-shareable URL — includes tenant slug so the landing page
+            // can resolve the right database without login.
+            const tenantSlug = localStorage.getItem("illizeo_tenant_id") || "illizeo";
+            const url = `${window.location.origin}/${tenantSlug}/c/${camp.share_token || ""}`;
+            const tenant = (auth.user as any)?.tenant_name || "nous";
+            const linkedinPost = `🚀 On recherche un·e ${camp.titre} chez ${tenant} !\n\n${camp.description ? camp.description.slice(0, 220) : "Une opportunité pour rejoindre une équipe qui a du sens."}\n\n💰 Prime de cooptation : ${fmtCurrency(reward)}\n📍 ${[camp.site, camp.type_contrat].filter(Boolean).join(" · ")}\n\nIntéressé·e ou tu connais quelqu'un ? Envoie-moi un message ou découvre l'offre 👇\n${url}\n\n#recrutement #${(camp.titre || "job").replace(/\s+/g, "")} #cooptation`;
+            const text = `On recrute ! Poste de ${camp.titre} chez ${tenant} — ${camp.description ? camp.description.slice(0, 140) : "rejoins une équipe qui a du sens"}. Prime de cooptation : ${fmtCurrency(reward)}.`;
+            const shareLinkedIn = async () => {
+              // LinkedIn no longer supports pre-filled post text via URL params.
+              // Workaround: copy the post body to clipboard first, then open
+              // LinkedIn — user pastes with Ctrl+V into the text field.
+              try {
+                if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(linkedinPost);
+                else { const ta = document.createElement("textarea"); ta.value = linkedinPost; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); }
+                addToast("Texte copié — collez-le (Ctrl+V) dans la fenêtre LinkedIn", "success");
+              } catch { addToast("LinkedIn ouvert — copiez votre texte manuellement", "warning"); }
+              const u = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
+              window.open(u, "_blank", "noopener,noreferrer,width=600,height=720");
+              close();
+            };
+            const shareEmail = () => {
+              const subject = `Opportunité : ${camp.titre}${reward > 0 ? ` — prime ${fmtCurrency(reward)}` : ""}`;
+              const body = `${text}\n\nPlus d'infos et candidature : ${url}\n\n— Partagé via Illizeo`;
+              window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
+              close();
+            };
+            const copyLink = async () => {
+              try {
+                if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+                else { const ta = document.createElement("textarea"); ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); }
+                addToast(t('emp.link_copied') || "Lien copié !", "success");
+                close();
+              } catch { prompt(lang === "fr" ? "Copiez ce lien :" : "Copy this link:", url); }
+            };
+            return (
+              <div onClick={close} style={{ position: "fixed", inset: 0, zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.4)", padding: 24 }}>
+                <div onClick={e => e.stopPropagation()} className="iz-fade-up" style={{ background: C.white, borderRadius: 16, width: 520, maxWidth: "94vw", boxShadow: "0 20px 60px rgba(0,0,0,.25)", fontFamily: font, overflow: "hidden" }}>
+                  <div style={{ padding: "22px 26px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: 1.5, textTransform: "uppercase" }}>Partager le poste</div>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: "4px 0 4px", lineHeight: 1.2, fontFamily: fontDisplay, letterSpacing: -0.4 }}>{camp.titre}</h3>
+                      <div style={{ fontSize: 12, color: C.textMuted }}>
+                        Prime <strong style={{ color: C.pink }}>{fmtCurrency(reward)}</strong>{isBoosted(camp) && reward !== baseReward && <span style={{ color: C.textMuted, textDecoration: "line-through", marginLeft: 6 }}>{fmtCurrency(baseReward)}</span>}
+                      </div>
+                    </div>
+                    <button onClick={close} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: C.textLight }}><X size={20} /></button>
+                  </div>
+
+                  <div style={{ padding: "20px 26px" }}>
+                    <div style={{ display: "grid", gap: 10, marginBottom: 18 }}>
+                      <button onClick={shareLinkedIn} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 12, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontFamily: font, textAlign: "left" as const, transition: "all .12s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "#0A66C2"; (e.currentTarget as HTMLElement).style.background = "#f0f7ff"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = C.border; (e.currentTarget as HTMLElement).style.background = C.white; }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 8, background: "#0A66C2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Linkedin size={18} color="#fff" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Publier sur LinkedIn</div>
+                          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>Ouvre la fenêtre de publication LinkedIn avec le lien pré-rempli</div>
+                        </div>
+                        <ChevronRight size={16} color={C.textMuted} />
+                      </button>
+
+                      <button onClick={shareEmail} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 12, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontFamily: font, textAlign: "left" as const, transition: "all .12s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = C.pink; (e.currentTarget as HTMLElement).style.background = C.pinkBg; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = C.border; (e.currentTarget as HTMLElement).style.background = C.white; }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 8, background: C.pink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Mail size={18} color="#fff" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Envoyer par email</div>
+                          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>Ouvre votre client mail avec un message pré-rédigé</div>
+                        </div>
+                        <ChevronRight size={16} color={C.textMuted} />
+                      </button>
+
+                      <button onClick={copyLink} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 12, border: `1px solid ${C.border}`, background: C.white, cursor: "pointer", fontFamily: font, textAlign: "left" as const, transition: "all .12s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = C.text; (e.currentTarget as HTMLElement).style.background = C.bg; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = C.border; (e.currentTarget as HTMLElement).style.background = C.white; }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 8, background: C.text, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Link size={18} color="#fff" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Copier le lien</div>
+                          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>À coller dans Slack, Teams, WhatsApp ou ailleurs</div>
+                        </div>
+                        <ChevronRight size={16} color={C.textMuted} />
+                      </button>
+                    </div>
+
+                    <div style={{ padding: "10px 12px", borderRadius: 8, background: C.bg, fontSize: 11, color: C.textMuted, display: "flex", alignItems: "center", gap: 8, fontFamily: "monospace" as const, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <Link size={11} style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{url}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
+
         </div>
         );
       })()}
@@ -3382,7 +3877,28 @@ export default function OnboardingModule() {
         const _myParcours = _myCollab ? PARCOURS_TEMPLATES.find((p: any) => p.id === _myCollab.parcours_id) : null;
         const _myParcoursName = (_myCollab as any)?.parcours_nom || _myParcours?.nom || "Onboarding Standard";
         const _myProfileActions = (_myCollab as any)?.parcours_actions || [];
-        const _myActionTpls = _myProfileActions.length > 0 ? _myProfileActions : ACTION_TEMPLATES.filter((a: any) => a.parcours === _myParcoursName);
+        // Gate actions by assignation target so an onboardee doesn't see actions owned by
+        // another team (e.g. checklist_it assigned to the "Équipe IT" group). Permissive on
+        // missing data: if we cannot resolve membership, the action is shown rather than hidden.
+        const _myFullName = `${(_myCollab as any)?.prenom || ""} ${(_myCollab as any)?.nom || ""}`.trim();
+        const _isTargeted = (a: any): boolean => {
+          const mode = a.assignation?.mode || a.assignation_mode;
+          const valeurs: string[] = a.assignation?.valeurs || a.assignation_valeurs || [];
+          if (!mode || mode === "tous") return true;
+          if (mode === "site") return !_myCollab?.site || valeurs.includes((_myCollab as any).site);
+          if (mode === "contrat") return !(_myCollab as any)?.type_contrat || valeurs.includes((_myCollab as any).type_contrat);
+          if (mode === "parcours") return valeurs.includes(_myParcoursName);
+          if (mode === "groupe") {
+            if (!GROUPES || GROUPES.length === 0 || !_myFullName) return true;
+            return valeurs.some((gn: string) => {
+              const g = (GROUPES as any[]).find(x => x.nom === gn);
+              return !!g && (g.membres || []).includes(_myFullName);
+            });
+          }
+          return true;
+        };
+        const _myActionTpls = (_myProfileActions.length > 0 ? _myProfileActions : ACTION_TEMPLATES.filter((a: any) => a.parcours === _myParcoursName))
+          .filter(_isTargeted);
         const _myActions = _myActionTpls.length > 0 ? _myActionTpls.map((a: any, i: number) => ({
           id: a.id || i + 1, title: a.titre, subtitle: a.description || "",
         })) : ACTIONS;
@@ -3657,7 +4173,7 @@ export default function OnboardingModule() {
           })()}
 
           {/* Phases with actions inside */}
-          {((ctx as any)._suiviView || "chrono") === "phases" && (
+          {suiviView === "phases" && (
           <div className="iz-card iz-fade-up iz-stagger-1" style={{ ...sCard, marginBottom: 20 }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px" }}>{t('emp.detailed_path')}</h3>
             {((_myCollab as any)?.parcours_phases?.length > 0
@@ -3678,6 +4194,10 @@ export default function OnboardingModule() {
               const allPhases = ((_myCollab as any)?.parcours_phases?.length > 0
                 ? (_myCollab as any).parcours_phases.map((p: any) => ({ id: p.id, nom: p.nom }))
                 : phases);
+              // Phase activation is action-driven, NOT date-driven: a phase only becomes
+              // "En cours" once every action of every previous phase is done. Reaching J+0
+              // / J+1 / J+8 does NOT auto-activate "Premier jour" / "Première semaine" /
+              // "3 premiers mois" — the employee must finish prerequisite actions first.
               const isCurrent = !allDone && (phIdx === 0 || allPhases.slice(0, phIdx).every((_: any, prevIdx: number) => {
                 const prevPhaseName = allPhases[prevIdx]?.nom;
                 const prevTpls = _myActionTpls.filter((t: any) => t.phase === prevPhaseName);
@@ -4383,6 +4903,40 @@ export default function OnboardingModule() {
               ) : "NF"}
             </div>
           </div>
+          <input id="avatar-upload" type="file" accept="image/jpeg,image/png" style={{ display: "none" }} onChange={e => {
+            const file = e.target.files?.[0];
+            (e.target as HTMLInputElement).value = "";
+            if (!file) return;
+            // Resize/compress avatar to max 256x256 JPEG ~80% before upload (avoids
+            // hitting MySQL TEXT/LONGTEXT body limits and keeps the data URL small).
+            const reader = new FileReader();
+            reader.onload = ev => {
+              const dataUrl = ev.target?.result as string;
+              const img = new Image();
+              img.onload = () => {
+                const MAX = 256;
+                const ratio = Math.min(1, MAX / Math.max(img.width, img.height));
+                const w = Math.round(img.width * ratio);
+                const h = Math.round(img.height * ratio);
+                const canvas = document.createElement("canvas");
+                canvas.width = w; canvas.height = h;
+                const cctx = canvas.getContext("2d");
+                if (!cctx) { addToast("Erreur lors du traitement de l'image", "error"); return; }
+                cctx.drawImage(img, 0, 0, w, h);
+                const compressed = canvas.toDataURL("image/jpeg", 0.85);
+                setAvatarImage(compressed); setAvatarZoom(100); setAvatarPos({ x: 50, y: 50 });
+                localStorage.setItem("illizeo_avatar", compressed);
+                if (auth.user?.id) {
+                  updateCompanySettings({ [`avatar_${auth.user.id}`]: compressed })
+                    .then(() => addToast("Photo enregistrée", "success"))
+                    .catch((err: any) => { addToast("Échec de l'enregistrement de la photo : " + (err?.message || ""), "error"); });
+                }
+              };
+              img.onerror = () => addToast("Image invalide", "error");
+              img.src = dataUrl;
+            };
+            reader.readAsDataURL(file);
+          }} />
           {avatarImage ? (
             <>
               {/* Zoom */}
@@ -4415,21 +4969,11 @@ export default function OnboardingModule() {
               </div>
             </>
           ) : (
-            <>
-              <input id="avatar-upload" type="file" accept="image/jpeg,image/png" style={{ display: "none" }} onChange={e => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  const reader = new FileReader();
-                  reader.onload = ev => { const url = ev.target?.result as string; setAvatarImage(url); setAvatarZoom(100); setAvatarPos({ x: 50, y: 50 }); localStorage.setItem("illizeo_avatar", url); updateCompanySettings({ [`avatar_${auth.user?.id}`]: url }).catch(() => {}); };
-                  reader.readAsDataURL(file);
-                }
-              }} />
-              <div onClick={() => document.getElementById("avatar-upload")?.click()} style={{ padding: "24px 16px", borderRadius: 12, border: `2px dashed ${C.border}`, textAlign: "center", cursor: "pointer", fontSize: 13, color: C.textLight, transition: "all .2s" }}>
-                <Upload size={24} color={C.textMuted} style={{ marginBottom: 8 }} /><br />
-                Importer une photo<br />
-                <span style={{ fontSize: 11, color: C.textMuted }}>JPG ou PNG · Max 5 Mo · Cadrage visage recommandé</span>
-              </div>
-            </>
+            <div onClick={() => document.getElementById("avatar-upload")?.click()} style={{ padding: "24px 16px", borderRadius: 12, border: `2px dashed ${C.border}`, textAlign: "center", cursor: "pointer", fontSize: 13, color: C.textLight, transition: "all .2s" }}>
+              <Upload size={24} color={C.textMuted} style={{ marginBottom: 8 }} /><br />
+              Importer une photo<br />
+              <span style={{ fontSize: 11, color: C.textMuted }}>JPG ou PNG · Max 5 Mo · Cadrage visage recommandé</span>
+            </div>
           )}
         </div>
         </>
@@ -4473,6 +5017,49 @@ export default function OnboardingModule() {
         </div>
         </>
       )}
+      {/* Badge celebration modal — confetti rain when a new badge is earned */}
+      {celebrationBadge && (() => {
+        const COLORS = ["#E91E8C", "#1A73E8", "#4CAF50", "#F9A825", "#9C27B0", "#FF5722", "#00BCD4"];
+        return (
+          <div onClick={() => setCelebrationBadge(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div onClick={e => e.stopPropagation()} style={{ position: "relative", background: C.white, borderRadius: 20, padding: "44px 48px 36px", minWidth: 360, maxWidth: 460, textAlign: "center", overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.35)" }}>
+              <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+                {Array.from({ length: 90 }).map((_, ci) => {
+                  const left = Math.random() * 100;
+                  const delay = Math.random() * 2.5;
+                  const duration = 3 + Math.random() * 2.5;
+                  const color = COLORS[ci % COLORS.length];
+                  const size = 6 + Math.random() * 8;
+                  const rot = Math.random() * 360;
+                  return (
+                    <span key={ci} style={{
+                      position: "absolute", top: "-30px", left: `${left}%`,
+                      width: size, height: size * 1.6, background: color, borderRadius: 2,
+                      animation: `iz-badge-confetti ${duration}s linear ${delay}s forwards`,
+                      transform: `rotate(${rot}deg)`,
+                    }} />
+                  );
+                })}
+              </div>
+              <style>{`@keyframes iz-badge-confetti { 0% { transform: translateY(-30px) rotate(0deg); opacity: 1; } 100% { transform: translateY(560px) rotate(720deg); opacity: 0.2; } } @keyframes iz-badge-pop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }`}</style>
+              <div style={{ position: "relative" }}>
+                <div style={{
+                  width: 96, height: 96, borderRadius: "50%",
+                  background: `linear-gradient(135deg, ${celebrationBadge.color || C.pink} 0%, ${C.pink} 100%)`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 48, margin: "0 auto 16px",
+                  boxShadow: `0 8px 24px ${(celebrationBadge.color || C.pink) + "55"}`,
+                  animation: "iz-badge-pop .6s cubic-bezier(.34,1.56,.64,1) forwards",
+                }}>🏆</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: 2, marginBottom: 8 }}>NOUVEAU BADGE DÉBLOQUÉ</div>
+                <h2 style={{ fontSize: 24, fontWeight: 700, color: C.text, margin: "0 0 8px" }}>{celebrationBadge.nom}</h2>
+                {celebrationBadge.description && <p style={{ fontSize: 13, color: C.textLight, margin: "0 0 24px", lineHeight: 1.5 }}>{celebrationBadge.description}</p>}
+                <button onClick={() => setCelebrationBadge(null)} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "10px 32px", fontSize: 14 }}>Génial !</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* Toast employee notifications */}
       <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 2000, display: "flex", flexDirection: "column", gap: 8 }}>
         {toasts.filter(t => t.role === "employee").map(t => (

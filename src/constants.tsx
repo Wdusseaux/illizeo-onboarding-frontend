@@ -426,6 +426,10 @@ export function fmtCurrency(amount: number): string {
 }
 
 export const font = `'Inter', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif`;
+// Heavier display font reserved for hero / marketing-style titles. Loaded
+// via Google Fonts (Plus Jakarta Sans variable, weights 200..800). Falls
+// back to Inter so titles never break if the font hasn't loaded yet.
+export const fontDisplay = `'Plus Jakarta Sans', 'Inter', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif`;
 
 // ─── ILLIZEO LOGO SVG ────────────────────────────────────────
 export const ILLIZEO_LOGO_URI = "/HR_Core_module_logo_O.png";

@@ -122,7 +122,7 @@ export function createAdminDashboardSuivi(ctx: any) {
     parcoursPanelData, setParcoursPanelData, parcoursPanelLoading, setParcoursPanelLoading, phasePanelMode, setPhasePanelMode, phasePanelData, setPhasePanelData,
     phasePanelLoading, setPhasePanelLoading, actionPanelMode, setActionPanelMode, actionPanelData, setActionPanelData, actionPanelLoading, setActionPanelLoading,
     assignMode, setAssignMode, assignSelected, setAssignSelected, assignSearch, setAssignSearch, assignOpen, setAssignOpen,
-    collabPanelMode, setCollabPanelMode, collabPanelData, setCollabPanelData, collabPanelLoading, setCollabPanelLoading, collabProfileId, setCollabProfileId,
+    collabPanelMode, setCollabPanelMode, collabPanelData, setCollabPanelData, collabPanelLoading, setCollabPanelLoading, collabProfileId, setCollabProfileId, relanceCollabId, setRelanceCollabId,
     collabProfileTab, setCollabProfileTab, dossierCheck, setDossierCheck, groupePanelMode, setGroupePanelMode, groupePanelData, setGroupePanelData,
     groupePanelLoading, setGroupePanelLoading, integrationPanelId, setIntegrationPanelId, integrationConfig, setIntegrationConfig, integrationSaving, setIntegrationSaving,
     apiKeyInput, setApiKeyInput, suiviFilter, setSuiviFilter, suiviSearch, setSuiviSearch, suiviParcoursFilter, setSuiviParcoursFilter, suiviScope, setSuiviScope, suiviSiteFilter, setSuiviSiteFilter, suiviDeptFilter, setSuiviDeptFilter, collabMenuId, setCollabMenuId,
@@ -186,7 +186,7 @@ export function createAdminDashboardSuivi(ctx: any) {
       admin_2fa: "sso",
       admin_provisioning: "provisioning",
     };
-    const isEditorTenant = (localStorage.getItem("illizeo_tenant_id") || "illizeo") === "illizeo";
+    const isEditorTenant = ["illizeo", "illizeo2"].includes(localStorage.getItem("illizeo_tenant_id") || "illizeo");
     const trialStart = localStorage.getItem("illizeo_trial_start");
     const isInTrial = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) <= 14 * 24 * 60 * 60 * 1000;
     const trialExpired = trialStart && !isInTrial;
@@ -293,405 +293,376 @@ export function createAdminDashboardSuivi(ctx: any) {
 
       const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, margin: "0 0 16px", color: C.text };
 
+      // ── Briefing data ──
+      const firstName = auth.user?.name?.split(" ")[0] || (lang === "fr" ? "RH" : "HR");
+      const todayLabel = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }).toUpperCase();
+      const enParcours = enCours + enRetard; // collaborateurs actifs sur un parcours
+      const topRetard = COLLABORATEURS.filter(c => c.status === "en_retard").slice(0, 1)[0];
+      const totalDocsManquants = totalDocsTotal - totalDocsValides;
+      const collabsAvecDocsManquants = COLLABORATEURS.filter(c => c.docsValides < c.docsTotal).length;
+      const collabsSansParcours = COLLABORATEURS.filter(c => !(c as any).parcours_id);
+      const nbSansParcours = collabsSansParcours.length;
+      const parseFrDate = (d: string): Date | null => { if (!d) return null; const p = d.split("/"); return p.length === 3 ? new Date(`${p[2]}-${p[1]}-${p[0]}`) : null; };
+      const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+      const sameDay = (a: Date | null, b: Date) => a && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+      const todayArrivals = COLLABORATEURS.filter(c => sameDay(parseFrDate(c.dateDebut), today0));
+      const firstArrival = todayArrivals[0];
+      const todayDepartures = COLLABORATEURS.filter(c => sameDay(parseFrDate((c as any).dateFin || (c as any).date_fin || ""), today0));
+      const firstDeparture = todayDepartures[0];
+
+      // Stats line (6 stats — NPS removed until backend endpoint exists)
+      const statsLine = [
+        { label: "En parcours", value: enParcours, color: C.text },
+        { label: "En cours", value: enCours, color: C.pink },
+        { label: "En retard", value: enRetard, color: C.red },
+        { label: "Terminés", value: termines, color: C.green },
+        { label: "Progression", value: `${avgProgression}%`, color: C.text },
+        { label: "Documents", value: `${docsPct}%`, color: C.text },
+      ];
+
+      // Today events — no time field until real schedule data is wired in
+      const todayEvents: { name: string; sub: string; initials: string; color: string; userId?: number; avatarUrl?: string }[] = [];
+      todayArrivals.forEach((c: any) => todayEvents.push({ name: `${c.prenom} ${c.nom}`, sub: "Premier jour", initials: c.initials, color: c.color, userId: c.user_id, avatarUrl: c.avatar_url || c.avatar }));
+      todayDepartures.forEach((c: any) => todayEvents.push({ name: `${c.prenom} ${c.nom}`, sub: "Fin de contrat", initials: c.initials, color: c.color, userId: c.user_id, avatarUrl: c.avatar_url || c.avatar }));
+
+      // Planning 8 semaines (S-2 → S+5): count arrivals/departures per week
+      const weekStart = new Date(today0); weekStart.setDate(today0.getDate() - today0.getDay() + 1); // Monday this week
+      const weeks = Array.from({ length: 8 }, (_, i) => {
+        const start = new Date(weekStart); start.setDate(weekStart.getDate() + (i - 2) * 7);
+        const end = new Date(start); end.setDate(start.getDate() + 7);
+        const arrivals = COLLABORATEURS.filter(c => { const d = parseFrDate(c.dateDebut); return !!d && d >= start && d < end; }).length;
+        const departures = COLLABORATEURS.filter(c => { const d = parseFrDate((c as any).dateFin || (c as any).date_fin || ""); return !!d && d >= start && d < end; }).length;
+        return { label: i < 2 ? `S-${2 - i}` : i === 2 ? "S0" : `S+${i - 2}`, arrivals, departures };
+      });
+      const maxWeek = Math.max(1, ...weeks.map(w => Math.max(w.arrivals, w.departures)));
+
       return (
-        <div style={{ flex: 1, padding: "24px 32px", overflow: "auto", fontFamily: font }}>
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-            <div>
-              <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: C.text }}>{t('dashboard.title')}</h1>
-              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>{totalCollab} {t('dash.collabs_count')} &middot; {activeParcours.length} {t('dash.active_paths_count')} &middot; {ACTION_TEMPLATES.length} {t('dash.configured_actions')}</div>
+        <div style={{ flex: 1, padding: "32px 40px", overflow: "auto", fontFamily: font, background: "#FAFAFB" }}>
+          {/* ── Header: date + actions ── */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 1.5, textTransform: "uppercase" }}>
+              {todayLabel} · {lang === "fr" ? "Vue RH globale" : "Global HR view"}
             </div>
-            <div style={{ fontSize: 11, color: C.textLight, background: C.bg, padding: "6px 14px", borderRadius: 8 }}>{t('kpi.realtime')}</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setAdminPage("admin_suivi")} style={{ padding: "9px 18px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.white, fontSize: 13, fontFamily: font, color: C.text, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                <Search size={14} /> {lang === "fr" ? "Rechercher" : "Search"}
+              </button>
+              <button onClick={() => { setAdminPage("admin_suivi"); ctx.setShowNewCollabModal && ctx.setShowNewCollabModal(true); }} style={{ padding: "9px 20px", borderRadius: 999, border: "none", background: C.pink, color: C.white, fontSize: 13, fontFamily: font, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                <Plus size={14} /> {lang === "fr" ? "Nouveau collaborateur" : "New employee"}
+              </button>
+            </div>
           </div>
 
-          {/* ── Setup wizard banner ── */}
-          {setupCompleted.length < SETUP_STEPS.length && (() => {
-            const totalReq = SETUP_STEPS.filter(s => s.required).length;
-            const doneReq = SETUP_STEPS.filter(s => s.required && setupCompleted.includes(s.id)).length;
-            const pct = Math.round((setupCompleted.length / SETUP_STEPS.length) * 100);
-            return (
-              <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden", marginBottom: 20, border: `1px solid ${C.pink}30` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 20, padding: "16px 24px" }}>
-                  <div style={{ width: 48, height: 48, borderRadius: 12, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Rocket size={22} color={C.pink} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>{t('wiz.config_space')} — {pct}%</div>
-                    <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>{doneReq}/{totalReq} {t('wiz.required_steps')} · {setupCompleted.length}/{SETUP_STEPS.length}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.bg, overflow: "hidden" }}>
-                        <div style={{ width: `${pct}%`, height: "100%", background: `linear-gradient(90deg, ${C.pink}, #E91E8C)`, borderRadius: 3, transition: "width .3s ease" }} />
-                      </div>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: C.pink }}>{pct}%</span>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-                    <button onClick={() => { setShowSetupWizard(true); setSetupStep(SETUP_STEPS.findIndex(s => !setupCompleted.includes(s.id)) || 0); }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12, padding: "8px 20px", display: "flex", alignItems: "center", gap: 6 }}>
-                      <Sparkles size={13} /> {setupCompleted.length === 0 ? (lang === "fr" ? "Démarrer" : "Start") : (lang === "fr" ? "Reprendre" : "Resume")}
-                    </button>
-                    {doneReq >= totalReq && (
-                      <button onClick={() => { finishSetupWizard(); }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 10, padding: "4px 12px", color: C.textMuted }}>{lang === "fr" ? "Masquer" : "Hide"}</button>
-                    )}
-                  </div>
+          {/* ── Hero AI Briefing ── */}
+          <div style={{ background: `linear-gradient(135deg, ${C.pinkLight} 0%, #FFF8FC 50%, #F9C5DA 100%)`, borderRadius: 22, padding: "30px 36px 22px", marginBottom: 30, color: C.text, position: "relative", overflow: "hidden", border: `1px solid ${C.pinkLight}` }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 20 }}>
+              <div style={{ width: 60, height: 60, borderRadius: 16, background: C.white, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 14px rgba(233,30,140,.18)" }}>
+                <Sparkles size={28} color={C.pink} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: 1.6, textTransform: "uppercase", marginBottom: 10 }}>
+                  {lang === "fr" ? "Briefing du matin · IA Illizeo" : "Morning briefing · Illizeo AI"}
                 </div>
-                {/* Step dots */}
-                <div style={{ display: "flex", gap: 0, borderTop: `1px solid ${C.border}` }}>
-                  {SETUP_STEPS.map((step, i) => {
-                    const done = setupCompleted.includes(step.id);
-                    return (
-                      <button key={step.id} onClick={() => { setShowSetupWizard(true); setSetupStep(i); }} title={step.title} style={{
-                        flex: 1, padding: "8px 0", border: "none", cursor: "pointer", fontFamily: font, fontSize: 10,
-                        background: done ? `${C.green}15` : "transparent", color: done ? C.green : C.textMuted,
-                        fontWeight: done ? 600 : 400, display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
-                        borderRight: i < SETUP_STEPS.length - 1 ? `1px solid ${C.border}` : "none", transition: "all .15s",
-                      }}>
-                        {done ? <Check size={10} /> : <span style={{ width: 6, height: 6, borderRadius: "50%", background: step.required ? C.pink : C.border, flexShrink: 0 }} />}
-                        {step.title}
-                      </button>
-                    );
-                  })}
+                <h1 style={{ fontSize: 28, fontWeight: 400, fontFamily: 'Georgia, "Times New Roman", serif', lineHeight: 1.35, margin: "0 0 18px", letterSpacing: -0.3, color: C.text }}>
+                  <em style={{ fontStyle: "italic", color: C.textMuted }}>{lang === "fr" ? "Bonjour" : "Hello"} {firstName},</em> {lang === "fr" ? "voici votre journée RH résumée par l'IA Illizeo." : "here is your HR day summarized by Illizeo AI."}
+                </h1>
+                <div style={{ fontSize: 14, lineHeight: 2, color: C.text, marginBottom: 22 }}>
+                  {lang === "fr" ? "Sur vos " : "Among your "}
+                  <span style={{ background: C.white, padding: "2px 10px", borderRadius: 6, fontWeight: 600, color: C.text, border: `1px solid ${C.pinkLight}` }}>{enParcours} {lang === "fr" ? "collaborateurs en parcours" : "employees on a journey"}</span>
+                  {topRetard && <>, <span style={{ color: "#C46500", borderBottom: "1px dashed #E89500", padding: "2px 0", fontWeight: 600 }}>{enRetard} {lang === "fr" ? "ont pris du retard" : "are running late"}</span> {lang === "fr" ? "dont" : "including"} <span style={{ background: C.white, padding: "2px 10px", borderRadius: 6, fontWeight: 600, color: C.text, border: `1px solid ${C.pinkLight}` }}>{topRetard.prenom} {topRetard.nom.toUpperCase()}</span></>}
+                  .
+                  {(firstArrival || firstDeparture) && <><br />{lang === "fr" ? "Aujourd'hui : " : "Today: "}
+                    {firstArrival && <><span style={{ background: C.white, padding: "2px 10px", borderRadius: 6, fontWeight: 600, color: C.text, border: `1px solid ${C.pinkLight}` }}>{firstArrival.prenom} {firstArrival.nom}</span> {lang === "fr" ? "commence" : "starts"}</>}
+                    {firstArrival && firstDeparture && (lang === "fr" ? ", et " : ", and ")}
+                    {firstDeparture && <><span style={{ background: C.white, padding: "2px 10px", borderRadius: 6, fontWeight: 600, color: C.text, border: `1px solid ${C.pinkLight}` }}>{firstDeparture.prenom} {firstDeparture.nom}</span> {lang === "fr" ? "termine son contrat" : "ends their contract"}</>}.</>}
+                  {totalDocsManquants > 0 && <> <span style={{ background: C.white, padding: "2px 10px", borderRadius: 6, fontWeight: 600, color: C.text, border: `1px solid ${C.pinkLight}` }}>{totalDocsManquants} {lang === "fr" ? "documents" : "documents"}</span> {lang === "fr" ? `sont encore manquants chez ${collabsAvecDocsManquants} collaborateurs.` : `are still missing for ${collabsAvecDocsManquants} employees.`}</>}
+                  {nbSansParcours > 0 && (
+                    <><br /><span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "#C46500", fontWeight: 600 }}>
+                      <AlertTriangle size={13} /> {lang === "fr" ? "Attention" : "Attention"}
+                    </span> : <span style={{ background: C.white, padding: "2px 10px", borderRadius: 6, fontWeight: 600, color: C.text, border: `1px solid ${C.pinkLight}` }}>{nbSansParcours} {lang === "fr" ? (nbSansParcours > 1 ? "collaborateurs n'ont" : "collaborateur n'a") : (nbSansParcours > 1 ? "employees have" : "employee has")} {lang === "fr" ? "pas de parcours assigné" : "no journey assigned"}</span>
+                    {collabsSansParcours.slice(0, 2).map((c: any, i: number) => (
+                      <span key={c.id}> {i === 0 ? (lang === "fr" ? "(" : "(") : ", "}<span style={{ fontWeight: 600 }}>{c.prenom} {c.nom}</span>{i === Math.min(1, collabsSansParcours.length - 1) ? (collabsSansParcours.length > 2 ? `, +${collabsSansParcours.length - 2})` : ")") : ""}</span>
+                    ))}.</>
+                  )}
+                </div>
+                {/* CTA pills */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {topRetard && (
+                    <button onClick={() => { ctx.setRelanceCollabId && ctx.setRelanceCollabId(topRetard.id); }} style={{ padding: "8px 16px", borderRadius: 999, background: C.pink, color: C.white, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 6 }}>
+                      <Send size={11} /> {lang === "fr" ? `Envoyer la relance à ${topRetard.prenom}` : `Nudge ${topRetard.prenom}`}
+                    </button>
+                  )}
+                  {totalDocsManquants > 0 && (
+                    <button onClick={() => { setAdminPage("admin_suivi"); ctx.setSuiviScope && ctx.setSuiviScope("actifs"); }} style={{ padding: "8px 16px", borderRadius: 999, background: C.white, color: C.text, border: `1px solid ${C.pinkLight}`, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 6 }}>
+                      <FileText size={11} color={C.pink} /> {lang === "fr" ? `Voir les ${totalDocsManquants} documents manquants` : `View ${totalDocsManquants} missing documents`}
+                    </button>
+                  )}
+                  {nbSansParcours > 0 && (
+                    <button onClick={() => { setAdminPage("admin_suivi"); ctx.setSuiviScope && ctx.setSuiviScope("actifs"); ctx.setSuiviFilter && ctx.setSuiviFilter("sans_parcours"); }} style={{ padding: "8px 16px", borderRadius: 999, background: C.white, color: "#C46500", border: `1px solid #FFD9A8`, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 6 }}>
+                      <AlertTriangle size={11} color="#C46500" /> {lang === "fr" ? `Assigner un parcours à ${nbSansParcours} collaborateur${nbSansParcours > 1 ? "s" : ""}` : `Assign a journey to ${nbSansParcours} employee${nbSansParcours > 1 ? "s" : ""}`}
+                    </button>
+                  )}
+                  <button onClick={() => { setAdminPage("admin_assistant_ia" as any); }} style={{ padding: "8px 16px", borderRadius: 999, background: C.white, color: C.text, border: `1px solid ${C.pinkLight}`, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: font, display: "flex", alignItems: "center", gap: 6 }}>
+                    <MessageCircle size={11} color={C.pink} /> {lang === "fr" ? "Demander autre chose à l'IA" : "Ask the AI something else"}
+                  </button>
                 </div>
               </div>
-            );
-          })()}
-
-          {/* ── Row 1: KPI Cards ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-            {kpiCards.map((s, i) => (
-              <div key={i} className="iz-card iz-fade-up" style={{ ...sCard, display: "flex", alignItems: "center", gap: 16, animationDelay: `${i * .05}s` }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center" }}><s.icon size={22} color={s.color} /></div>
-                <div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
-                  <div style={{ fontSize: 12, color: C.textLight, marginTop: 2 }}>{s.label}</div>
+            </div>
+            {/* AI reply bubble — shown after a successful response */}
+            {(ctx.aiBriefingReply || ctx.aiBriefingLoading) && (
+              <div style={{ marginTop: 22, padding: "14px 18px", background: C.white, borderRadius: 12, border: `1px solid ${C.pinkLight}`, display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ width: 28, height: 28, borderRadius: 8, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Sparkles size={14} color={C.pink} />
                 </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {ctx.aiBriefingLoading ? (
+                    <div style={{ fontSize: 13, color: C.textMuted, fontStyle: "italic" }}>
+                      {lang === "fr" ? "L'IA réfléchit…" : "AI is thinking…"}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{ctx.aiBriefingReply}</div>
+                  )}
+                </div>
+                {!ctx.aiBriefingLoading && (
+                  <button onClick={() => { ctx.setAiBriefingReply(""); ctx.setAiBriefingHistory([]); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted, padding: 0, flexShrink: 0 }} title={lang === "fr" ? "Effacer" : "Clear"}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            )}
+            {/* IA prompt input */}
+            <div style={{ marginTop: 26, paddingTop: 18, borderTop: `1px solid ${C.pinkLight}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10 }}>
+                <Sparkles size={14} color={C.pink} style={{ flexShrink: 0 }} />
+                <input
+                  id="iz-ai-briefing-input"
+                  type="text"
+                  disabled={ctx.aiBriefingLoading}
+                  placeholder={lang === "fr" ? "Demandez à l'IA : « combien de collaborateurs ont fini leur intégration ce trimestre ? »" : "Ask the AI: « how many employees finished onboarding this quarter? »"}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !ctx.aiBriefingLoading) {
+                      const v = (e.target as HTMLInputElement).value.trim();
+                      if (!v) return;
+                      const inputEl = e.target as HTMLInputElement;
+                      const history = ctx.aiBriefingHistory || [];
+                      ctx.setAiBriefingLoading(true);
+                      ctx.setAiBriefingReply("");
+                      import('../api/endpoints').then(m => m.postAdminAiChat(v, history)).then((res: any) => {
+                        ctx.setAiBriefingReply(res.reply || (lang === "fr" ? "Aucune réponse." : "No reply."));
+                        ctx.setAiBriefingHistory([...history, { role: "user", content: v }, { role: "assistant", content: res.reply || "" }]);
+                        inputEl.value = "";
+                      }).catch((err: any) => {
+                        let msg = err?.message || (lang === "fr" ? "L'IA est indisponible (vérifiez votre plan IA Business)." : "AI is unavailable (check your AI Business plan).");
+                        try { const parsed = JSON.parse(msg); if (parsed && typeof parsed === 'object' && parsed.reply) msg = parsed.reply; } catch {}
+                        ctx.setAiBriefingReply(msg);
+                        addToast_admin(msg, "error");
+                      }).finally(() => ctx.setAiBriefingLoading(false));
+                    }
+                  }}
+                  style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 13, fontStyle: "italic", color: C.text, fontFamily: font, opacity: ctx.aiBriefingLoading ? 0.5 : 1 }}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ fontSize: 11, color: C.textMuted }}>{lang === "fr" ? "Entrée ↵" : "Enter ↵"}</span>
+                <button disabled={ctx.aiBriefingLoading} onClick={() => {
+                  const inp = document.getElementById('iz-ai-briefing-input') as HTMLInputElement | null;
+                  const v = inp?.value.trim();
+                  if (!v) { inp?.focus(); return; }
+                  const history = ctx.aiBriefingHistory || [];
+                  ctx.setAiBriefingLoading(true);
+                  ctx.setAiBriefingReply("");
+                  import('../api/endpoints').then(m => m.postAdminAiChat(v, history)).then((res: any) => {
+                    ctx.setAiBriefingReply(res.reply || (lang === "fr" ? "Aucune réponse." : "No reply."));
+                    ctx.setAiBriefingHistory([...history, { role: "user", content: v }, { role: "assistant", content: res.reply || "" }]);
+                    if (inp) inp.value = "";
+                  }).catch((err: any) => {
+                    const msg = err?.message || (lang === "fr" ? "L'IA est indisponible (vérifiez votre plan IA Business)." : "AI is unavailable (check your AI Business plan).");
+                    ctx.setAiBriefingReply(msg);
+                    addToast_admin(msg, "error");
+                  }).finally(() => ctx.setAiBriefingLoading(false));
+                }} style={{ padding: "8px 18px", borderRadius: 999, background: ctx.aiBriefingLoading ? C.textMuted : C.pink, color: C.white, border: "none", fontSize: 12, fontFamily: font, fontWeight: 600, cursor: ctx.aiBriefingLoading ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Send size={12} /> {ctx.aiBriefingLoading ? (lang === "fr" ? "Envoi…" : "Sending…") : (lang === "fr" ? "Envoyer" : "Send")}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Stats horizontales ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 0, background: C.white, border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 8px", marginBottom: 28 }}>
+            {statsLine.map((s, i) => (
+              <div key={i} style={{ textAlign: "center", borderRight: i < statsLine.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1.3, textTransform: "uppercase", marginBottom: 8 }}>{s.label}</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
               </div>
             ))}
           </div>
 
-          {/* ── Alertes IA ── */}
-          {(() => {
-            if (ctx._aiAlertsLoaded) return null;
-            // Build alerts from data
-            const alerts: { type: "danger" | "warning" | "info"; icon: any; message: string }[] = [];
-
-            // Collaborateurs en retard
-            const retards = COLLABORATEURS.filter(c => c.status === "en_retard");
-            if (retards.length > 0) {
-              alerts.push({ type: "danger", icon: AlertTriangle, message: `${retards.length} collaborateur${retards.length > 1 ? "s" : ""} en retard : ${retards.slice(0, 3).map(c => `${c.prenom} ${c.nom}`).join(", ")}${retards.length > 3 ? ` et ${retards.length - 3} autre(s)` : ""}` });
-            }
-
-            // Documents manquants
-            const docsMissing = COLLABORATEURS.filter(c => c.status !== "termine" && c.docsValides < c.docsTotal);
-            if (docsMissing.length > 0) {
-              const totalMissing = docsMissing.reduce((s, c) => s + (c.docsTotal - c.docsValides), 0);
-              alerts.push({ type: "warning", icon: FileText, message: `${totalMissing} document${totalMissing > 1 ? "s" : ""} manquant${totalMissing > 1 ? "s" : ""} chez ${docsMissing.length} collaborateur${docsMissing.length > 1 ? "s" : ""} : ${docsMissing.slice(0, 3).map(c => `${c.prenom} ${c.nom} (${c.docsTotal - c.docsValides})`).join(", ")}` });
-            }
-
-            // Périodes d'essai proches (from custom fields if available)
-            const now = new Date();
-            const essaiProche = COLLABORATEURS.filter(c => {
-              const fin = (c as any).date_fin_essai;
-              if (!fin) return false;
-              const d = new Date(fin);
-              return d > now && d < new Date(now.getTime() + 30 * 86400000);
-            });
-            if (essaiProche.length > 0) {
-              alerts.push({ type: "info", icon: Calendar, message: `${essaiProche.length} période${essaiProche.length > 1 ? "s" : ""} d'essai se terminant dans 30 jours : ${essaiProche.map(c => `${c.prenom} ${c.nom}`).join(", ")}` });
-            }
-
-            // Faible progression moyenne
-            if (avgProgression < 30 && totalCollab > 0) {
-              alerts.push({ type: "warning", icon: Target, message: `Progression moyenne faible : ${avgProgression}%. Vérifiez que les parcours sont bien assignés et que les collaborateurs sont actifs.` });
-            }
-
-            // Pas de parcours actif
-            if (activeParcours.length === 0 && PARCOURS_TEMPLATES.length > 0) {
-              alerts.push({ type: "info", icon: Route, message: `Aucun parcours actif. ${PARCOURS_TEMPLATES.length} parcours en brouillon — activez-en un pour commencer les onboardings.` });
-            }
-
-            if (alerts.length === 0) return null;
-
-            const alertStyles = {
-              danger: { bg: "#FFF0F0", border: "#FFCDD2", color: "#C62828", iconColor: "#E53935" },
-              warning: { bg: "#FFF8E1", border: "#FFE0B2", color: "#E65100", iconColor: "#F9A825" },
-              info: { bg: "#E3F2FD", border: "#BBDEFB", color: "#1565C0", iconColor: "#1A73E8" },
-            };
-
-            return (
-              <div className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 20, padding: "16px 20px", border: `1px solid ${C.pink}30` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <Sparkles size={16} color={C.pink} />
-                  <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Alertes & Insights IA</span>
-                  <span style={{ fontSize: 10, color: C.textMuted, marginLeft: "auto" }}>Analyse automatique</span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {alerts.map((a, i) => {
-                    const s = alertStyles[a.type];
-                    const Icon = a.icon;
-                    return (
-                      <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px", borderRadius: 8, background: s.bg, border: `1px solid ${s.border}` }}>
-                        <Icon size={16} color={s.iconColor} style={{ marginTop: 1, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: s.color, lineHeight: 1.5 }}>{a.message}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+          {/* ── Grid: Collaborateurs + Aujourd'hui/Actions ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16, marginBottom: 28 }}>
+            {/* Collaborateurs en parcours */}
+            <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "22px 24px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{lang === "fr" ? "Collaborateurs en parcours" : "Employees on a journey"}</h3>
+                <button onClick={() => setAdminPage("admin_suivi")} style={{ background: "none", border: `1px solid ${C.border}`, fontSize: 11, padding: "5px 14px", borderRadius: 999, cursor: "pointer", fontFamily: font, color: C.text, fontWeight: 500 }}>{lang === "fr" ? "Voir tous" : "See all"}</button>
               </div>
-            );
-          })()}
-
-          {/* ── Insights IA (backend Claude) ── */}
-          {(() => {
-            const { aiInsights: insightsState, setAiInsights } = ctx;
-
-            const loadInsights = () => {
-              setAiInsights({ insights: [], reason: "loading" });
-              import('../api/endpoints').then(m => m.getAiInsights()).then((res: any) => {
-                setAiInsights({ insights: res.insights || [], reason: res.reason || "loaded" });
-              }).catch((err: any) => {
-                console.warn("AI Insights error:", err);
-                setAiInsights({ insights: [], reason: "error" });
-              });
-            };
-
-            // Load only once (when null)
-            if (!insightsState && setAiInsights) {
-              loadInsights();
-            }
-
-            const insights = insightsState?.insights;
-            const reason = insightsState?.reason;
-            if (reason === "loading") return <div style={{ padding: "16px 20px", marginBottom: 20, borderRadius: 12, border: `1px solid ${C.blue}30`, display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: C.textMuted }}><Sparkles size={16} color={C.blue} /> Analyse IA en cours...</div>;
-            if (!insights || insights.length === 0) {
-              if (reason === 'plan_upgrade_required') {
+              <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 18 }}>{recentCollabs.length} {lang === "fr" ? "sur l'ensemble" : "of total"}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1.1fr 0.6fr 1.4fr 0.9fr", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.border}`, fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1, textTransform: "uppercase" }}>
+                <span>{lang === "fr" ? "Collaborateur" : "Employee"}</span>
+                <span>{lang === "fr" ? "Site" : "Site"}</span>
+                <span>{lang === "fr" ? "Jour" : "Day"}</span>
+                <span>{lang === "fr" ? "Progression" : "Progress"}</span>
+                <span>{lang === "fr" ? "Statut" : "Status"}</span>
+              </div>
+              {recentCollabs.map(c => {
+                const dStart = parseFrDate(c.dateDebut);
+                const dayJ = dStart ? Math.round((today0.getTime() - dStart.getTime()) / 86400000) : 0;
+                const dayLabel = dayJ >= 0 ? `J+${dayJ}` : `J${dayJ}`;
                 return (
-                  <div className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 20, padding: "14px 20px", display: "flex", alignItems: "center", gap: 10, border: `1px solid ${C.border}` }}>
-                    <Sparkles size={16} color={C.textMuted} />
-                    <span style={{ fontSize: 12, color: C.textMuted }}>Les insights IA sont disponibles à partir du plan <b>IA Business</b>.</span>
-                    <button onClick={() => { setAdminPage("admin_abonnement" as any); }} style={{ ...sBtn("outline"), fontSize: 10, padding: "4px 10px", marginLeft: "auto" }}>Upgrader</button>
+                  <div key={c.id} onClick={() => { setAdminPage("admin_suivi"); setCollabProfileId(c.id); }}
+                    style={{ display: "grid", gridTemplateColumns: "2fr 1.1fr 0.6fr 1.4fr 0.9fr", gap: 12, padding: "12px 0", borderBottom: `1px solid ${C.border}`, cursor: "pointer", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      {(() => {
+                        const av = (c as any).avatar_url || (c as any).avatar || (c as any).photo_url || (c as any).photo || ((c as any).user_id ? ((ctx.allCompanySettings || {})[`avatar_${(c as any).user_id}`] || null) : null);
+                        return (
+                          <div style={{ width: 32, height: 32, borderRadius: "50%", background: av ? "transparent" : c.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: C.white, flexShrink: 0, overflow: "hidden" }}>
+                            {av ? <img src={av} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : c.initials}
+                          </div>
+                        );
+                      })()}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.prenom} {c.nom}</div>
+                        <div style={{ fontSize: 10, color: C.textMuted }}>{c.poste}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textLight }}>{c.site}</div>
+                    <div style={{ fontSize: 12, color: C.textLight, fontWeight: 500 }}>{dayLabel}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ flex: 1, height: 6, background: C.bg, borderRadius: 3, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${c.progression}%`, background: c.status === "termine" ? C.green : c.status === "en_retard" ? C.red : C.pink, borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, minWidth: 32, textAlign: "right" }}>{c.progression}%</span>
+                    </div>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 500, justifySelf: "start", color: c.status === "termine" ? C.green : c.status === "en_retard" ? C.red : C.pink, background: c.status === "termine" ? C.greenLight : c.status === "en_retard" ? C.redLight : C.pinkBg }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.status === "termine" ? C.green : c.status === "en_retard" ? C.red : C.pink }} />
+                      {c.status === "termine" ? (lang === "fr" ? "Terminé" : "Completed") : c.status === "en_retard" ? (lang === "fr" ? "En retard" : "Late") : (lang === "fr" ? "En cours" : "In progress")}
+                    </span>
                   </div>
                 );
-              }
-              return null;
-            }
-            const typeStyles: Record<string, { bg: string; border: string; color: string; icon: any }> = {
-              danger: { bg: "#FFF0F0", border: "#FFCDD2", color: "#C62828", icon: AlertTriangle },
-              warning: { bg: "#FFF8E1", border: "#FFE0B2", color: "#E65100", icon: Clock },
-              success: { bg: "#E8F5E9", border: "#C8E6C9", color: "#2E7D32", icon: CheckCircle },
-              info: { bg: "#E3F2FD", border: "#BBDEFB", color: "#1565C0", icon: Sparkles },
-            };
-            const maxVisible = 3;
-            const hasMore = insights.length > maxVisible;
-            const { aiInsightsModalOpen, setAiInsightsModalOpen } = ctx;
-
-            const renderInsight = (ins: any, i: number) => {
-              const s = typeStyles[ins.type] || typeStyles.info;
-              const Icon = s.icon;
-              return (
-                <div key={i} style={{ padding: "12px 16px", borderRadius: 10, background: s.bg, border: `1px solid ${s.border}` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <Icon size={14} color={s.color} />
-                    <span style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{ins.title}</span>
-                    {ins.priority === "high" && <span style={{ fontSize: 8, padding: "1px 5px", borderRadius: 3, background: s.color, color: "#fff", fontWeight: 700 }}>URGENT</span>}
-                  </div>
-                  <div style={{ fontSize: 12, color: s.color, lineHeight: 1.5, opacity: 0.85 }}>{ins.message}</div>
-                </div>
-              );
-            };
-
-            return (
-              <>
-              <div className="iz-card iz-fade-up" style={{ ...sCard, marginBottom: 20, padding: "16px 20px", border: `1px solid ${C.blue}30` }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg, #1a1a2e, ${C.blue})`, display: "flex", alignItems: "center", justifyContent: "center" }}><Sparkles size={14} color="#fff" /></div>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Insights IA</span>
-                  <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: C.blueLight, color: C.blue, fontWeight: 600 }}>CLAUDE</span>
-                  <span style={{ marginLeft: "auto", fontSize: 10, color: C.textMuted }}>Analyse générée par IA</span>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {insights.slice(0, maxVisible).map(renderInsight)}
-                </div>
-                <div style={{ fontSize: 9, color: C.textMuted, marginTop: 10 }}>L'IA peut commettre des erreurs. Vérifiez les informations.</div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
-                  <button onClick={() => loadInsights()}
-                    style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.textMuted, fontFamily: font }}>
-                    <RefreshCw size={12} /> Rafraîchir
-                  </button>
-                  {hasMore && (
-                    <button onClick={() => setAiInsightsModalOpen(true)}
-                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: C.blue, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                      Voir tout ({insights.length}) <ChevronRight size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Modal all insights */}
-              {aiInsightsModalOpen && (
-                <div className="iz-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-                  <div className="iz-modal iz-scale-in" style={{ background: C.white, borderRadius: 16, width: 700, maxHeight: "80vh", overflow: "auto" }}>
-                    <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ width: 28, height: 28, borderRadius: 8, background: `linear-gradient(135deg, #1a1a2e, ${C.blue})`, display: "flex", alignItems: "center", justifyContent: "center" }}><Sparkles size={14} color="#fff" /></div>
-                        <span style={{ fontSize: 16, fontWeight: 700 }}>Tous les insights IA</span>
-                        <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: C.blueLight, color: C.blue, fontWeight: 600 }}>CLAUDE</span>
-                      </div>
-                      <button onClick={() => setAiInsightsModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
-                    </div>
-                    <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 10 }}>
-                      {insights.map(renderInsight)}
-                    </div>
-                    <div style={{ padding: "12px 24px", borderTop: `1px solid ${C.border}`, fontSize: 9, color: C.textMuted, textAlign: "center" }}>L'IA peut commettre des erreurs. Vérifiez les informations.</div>
-                  </div>
-                </div>
-              )}
-              </>
-            );
-          })()}
-
-          {/* ── Row 2: Charts ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
-            {/* Left: Progression moyenne (SVG circular) */}
-            <div className="iz-card iz-fade-up iz-stagger-2" style={{ ...sCard, display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <h3 style={sectionTitle}>{t('kpi.avg_progress')}</h3>
-              <div style={{ position: "relative", width: 180, height: 180, margin: "8px 0 12px" }}>
-                <svg width="180" height="180" viewBox="0 0 180 180">
-                  <circle cx="90" cy="90" r={circleR} fill="none" stroke={C.border} strokeWidth="12" />
-                  <circle cx="90" cy="90" r={circleR} fill="none" stroke={C.pink} strokeWidth="12" strokeDasharray={`${circleDash} ${circleCirc}`} strokeLinecap="round" transform="rotate(-90 90 90)" style={{ transition: "stroke-dasharray .6s ease" }} />
-                </svg>
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                  <div style={{ fontSize: 36, fontWeight: 700, color: C.text, lineHeight: 1 }}>{avgProgression}%</div>
-                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{t('dash.average')}</div>
-                </div>
-              </div>
-              <div style={{ fontSize: 12, color: C.textLight, textAlign: "center" }}>{totalCollab} {t('dash.collabs_tracked')}</div>
+              })}
             </div>
 
-            {/* Right: Répartition par statut (PieChart) */}
-            <div className="iz-card iz-fade-up iz-stagger-3" style={sCard}>
-              <h3 style={sectionTitle}>{t('dash.status_breakdown')}</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={78} dataKey="value" paddingAngle={3}>
-                    {pieData.map((_, i) => <Cell key={i} fill={pieColors[i]} />)}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ display: "flex", justifyContent: "center", gap: 20, marginTop: 8 }}>
-                {pieData.map((d, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: pieColors[i] }} />
-                    <span style={{ color: C.textLight }}>{d.name}</span>
-                    <span style={{ fontWeight: 700, color: C.text }}>{d.value}</span>
+            {/* Sidebar: Aujourd'hui + Actions à venir */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "20px 22px" }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{lang === "fr" ? "Aujourd'hui" : "Today"}</h3>
+                <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 14 }}>{todayEvents.length} {lang === "fr" ? "événements" : "events"}</div>
+                {todayEvents.length === 0 ? (
+                  <div style={{ fontSize: 12, color: C.textMuted, padding: "8px 0" }}>{lang === "fr" ? "Rien de prévu aujourd'hui." : "Nothing scheduled today."}</div>
+                ) : todayEvents.map((e: any, i: number) => {
+                  const av = e.avatarUrl || (e.userId ? ((ctx.allCompanySettings || {})[`avatar_${e.userId}`] || null) : null);
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < todayEvents.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: av ? "transparent" : e.color, color: C.white, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0, overflow: "hidden" }}>
+                        {av ? <img src={av} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : e.initials}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.name}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted }}>{e.sub}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "20px 22px" }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{lang === "fr" ? "Actions à venir" : "Upcoming actions"}</h3>
+                <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 14 }}>{upcomingActions.length} {lang === "fr" ? "cette semaine" : "this week"}</div>
+                {upcomingActions.map((a, i) => (
+                  <div key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 0", borderBottom: i < upcomingActions.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, minWidth: 36, padding: "3px 0", textAlign: "center", background: C.pinkBg, borderRadius: 6 }}>{a.delaiRelatif}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.titre}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted }}>{a.parcours}</div>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* ── Row 3: Completion rates ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 24 }}>
-            {/* Documents completion */}
-            <div className="iz-card iz-fade-up iz-stagger-4" style={sCard}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <h3 style={{ ...sectionTitle, margin: 0, display: "flex", alignItems: "center", gap: 8 }}><FileText size={16} color={C.pink} /> {t('dash.docs_rate')}</h3>
-                <span style={{ fontSize: 20, fontWeight: 700, color: docsPct >= 75 ? C.green : docsPct >= 50 ? C.amber : C.red }}>{docsPct}%</span>
-              </div>
-              <div style={{ height: 10, background: C.bg, borderRadius: 5, overflow: "hidden", marginBottom: 8 }}>
-                <div style={{ height: "100%", width: `${docsPct}%`, background: docsPct >= 75 ? C.green : docsPct >= 50 ? C.amber : C.red, borderRadius: 5, transition: "width .5s ease" }} />
-              </div>
-              <div style={{ fontSize: 12, color: C.textLight }}>{totalDocsValides} {t('dash.validated_of')} {totalDocsTotal} {t('table.documents')}</div>
-            </div>
-
-            {/* Actions completion */}
-            <div className="iz-card iz-fade-up iz-stagger-5" style={sCard}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <h3 style={{ ...sectionTitle, margin: 0, display: "flex", alignItems: "center", gap: 8 }}><ListChecks size={16} color={C.blue} /> {t('dash.actions_rate')}</h3>
-                <span style={{ fontSize: 20, fontWeight: 700, color: actionsPct >= 75 ? C.green : actionsPct >= 50 ? C.amber : C.red }}>{actionsPct}%</span>
-              </div>
-              <div style={{ height: 10, background: C.bg, borderRadius: 5, overflow: "hidden", marginBottom: 8 }}>
-                <div style={{ height: "100%", width: `${actionsPct}%`, background: actionsPct >= 75 ? C.green : actionsPct >= 50 ? C.amber : C.red, borderRadius: 5, transition: "width .5s ease" }} />
-              </div>
-              <div style={{ fontSize: 12, color: C.textLight }}>{totalActionsCompletes} {t('dash.completed_of')} {totalActionsTotal} {t('table.actions')}</div>
-            </div>
-          </div>
-
-          {/* ── Row 4: Recent collaborateurs table ── */}
-          <div className="iz-card iz-fade-up iz-stagger-6" style={{ ...sCard, marginBottom: 24 }}>
-            <h3 style={sectionTitle}>{t('dashboard.recent_collabs')}</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 1fr 0.8fr", gap: 0, padding: "8px 12px", background: C.bg, borderRadius: 8, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase", letterSpacing: .3, marginBottom: 4 }}>
-              <span>{t('table.collaborateur')}</span><span>{t('table.poste')}</span><span>{t('table.site')}</span><span>{t('table.progression')}</span><span>{t('table.statut')}</span>
-            </div>
-            {recentCollabs.map(c => (
-              <div key={c.id} onClick={() => { setAdminPage("admin_suivi"); setCollabProfileId(c.id); }}
-                style={{ display: "grid", gridTemplateColumns: "2fr 1.2fr 1fr 1fr 0.8fr", gap: 0, padding: "12px 12px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", alignItems: "center", transition: "background .1s" }}
-                onMouseEnter={e => (e.currentTarget.style.background = C.bg)}
-                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: "50%", background: c.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: C.white, flexShrink: 0 }}>{c.initials}</div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{c.prenom} {c.nom}</div>
-                    <div style={{ fontSize: 10, color: C.textMuted }}>{c.dateDebut}</div>
-                  </div>
-                </div>
-                <div style={{ fontSize: 12, color: C.textLight }}>{c.poste}</div>
-                <div style={{ fontSize: 12, color: C.textLight }}>{c.site}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <div style={{ flex: 1, height: 6, background: C.bg, borderRadius: 3, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${c.progression}%`, background: c.status === "termine" ? C.green : c.status === "en_retard" ? C.red : C.blue, borderRadius: 3 }} />
-                  </div>
-                  <span style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, minWidth: 28, textAlign: "right" }}>{c.progression}%</span>
-                </div>
-                <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, justifySelf: "start", background: c.status === "termine" ? C.greenLight : c.status === "en_retard" ? C.redLight : C.blueLight, color: c.status === "termine" ? C.green : c.status === "en_retard" ? C.red : C.blue }}>
-                  {c.status === "termine" ? t('status.completed') : c.status === "en_retard" ? t('kpi.late') : t('kpi.ongoing')}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* ── Row 5: Parcours actifs + Actions à venir ── */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            {/* Parcours actifs */}
-            <div className="iz-card iz-fade-up iz-stagger-7" style={sCard}>
-              <h3 style={{ ...sectionTitle, display: "flex", alignItems: "center", gap: 8 }}><Route size={16} color={C.purple} /> {t('dash.active_parcours')}</h3>
-              {activeParcours.map(p => {
-                const realCount = COLLABORATEURS.filter((c: any) => c.parcours_id === p.id && c.status !== "termine").length;
-                return (
-                <div key={p.id} onClick={() => { setSuiviParcoursFilter(p.nom); setSuiviScope("actifs"); setAdminPage("admin_suivi"); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: `1px solid ${C.border}`, cursor: "pointer", borderRadius: 6, transition: "background .15s" }} className="iz-sidebar-item">
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{p.nom}</div>
-                    <div style={{ fontSize: 11, color: C.textMuted }}>{p.actionsCount} actions &middot; {p.docsCount} documents &middot; {p.phases.length} phases</div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: realCount > 0 ? C.pink : C.textMuted }}>{realCount}</span>
-                    <span style={{ fontSize: 10, color: C.textMuted }}>{realCount > 1 ? "collabs" : "collab"}</span>
-                  </div>
-                </div>
-                );
-              })}
-              {activeParcours.length === 0 && <div style={{ padding: 20, textAlign: "center", color: C.textMuted, fontSize: 12 }}>Aucun parcours actif</div>}
-            </div>
-
-            {/* Actions à venir */}
-            <div className="iz-card iz-fade-up iz-stagger-8" style={sCard}>
-              <h3 style={{ ...sectionTitle, display: "flex", alignItems: "center", gap: 8 }}><CalendarClock size={16} color={C.amber} /> {t('dash.upcoming_actions')}</h3>
-              {upcomingActions.map(a => (
-                <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: a.obligatoire ? C.pinkBg : C.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {a.obligatoire ? <AlertTriangle size={14} color={C.pink} /> : <Clock size={14} color={C.textMuted} />}
+          {/* ── Setup wizard banner (preserved) ── */}
+          {setupCompleted.length < SETUP_STEPS.length && (() => {
+            const totalReq = SETUP_STEPS.filter(s => s.required).length;
+            const doneReq = SETUP_STEPS.filter(s => s.required && setupCompleted.includes(s.id)).length;
+            const pct = Math.round((setupCompleted.length / SETUP_STEPS.length) * 100);
+            return (
+              <div className="iz-card" style={{ background: C.white, padding: 0, overflow: "hidden", marginBottom: 28, borderRadius: 14, border: `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "16px 22px" }}>
+                  <div style={{ width: 42, height: 42, borderRadius: 10, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Zap size={20} color={C.pink} />
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{a.titre}</div>
-                    <div style={{ fontSize: 11, color: C.textMuted }}>{a.parcours} &middot; {a.phase}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 4 }}>{lang === "fr" ? "Votre espace n'est pas encore configuré" : "Your space is not yet configured"}</div>
+                    <div style={{ fontSize: 12, color: C.textMuted }}>{lang === "fr" ? `L'IA peut vous guider à travers les ${SETUP_STEPS.length} étapes en 8 minutes.` : `AI can guide you through the ${SETUP_STEPS.length} steps in 8 minutes.`} · {doneReq}/{totalReq} {t('wiz.required_steps')} · {pct}%</div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: C.blue }}>{a.delaiRelatif}</span>
-                    {a.obligatoire && <span style={{ fontSize: 9, color: C.red, fontWeight: 600 }}>{t('dash.obligatory')}</span>}
-                  </div>
+                  <button onClick={() => { setShowSetupWizard(true); setSetupStep(SETUP_STEPS.findIndex(s => !setupCompleted.includes(s.id)) || 0); }} style={{ padding: "9px 18px", borderRadius: 999, background: C.pink, color: C.white, border: "none", fontSize: 12, fontFamily: font, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                    <Sparkles size={13} /> {lang === "fr" ? "Configurer avec l'IA" : "Configure with AI"}
+                  </button>
                 </div>
-              ))}
+              </div>
+            );
+          })()}
+
+          {/* ── Footer: Parcours actifs + Planning 8 semaines ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 16, marginBottom: 28 }}>
+            <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "20px 22px" }}>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{lang === "fr" ? "Parcours actifs" : "Active journeys"}</h3>
+              <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 16 }}>{PARCOURS_TEMPLATES.length} {lang === "fr" ? "templates" : "templates"}</div>
+              {PARCOURS_TEMPLATES.map(p => {
+                const realCount = COLLABORATEURS.filter((c: any) => c.parcours_id === p.id && c.status !== "termine").length;
+                const cat = (p as any).categorie || "onboarding";
+                const colorMap: Record<string, string> = { onboarding: C.pink, offboarding: "#E53935", reboarding: "#7B5EA7", crossboarding: C.blue };
+                const accent = colorMap[cat] || C.pink;
+                return (
+                  <div key={p.id} onClick={() => { setSuiviParcoursFilter(p.nom); setSuiviScope("actifs"); setAdminPage("admin_suivi"); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}>
+                    <div style={{ width: 3, height: 30, background: accent, borderRadius: 2, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.nom}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted }}>{p.actionsCount} actions · {p.docsCount} docs</div>
+                    </div>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: realCount > 0 ? accent : C.textMuted }}>{realCount}</span>
+                  </div>
+                );
+              })}
+              {PARCOURS_TEMPLATES.length === 0 && <div style={{ padding: 20, textAlign: "center", color: C.textMuted, fontSize: 12 }}>{lang === "fr" ? "Aucun parcours" : "No journey"}</div>}
+            </div>
+
+            <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "20px 22px" }}>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.text }}>{lang === "fr" ? "Planning · 8 semaines" : "Planning · 8 weeks"}</h3>
+              <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 18 }}>{lang === "fr" ? "Arrivées & départs" : "Arrivals & departures"}</div>
+              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, height: 160, padding: "0 4px" }}>
+                {weeks.map((w, i) => {
+                  const arrH = (w.arrivals / maxWeek) * 130;
+                  const depH = (w.departures / maxWeek) * 130;
+                  return (
+                    <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 130, width: "100%", justifyContent: "center" }}>
+                        {w.arrivals > 0 && <div title={`${w.arrivals} arrivée(s)`} style={{ width: 14, height: arrH, background: C.pink, borderRadius: "3px 3px 0 0", transition: "height .4s ease" }} />}
+                        {w.departures > 0 && <div title={`${w.departures} départ(s)`} style={{ width: 14, height: depH, background: "#C9A961", borderRadius: "3px 3px 0 0", transition: "height .4s ease" }} />}
+                        {w.arrivals === 0 && w.departures === 0 && <div style={{ width: 14, height: 2, background: C.border, borderRadius: 1 }} />}
+                      </div>
+                      <div style={{ fontSize: 11, color: i === 2 ? C.pink : C.textMuted, fontWeight: i === 2 ? 700 : 400 }}>{w.label}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", gap: 16, marginTop: 14, fontSize: 11, color: C.textLight }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, background: C.pink, borderRadius: 2 }} /> {lang === "fr" ? "Arrivées" : "Arrivals"}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, background: "#C9A961", borderRadius: 2 }} /> {lang === "fr" ? "Départs" : "Departures"}</span>
+              </div>
             </div>
           </div>
+
         </div>
       );
     };
@@ -843,10 +814,15 @@ export function createAdminDashboardSuivi(ctx: any) {
             style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 1fr 0.8fr 0.5fr", gap: 0, padding: "14px 16px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", alignItems: "center", transition: "all .1s" }}
             className="iz-sidebar-item">
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 36, height: 36, borderRadius: "50%", background: c.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: C.white, flexShrink: 0, position: "relative" }}>
-                {c.initials}
-                <div style={{ position: "absolute", bottom: -1, right: -1, width: 10, height: 10, borderRadius: "50%", background: c.status === "termine" ? C.green : c.status === "en_retard" ? C.red : C.blue, border: `2px solid ${C.white}` }} />
-              </div>
+              {(() => {
+                const avatarUrl = (c as any).avatar_url || (c as any).avatar || (c as any).photo_url || (c as any).photo || (c.user_id ? ((ctx.allCompanySettings || {})[`avatar_${c.user_id}`] || null) : null);
+                return (
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: avatarUrl ? "transparent" : c.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: C.white, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+                    {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : c.initials}
+                    <div style={{ position: "absolute", bottom: -1, right: -1, width: 10, height: 10, borderRadius: "50%", background: c.status === "termine" ? C.green : c.status === "en_retard" ? C.red : C.blue, border: `2px solid ${C.white}` }} />
+                  </div>
+                );
+              })()}
               <div>
                 <div style={{ fontSize: 14, fontWeight: 500, color: C.text, display: "flex", alignItems: "center", gap: 6 }}>
                   {c.prenom} {c.nom}
@@ -1116,6 +1092,10 @@ export function createAdminDashboardSuivi(ctx: any) {
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
               <button onClick={() => setCollabProfileId(null)} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: C.text, fontFamily: font }}><ChevronLeft size={16} /> {t('misc.return')}</button>
               <button onClick={() => { setCollabPanelData({ ...collab, email: collab.email || "" }); setCollabPanelMode("edit"); }} style={{ ...sBtn("pink"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}><FilePen size={14} /> Modifier</button>
+              {/* Relancer (manual reminder email) */}
+              <button onClick={() => setRelanceCollabId(collab.id)} style={{ ...sBtn("outline"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, borderColor: C.pink, color: C.pink }}>
+                <Send size={14} /> Relancer
+              </button>
               {/* Générer un contrat */}
               <button onClick={() => {
                 const contrats = ctx.contrats || [];
@@ -1124,7 +1104,26 @@ export function createAdminDashboardSuivi(ctx: any) {
                   addToast_admin("Aucun modèle de contrat actif. Créez-en un dans Contrats & Documents.");
                   return;
                 }
-                ctx.setGenerateContrat(activeContrats[0]);
+                // Smart pre-selection: score each contract by matching type_contrat + juridiction (country derived from site)
+                const collabType = (collab.type_contrat || "").toLowerCase().trim();
+                const collabSite = (collab.site || "").toLowerCase();
+                const inferCountry = (site: string) => {
+                  if (/suisse|switzerland|gen[èe]ve|lausanne|z[uü]rich|bern|basel|nyon/.test(site)) return "suisse";
+                  if (/france|paris|lyon|marseille|toulouse|nice|nantes|bordeaux/.test(site)) return "france";
+                  if (/belg|bruxelles|brussels|anvers|li[èe]ge/.test(site)) return "belgique";
+                  if (/luxemb/.test(site)) return "luxembourg";
+                  return "";
+                };
+                const collabCountry = inferCountry(collabSite);
+                const scored = activeContrats.map((c: any) => {
+                  let score = 0;
+                  const cType = (c.type || "").toLowerCase().trim();
+                  const cJur = (c.juridiction || "").toLowerCase();
+                  if (collabType && cType && cType === collabType) score += 10;
+                  if (collabCountry && cJur.includes(collabCountry)) score += 5;
+                  return { c, score };
+                }).sort((a: any, b: any) => b.score - a.score);
+                ctx.setGenerateContrat(scored[0].c);
                 ctx.setGenerateCollabId(collab.id);
               }} style={{ ...sBtn("outline"), padding: "8px 20px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, borderColor: C.green, color: C.green }}>
                 <FileSignature size={14} /> Générer un contrat
@@ -1140,7 +1139,14 @@ export function createAdminDashboardSuivi(ctx: any) {
               })()}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-              <div style={{ width: 64, height: 64, borderRadius: "50%", background: collab.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: C.white, flexShrink: 0 }}>{collab.initials}</div>
+              {(() => {
+                const av = (collab as any).avatar_url || (collab as any).avatar || (collab as any).photo_url || (collab as any).photo || ((collab as any).user_id ? ((ctx.allCompanySettings || {})[`avatar_${(collab as any).user_id}`] || null) : null);
+                return (
+                  <div style={{ width: 64, height: 64, borderRadius: "50%", background: av ? "transparent" : collab.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 700, color: C.white, flexShrink: 0, overflow: "hidden" }}>
+                    {av ? <img src={av} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : collab.initials}
+                  </div>
+                );
+              })()}
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
                   <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: C.text }}>{collab.prenom} {collab.nom}</h1>
@@ -1690,11 +1696,66 @@ export function createAdminDashboardSuivi(ctx: any) {
 
     // ─── PARCOURS & ACTIONS ───────────────────────────────────
 
+  // ─── RELANCE MODAL (manual reminder email) ────────────────
+  const renderRelanceModal = () => {
+    if (relanceCollabId == null) return null;
+    const collab = COLLABORATEURS.find((c: any) => c.id === relanceCollabId);
+    if (!collab) return null;
+    const close = () => { setRelanceCollabId(null); ctx.setRelanceDraft && ctx.setRelanceDraft(null); };
+    const draft = ctx.relanceDraft || {
+      subject: `Rappel : avancement de votre parcours d'intégration`,
+      body: `Bonjour ${collab.prenom},\n\nJe me permets de revenir vers vous concernant votre parcours d'intégration. Quelques actions sont encore en attente de votre côté et un rappel pourrait vous aider à les finaliser sereinement.\n\nN'hésitez pas si vous avez besoin d'aide.\n\nBien cordialement,\n${(ctx.auth?.user?.name || "")}`,
+    };
+    const setDraft = (d: any) => ctx.setRelanceDraft && ctx.setRelanceDraft({ ...draft, ...d });
+    const sending = !!ctx.relanceSending;
+    const sendIt = async () => {
+      if (!draft.subject.trim() || !draft.body.trim()) { addToast_admin("Sujet et message requis", "warning"); return; }
+      ctx.setRelanceSending && ctx.setRelanceSending(true);
+      try {
+        const m = await import('../api/endpoints');
+        await m.relancerCollaborateur(collab.id, { subject: draft.subject.trim(), body: draft.body.trim() });
+        addToast_admin(`Relance envoyée à ${collab.prenom} ${collab.nom}`, "success");
+        close();
+      } catch (err: any) {
+        addToast_admin(err?.message || "Échec de l'envoi de la relance", "error");
+      } finally {
+        ctx.setRelanceSending && ctx.setRelanceSending(false);
+      }
+    };
+    return (
+      <div onClick={close} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="iz-modal iz-scale-in" onClick={e => e.stopPropagation()} style={{ background: C.white, borderRadius: 16, width: 620, maxHeight: "85vh", overflow: "auto", zIndex: 1201 }}>
+          <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}><Send size={18} color={C.pink} /> Relancer le collaborateur</h2>
+              <p style={{ fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{collab.prenom} {collab.nom} · {collab.email || "email non renseigné"}</p>
+            </div>
+            <button onClick={close} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
+          </div>
+          <div style={{ padding: "20px 24px" }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textLight, marginBottom: 6 }}>Sujet</label>
+            <input value={draft.subject} onChange={e => setDraft({ subject: e.target.value })} style={{ ...sInput, fontSize: 13, marginBottom: 16 }} />
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textLight, marginBottom: 6 }}>Message</label>
+            <textarea value={draft.body} onChange={e => setDraft({ body: e.target.value })} rows={10} style={{ ...sInput, fontSize: 13, fontFamily: font, resize: "vertical", lineHeight: 1.6 }} />
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 8 }}>L'email sera envoyé à l'adresse du collaborateur depuis votre adresse RH par défaut.</div>
+          </div>
+          <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <button onClick={close} disabled={sending} style={{ ...sBtn("outline"), padding: "8px 18px", fontSize: 13 }}>Annuler</button>
+            <button onClick={sendIt} disabled={sending || !collab.email} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 22px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, opacity: !collab.email ? 0.5 : 1 }}>
+              <Send size={14} /> {sending ? "Envoi…" : "Envoyer la relance"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return {
     renderDashboard_admin,
     renderSuivi,
     renderCollabProfile,
     renderOcrModal,
+    renderRelanceModal,
     PARCOURS_CAT_META,
     PAGE_MODULE_MAP,
     hasModule,

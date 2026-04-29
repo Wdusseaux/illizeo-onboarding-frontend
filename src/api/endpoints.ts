@@ -89,6 +89,7 @@ export function transformCollaborateur(c: ApiCollaborateur) {
     initials: c.initials, color: c.couleur, parcours_id: c.parcours_id ?? undefined,
     managerId: c.manager_id, hrManagerId: c.hr_manager_id,
     manager: c.manager ?? null, hrManager: c.hr_manager ?? null,
+    user_id: (c as any).user_id ?? null, photo: c.photo ?? null,
     // Extended fields — pass through as-is
     civilite: c.civilite || null, date_naissance: c.date_naissance || null, nationalite: c.nationalite || null,
     numero_avs: c.numero_avs || null, telephone: c.telephone || null, adresse: c.adresse || null,
@@ -397,11 +398,15 @@ export async function getContratGenerated(contratId: number, collaborateurId?: n
 export async function downloadContratMerged(contratId: number, collaborateurId: number, format: 'docx' | 'pdf' = 'pdf') {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
   const tenantId = localStorage.getItem('illizeo_tenant_id') || import.meta.env.VITE_TENANT_ID || 'illizeo';
-  const token = localStorage.getItem('illizeo_auth_token');
+  const token = localStorage.getItem('illizeo_token');
   const res = await fetch(`${baseUrl}/contrats/${contratId}/download?collaborateur_id=${collaborateurId}&format=${format}`, {
     headers: { 'X-Tenant': tenantId, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   });
-  if (!res.ok) throw new Error('Download failed');
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const body = await res.text(); const parsed = JSON.parse(body); msg = parsed.error || parsed.message || msg; } catch {}
+    throw new Error(msg);
+  }
   const blob = await res.blob();
   const filename = res.headers.get('Content-Disposition')?.match(/filename="?(.+?)"?$/)?.[1] || `contrat.${format}`;
   const url = URL.createObjectURL(blob);
@@ -779,6 +784,14 @@ export interface Cooptation {
   is_validable: boolean;
   jours_restants: number | null;
   created_at: string;
+  // AI scoring (computed by backend CooptationScoringService via Claude Haiku)
+  priority_score?: number | null;
+  priority_reason?: string | null;
+  priority_action?: string | null;
+  priority_computed_at?: string | null;
+  priority_model_version?: string | null;
+  cv_parsed_data?: Record<string, any> | null;
+  cv_parsed_at?: string | null;
 }
 
 export interface CooptationSettings {
@@ -882,6 +895,11 @@ export interface CooptationCampaign {
   share_token: string;
   cooptations_count?: number;
   created_at: string;
+  // Boost — temporary multiplier on the reward (e.g. ×2 pendant 8 jours)
+  boost_active?: boolean;
+  boost_multiplier?: number;
+  boost_label?: string | null;
+  boost_until?: string | null;
 }
 
 export interface LeaderboardEntry {
@@ -1776,6 +1794,10 @@ export async function updateAiAutoRechargeConfig(config: { enabled: boolean; thr
 
 export async function postAdminAiChat(message: string, history: { role: string; content: string }[]) {
   return apiFetch<{ reply: string }>('/ai/admin-chat', { method: 'POST', body: JSON.stringify({ message, history }) });
+}
+
+export async function relancerCollaborateur(collabId: number, payload: { subject: string; body: string }) {
+  return apiFetch<{ success: boolean; message?: string }>(`/collaborateurs/${collabId}/relancer`, { method: 'POST', body: JSON.stringify(payload) });
 }
 
 export async function getExchangeRates() {

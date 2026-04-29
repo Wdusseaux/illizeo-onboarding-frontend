@@ -64,6 +64,23 @@ export async function apiFetch<T>(endpoint: string, options?: RequestInit): Prom
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
+
+      // 402 with structured AI-quota payloads → emit a global event so the app
+      // can show a toast + CTA without every call site needing its own try/catch.
+      if (res.status === 402) {
+        try {
+          const payload = JSON.parse(body);
+          const isAiBlock = payload && (
+            payload.error === 'spending_cap' ||
+            payload.quota_exceeded === true ||
+            payload.no_plan === true
+          );
+          if (isAiBlock) {
+            window.dispatchEvent(new CustomEvent('illizeo:ai-blocked', { detail: payload }));
+          }
+        } catch { /* not JSON, ignore */ }
+      }
+
       throw new ApiError(res.status, body || `HTTP ${res.status}`);
     }
 

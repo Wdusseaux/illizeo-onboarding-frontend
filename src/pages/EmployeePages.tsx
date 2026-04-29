@@ -18,7 +18,7 @@ import {
   Moon, Sun, HelpCircle
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode, COUNTRIES } from '../constants';
+import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGION_CURRENCY, getLocaleSettings, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtDateTimeShort, fmtCurrency, font, fontDisplay, ILLIZEO_LOGO_URI, ILLIZEO_FULL_LOGO_URI, getLogoUri, getLogoFullUri, IllizeoLogoFull, IllizeoLogo, IllizeoLogoBrand, PreboardSidebar, sCard, sBtn, sInput, isDarkMode, applyDarkMode, COUNTRIES } from '../constants';
 import type { OnboardingStep, DashboardPage, DashboardTab, UserRole, AdminPage, AdminModal, Collaborateur, ParcoursCategorie, ParcourTemplate, ActionTemplate, ActionType, AssignTarget, GroupePersonnes, DocCategory, WorkflowRule, EmailTemplate, TeamMember } from '../types';
 import RichEditor from '../components/RichEditor';
 import TranslatableField, { type Translations } from '../components/TranslatableField';
@@ -223,7 +223,26 @@ export function createEmployeeRenders(ctx: any) {
   const CAT_LABELS_MAP: Record<string, string> = { onboarding: "Onboarding", offboarding: "Offboarding", crossboarding: "Crossboarding", reboarding: "Reboarding" };
   // Use actions from /me/collaborateur first, fallback to ACTION_TEMPLATES filtered by parcours name
   const myProfileActions = (myCollab as any)?.parcours_actions || [];
-  const myActions = myProfileActions.length > 0 ? myProfileActions : ACTION_TEMPLATES.filter((a: any) => a.parcours === myParcoursName);
+  // Gate by assignation target — see Onboarding_v1.tsx _isTargeted for the same logic.
+  const myFullName = `${(myCollab as any)?.prenom || ""} ${(myCollab as any)?.nom || ""}`.trim();
+  const isTargetedAction = (a: any): boolean => {
+    const mode = a.assignation?.mode || a.assignation_mode;
+    const valeurs: string[] = a.assignation?.valeurs || a.assignation_valeurs || [];
+    if (!mode || mode === "tous") return true;
+    if (mode === "site") return !(myCollab as any)?.site || valeurs.includes((myCollab as any).site);
+    if (mode === "contrat") return !(myCollab as any)?.type_contrat || valeurs.includes((myCollab as any).type_contrat);
+    if (mode === "parcours") return valeurs.includes(myParcoursName);
+    if (mode === "groupe") {
+      if (!GROUPES || GROUPES.length === 0 || !myFullName) return true;
+      return valeurs.some((gn: string) => {
+        const g = (GROUPES as any[]).find(x => x.nom === gn);
+        return !!g && (g.membres || []).includes(myFullName);
+      });
+    }
+    return true;
+  };
+  const myActions = (myProfileActions.length > 0 ? myProfileActions : ACTION_TEMPLATES.filter((a: any) => a.parcours === myParcoursName))
+    .filter(isTargetedAction);
   const ACTION_TYPE_COLORS: Record<string, { bg: string; color: string }> = {
     document: { bg: C.redLight, color: C.red },
     signature: { bg: "#FFF8E1", color: "#F9A825" },
@@ -374,7 +393,15 @@ export function createEmployeeRenders(ctx: any) {
         <div style={{ position: "relative" }}>
           <button onClick={() => setOpen(!open)}
             style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px 6px 6px", background: open ? C.bg : "transparent", border: `1px solid ${open ? C.border : "transparent"}`, borderRadius: 22, cursor: "pointer", fontFamily: font, transition: "all .15s" }}>
-            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "linear-gradient(135deg, #E91E8C, #E41076)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: C.white }}>{initials}</div>
+            <div style={{ width: 32, height: 32, borderRadius: "50%", background: avatarImage ? "none" : "linear-gradient(135deg, #E91E8C, #E41076)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: C.white, overflow: "hidden" }}>
+              {avatarImage ? (
+                <img src={avatarImage} alt="" style={{
+                  width: `${avatarZoom || 100}%`, height: `${avatarZoom || 100}%`, objectFit: "cover", position: "relative",
+                  left: `${(50 - (avatarPos?.x || 50)) * ((avatarZoom || 100) - 100) / 100}%`,
+                  top: `${(50 - (avatarPos?.y || 50)) * ((avatarZoom || 100) - 100) / 100}%`,
+                }} />
+              ) : initials}
+            </div>
             <div style={{ textAlign: "left", lineHeight: 1.2 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{fullName}</div>
               {role && <div style={{ fontSize: 10, color: C.textMuted }}>{role}</div>}
@@ -386,7 +413,15 @@ export function createEmployeeRenders(ctx: any) {
               <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 100 }} />
               <div className="iz-fade-up" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 260, background: C.white, borderRadius: 12, boxShadow: "0 8px 28px rgba(0,0,0,.12)", border: `1px solid ${C.border}`, zIndex: 101, overflow: "hidden" }}>
                 <div style={{ padding: "16px 18px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg, #E91E8C, #E41076)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: C.white }}>{initials}</div>
+                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: avatarImage ? "none" : "linear-gradient(135deg, #E91E8C, #E41076)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: C.white, overflow: "hidden" }}>
+                    {avatarImage ? (
+                      <img src={avatarImage} alt="" style={{
+                        width: `${avatarZoom || 100}%`, height: `${avatarZoom || 100}%`, objectFit: "cover", position: "relative",
+                        left: `${(50 - (avatarPos?.x || 50)) * ((avatarZoom || 100) - 100) / 100}%`,
+                        top: `${(50 - (avatarPos?.y || 50)) * ((avatarZoom || 100) - 100) / 100}%`,
+                      }} />
+                    ) : initials}
+                  </div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{fullName}</div>
                     {auth.user?.email && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{auth.user.email}</div>}
@@ -481,8 +516,13 @@ export function createEmployeeRenders(ctx: any) {
   const renderActionCard = (action: typeof ACTIONS[0], showCheckbox = false, staggerIdx = 0) => {
     const isDone = completedActions.has(action.id);
     const liveSubtitle = action.id === 1 ? (docsMissing > 0 ? `${lang === "fr" ? "Il vous reste" : "You have"} ${docsMissing} ${t('emp.docs_remaining')}` : t('emp.docs_file_complete')) : action.subtitle;
+    // If the action carries required pieces (document/admin), clicking it should
+    // jump straight to the per-piece upload panel — same UX as Mon profil > Documents administratifs.
+    const actionPieces: string[] = (action as any).piecesRequises || (action as any).pieces_requises || [];
+    const opensUploadPanel = Array.isArray(actionPieces) && actionPieces.length > 0;
+    const openAction = () => opensUploadPanel ? setShowDocCategory(`action_${action.id}`) : setShowActionDetail(action.id);
     return (
-    <div key={action.id} className={`iz-card iz-fade-up iz-stagger-${Math.min(staggerIdx, 8)}`} onClick={() => setShowActionDetail(action.id)} style={{ ...sCard, padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer", marginBottom: 12, opacity: isDone ? 0.6 : 1 }}>
+    <div key={action.id} className={`iz-card iz-fade-up iz-stagger-${Math.min(staggerIdx, 8)}`} onClick={openAction} style={{ ...sCard, padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, cursor: "pointer", marginBottom: 12, opacity: isDone ? 0.6 : 1 }}>
       <div className="iz-avatar" style={{ width: 40, height: 40, borderRadius: 10, background: isDone ? C.greenLight : action.iconBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
         {isDone ? <CheckCircle size={18} color={C.green} /> : (action.icon || <FileText size={18} color={action.iconColor} />)}
       </div>
@@ -501,7 +541,12 @@ export function createEmployeeRenders(ctx: any) {
       {action.urgent && !isDone && (() => {
         const tplMatch = ACTION_TEMPLATES.find((tp: any) => tp.titre === action.title);
         const isSignatureAction = tplMatch?.type === "signature" || tplMatch?.type === "lecture";
-        return <button className="iz-btn-pink" onClick={e => { e.stopPropagation(); if (isSignatureAction) { setShowActionDetail(action.id); } else { setShowDocPanel("admin"); } }} style={{ ...sBtn("dark"), padding: "8px 20px", fontSize: 13 }}>{isSignatureAction ? t('emp.sign_btn') || "Signer" : t('emp.complete_btn')}</button>;
+        return <button className="iz-btn-pink" onClick={e => {
+          e.stopPropagation();
+          if (isSignatureAction) setShowActionDetail(action.id);
+          else if (opensUploadPanel) setShowDocCategory(`action_${action.id}`);
+          else setShowDocPanel("admin");
+        }} style={{ ...sBtn("dark"), padding: "8px 20px", fontSize: 13 }}>{isSignatureAction ? t('emp.sign_btn') || "Signer" : t('emp.complete_btn')}</button>;
       })()}
       {showCheckbox && (
         <div onClick={e => { e.stopPropagation(); if (isDone) { handleReactivateAction(action.id, (action as any).assignment_id); } else { handleCompleteAction(action.id, (action as any).assignment_id); } }} style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${isDone ? C.green : C.border}`, background: isDone ? C.green : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all .2s", cursor: "pointer" }}>
@@ -523,9 +568,101 @@ export function createEmployeeRenders(ctx: any) {
       setBannerPos({ x, y });
     };
     const handleBannerUpload = handleBannerFileUpload;
+    // Pre-arrival detection — when dateDebut is in the future, show the
+    // "Compte à rebours" hero banner instead of the classic gradient one.
+    // Cache the variant in localStorage so the correct banner is rendered on the
+    // first paint after a refresh, before the API has returned the profile.
+    const _bannerCacheKey = `illizeo_banner_variant_${auth.user?.id || "anon"}`;
+    const _preArrivalDateDebut = myCollab?.dateDebut || (myCollab as any)?.date_debut;
+    const _parseArrivalForBanner = (s: string): Date | null => {
+      if (!s) return null;
+      const str = String(s).trim();
+      if (str.includes("T")) { const d = new Date(str); return isNaN(d.getTime()) ? null : d; }
+      let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (m) return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 9, 0, 0);
+      m = str.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+      if (m) return new Date(parseInt(m[3], 10), parseInt(m[2], 10) - 1, parseInt(m[1], 10), 9, 0, 0);
+      const d = new Date(str); return isNaN(d.getTime()) ? null : d;
+    };
+    const _bannerArrival = _preArrivalDateDebut ? _parseArrivalForBanner(_preArrivalDateDebut) : null;
+    const _bannerNow = new Date(ctx.nowTick || Date.now());
+    const _bannerProfileReady = !!myCollabProfile;
+    const _bannerComputedPreArrival = !!(_bannerArrival && _bannerArrival.getTime() > _bannerNow.getTime());
+    // Persist the variant once the profile is loaded so future renders skip the flash.
+    if (_bannerProfileReady) {
+      try { localStorage.setItem(_bannerCacheKey, _bannerComputedPreArrival ? "preArrival" : "classic"); } catch {}
+    }
+    const _bannerCachedVariant = (() => { try { return localStorage.getItem(_bannerCacheKey); } catch { return null; } })();
+    const _bannerInPreArrival = _bannerProfileReady ? _bannerComputedPreArrival : _bannerCachedVariant === "preArrival";
+    const _bannerDays = _bannerArrival ? Math.max(0, Math.floor((_bannerArrival.getTime() - _bannerNow.getTime()) / 86400000)) : 0;
+    const _bannerFirstName = auth.user?.name?.split(" ")[0] || "";
+    const _bannerPoste = (myCollab as any)?.poste || (myCollab as any)?.metier || "";
+    const _bannerArrivalLabel = _bannerArrival ? new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(_bannerArrival) : "";
+    const _bannerAccompagnants = (myCollab as any)?.accompagnants || [];
+    const _bannerBuddy = _bannerAccompagnants.find((a: any) => (a.role || '').toLowerCase().includes('buddy') || (a.role || '').toLowerCase().includes('parrain')) || _bannerAccompagnants[0];
+    const _bannerBuddyName = _bannerBuddy ? (_bannerBuddy.name || _bannerBuddy.nom || `${_bannerBuddy.prenom || ""} ${_bannerBuddy.nom || ""}`.trim()) : "";
+
     return (
     <div style={{ flex: 1 }}>
-      {/* Hero banner */}
+      {/* Hero banner — pre-arrival "Compte à rebours" variant when dateDebut is in the future, classic gradient otherwise */}
+      {_bannerInPreArrival ? (
+        <div className="iz-fade-in" style={{
+          background: `linear-gradient(110deg, ${C.pinkBg} 0%, ${C.white} 60%, ${C.pinkLight} 100%)`,
+          padding: "36px 40px", position: "relative", overflow: "hidden",
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 24, minHeight: 260,
+        }}>
+          <div style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 28, flex: 1, minWidth: 0 }}>
+            {/* Photo collab */}
+            <div onClick={() => setShowAvatarEditor(true)} title="Modifier la photo" style={{
+              width: 110, height: 110, borderRadius: "50%", flexShrink: 0,
+              background: avatarImage ? "none" : "linear-gradient(135deg, #E91E8C, #E41076)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 36, fontWeight: 600, color: "#fff",
+              border: `4px solid ${C.white}`, boxShadow: "0 6px 24px rgba(228,16,118,.18)",
+              cursor: "pointer", overflow: "hidden", position: "relative",
+            }}>
+              {avatarImage ? (
+                <img src={avatarImage} alt="" style={{
+                  width: `${avatarZoom}%`, height: `${avatarZoom}%`, objectFit: "cover", position: "relative",
+                  left: `${(50 - avatarPos.x) * (avatarZoom - 100) / 100}%`,
+                  top: `${(50 - avatarPos.y) * (avatarZoom - 100) / 100}%`,
+                }} />
+              ) : (auth.user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?")}
+            </div>
+            {/* Texte */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "5px 13px", borderRadius: 999, background: C.pinkLight, marginBottom: 14 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: C.pink }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: 1.2, textTransform: "uppercase" }}>Compte à rebours</span>
+              </div>
+              <h1 style={{ fontSize: 34, fontWeight: 700, color: "#1f2937", lineHeight: 1.15, margin: "0 0 10px", fontFamily: font }}>
+                On vous attend, {_bannerFirstName}.
+              </h1>
+              <div style={{ fontSize: 14, fontStyle: "italic", color: "#52525b", marginBottom: 4 }}>
+                {[_bannerPoste, _bannerArrivalLabel].filter(Boolean).join(" · ")}
+              </div>
+              {_bannerBuddyName && (
+                <div style={{ fontSize: 14, fontStyle: "italic", color: "#52525b", marginBottom: 18, maxWidth: 560 }}>
+                  {_bannerBuddyName} sera votre point de contact — il/elle a déjà préparé votre première semaine.
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button onClick={() => setDashPage("mes_actions" as any)} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, padding: "10px 20px", display: "flex", alignItems: "center", gap: 8, borderRadius: 999 }}>
+                  Voir mon programme <ArrowRight size={14} />
+                </button>
+                <button onClick={() => setDashPage("organigramme" as any)} style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 999, padding: "10px 20px", fontSize: 13, fontWeight: 600, color: C.text, cursor: "pointer", fontFamily: font }}>
+                  Présenter l'équipe
+                </button>
+              </div>
+            </div>
+          </div>
+          {/* Big J-X */}
+          <div style={{ position: "relative", zIndex: 1, flexShrink: 0, display: "flex", alignItems: "baseline", color: C.pink, fontFamily: '"Playfair Display", Georgia, "Times New Roman", serif', fontStyle: "italic", lineHeight: 1, paddingRight: 8 }}>
+            <span style={{ fontSize: 84, fontWeight: 500 }}>J–</span>
+            <span style={{ fontSize: 148, fontWeight: 600 }}>{_bannerDays}</span>
+          </div>
+        </div>
+      ) : (
       <div ref={bannerRef} className="iz-fade-in" onMouseMove={handleBannerMouseMove} onMouseUp={() => setBannerDragging(false)} onMouseLeave={() => setBannerDragging(false)} style={{ height: 180, background: bannerImage ? `url(${bannerImage})` : bannerGradient, backgroundSize: `${bannerZoom}%`, backgroundPosition: `${bannerPos.x}% ${bannerPos.y}%`, borderRadius: 0, display: "flex", alignItems: "flex-end", padding: "0 40px 24px", position: "relative", transition: bannerDragging ? "none" : "background .4s", cursor: bannerEditMode ? (bannerDragging ? "grabbing" : "grab") : "default", userSelect: "none" as const }}>
         {/* Gradient overlay when image is set */}
         {bannerImage && <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,.1) 0%, rgba(0,0,0,.45) 100%)" }} />}
@@ -572,6 +709,7 @@ export function createEmployeeRenders(ctx: any) {
         {/* Customization panel — rendered at root level for proper z-index */}
         {false && employeeBannerCustom && null}
       </div>
+      )}
 
       {/* ── Pre-arrival hero section (J-X countdown) ── */}
       {(() => {
@@ -616,9 +754,6 @@ export function createEmployeeRenders(ctx: any) {
                 <div style={{ fontSize: 22, fontWeight: 700, color: C.pink, fontFamily: font }}>Bienvenue {firstName} !</div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <button onClick={() => setDashPage("assistant_ia")} title="Ouvrir l'assistant IA pour poser une question" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 13, color: C.textLight, fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  <HelpCircle size={14} /> Aide
-                </button>
                 <button onClick={async () => {
                   try {
                     const { apiFetch } = await import('../api/client');
@@ -653,7 +788,7 @@ export function createEmployeeRenders(ctx: any) {
                 <h1 style={{ fontSize: 40, fontWeight: 700, color: C.pink, lineHeight: 1.1, marginBottom: 20, fontFamily: font }}>
                   Préparez votre arrivée<br />en toute sérénité.
                 </h1>
-                <p style={{ fontSize: 14, color: C.text, lineHeight: 1.6, marginBottom: 24, maxWidth: 520 }}>
+                <p style={{ fontSize: 14, color: "#1f2937", lineHeight: 1.6, marginBottom: 24, maxWidth: 520 }}>
                   {firstName}, voici tout ce qu'il faut savoir avant le grand jour. Quelques formalités à compléter, l'équipe à rencontrer, et le programme de votre première semaine.
                 </p>
                 <div style={{ display: "flex", gap: 12, marginBottom: 32, flexWrap: "wrap" }}>
@@ -712,11 +847,11 @@ export function createEmployeeRenders(ctx: any) {
                 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: 1, marginBottom: 8, textTransform: "uppercase" }}>VOUS ÊTES SUR LES RAILS</div>
-                    <h2 style={{ fontSize: 24, fontWeight: 700, color: C.text, marginBottom: 6, fontFamily: font }}>
+                    <h2 style={{ fontSize: 24, fontWeight: 700, color: "#1f2937", marginBottom: 6, fontFamily: font }}>
                       Vous avez complété {employeeProgression}% de votre intégration
                     </h2>
-                    <p style={{ fontSize: 13, color: C.textLight, marginBottom: 16 }}>
-                      {completedActionsCount} étape{completedActionsCount > 1 ? 's' : ''} validée{completedActionsCount > 1 ? 's' : ''} · {totalActions - completedActionsCount} action{(totalActions - completedActionsCount) > 1 ? 's' : ''} restante{(totalActions - completedActionsCount) > 1 ? 's' : ''}
+                    <p style={{ fontSize: 13, color: "#52525b", marginBottom: 16 }}>
+                      {(() => { const remaining = Math.max(0, totalActions - completedActionsCount); return `${completedActionsCount} étape${completedActionsCount > 1 ? 's' : ''} validée${completedActionsCount > 1 ? 's' : ''} · ${remaining} action${remaining > 1 ? 's' : ''} restante${remaining > 1 ? 's' : ''}`; })()}
                     </p>
                     <div style={{ display: "flex", gap: 10 }}>
                       <button onClick={() => setDashPage("mes_actions" as any)} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, padding: "10px 20px" }}>
@@ -1405,16 +1540,25 @@ export function createEmployeeRenders(ctx: any) {
                     <div style={{ fontSize: 14, fontWeight: 500, color: C.text }}>{m.name}</div>
                     <div style={{ fontSize: 12, color: C.textLight }}>{m.role}</div>
                   </div>
-                  <MessageCircle size={16} color={C.textLight} style={{ cursor: "pointer" }} onClick={async () => {
-                    const user = msgUsers.find(u => u.name === m.name);
-                    if (user) {
-                      const existing = msgConversations.find(c => c.other_user?.id === user.id);
-                      if (existing) { setMsgActiveConvId(existing.id); }
-                      else { try { const msg = await apiSendMessage(user.id, "👋"); await getConversations().then(setMsgConversations); setMsgActiveConvId(msg.conversation_id); } catch {} }
-                    }
-                    setDashPage("messagerie");
-                  }} />
-                  <ChevronRight size={16} color={C.textLight} style={{ cursor: "pointer" }} />
+                  <button
+                    title={`Envoyer un message à ${m.name}`}
+                    onClick={async () => {
+                      const user = msgUsers.find(u => u.name === m.name) || msgUsers.find(u => u.email && m.email && u.email === m.email);
+                      if (user) {
+                        const existing = msgConversations.find(c => c.other_user?.id === user.id);
+                        if (existing) { setMsgActiveConvId(existing.id); }
+                        else {
+                          try { const msg = await apiSendMessage(user.id, "👋"); await getConversations().then(setMsgConversations); setMsgActiveConvId(msg.conversation_id); } catch {}
+                        }
+                      }
+                      setDashPage("messagerie");
+                    }}
+                    style={{ background: "none", border: "none", padding: 6, cursor: "pointer", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = C.bg; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                  >
+                    <MessageCircle size={16} color={C.pink} />
+                  </button>
                 </div>
               ));
             })()}
@@ -1755,78 +1899,130 @@ export function createEmployeeRenders(ctx: any) {
   };
 
   // ─── ENTREPRISE ──────────────────────────────────────────
-  const renderCompanyBlock = (block: any) => {
+  const renderCompanyBlock = (block: any, idx?: number) => {
     const iconMap: Record<string, React.FC<any>> = { building: Building2, sparkles: Sparkles, heart: Gift, rocket: Zap, users: Users, shield: ShieldCheck, star: Star, target: Target };
     const tr = (field: string) => {
       const val = block.translations?.[field]?.[lang];
       return val || (block as any)[field] || "";
     };
+    const sectionPad = "80px 64px";
+    const numLabel = idx !== undefined && idx > 0 ? String(idx).padStart(2, "0") : null;
+    const eyebrowText = (defaultLabel: string) => {
+      const custom = block.data?.eyebrow as string | undefined;
+      const label = (custom || defaultLabel || "").toUpperCase();
+      return numLabel ? `${numLabel} — ${label}` : label;
+    };
     switch (block.type) {
-      case 'hero':
+      case 'hero': {
+        // Hero title supports the {prenom} placeholder. If the admin doesn't set a
+        // titre, we fall back to "Bienvenue, {prenom}.". The first name is rendered
+        // in pink while the rest of the title uses a darker rose for visual rhythm.
+        const heroFirstName = auth.user?.name?.split(" ")[0] || "";
+        const heroTitleRaw = (tr('titre') || `Bienvenue, {prenom}.`).replace(/\{prenom\}/gi, heroFirstName);
         return (
-          <div key={block.id} style={{ background: `linear-gradient(135deg, #1a1a2e 0%, #2D1B3D 50%, ${C.pink} 100%)`, borderRadius: 16, padding: "48px 40px", color: "#fff", marginBottom: 24 }}>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,.6)", marginBottom: 8 }}>{block.data?.subtitle || ""}</div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 12px", color: "#fff" }}>{tr('titre')}</h1>
-            <p style={{ fontSize: 15, lineHeight: 1.6, opacity: .85, maxWidth: 600, margin: 0, color: "#fff" }}>{tr('contenu')}</p>
-          </div>
+          <section key={block.id} style={{ padding: sectionPad, borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
+              <span style={{ width: 32, height: 1, background: C.pink }} />
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, color: C.pink, textTransform: "uppercase" }}>{(block.data?.subtitle as string) || "Votre aventure commence ici"}</span>
+            </div>
+            <h1 style={{ fontSize: 72, fontWeight: 800, lineHeight: 1.05, margin: "0 0 24px", fontFamily: fontDisplay, letterSpacing: -2, color: C.pink }}>
+              {heroTitleRaw}
+            </h1>
+            {tr('contenu') && (
+              <p style={{ fontSize: 17, lineHeight: 1.6, color: C.textLight, margin: 0, maxWidth: 720 }}>{tr('contenu')}</p>
+            )}
+          </section>
         );
+      }
       case 'text':
-        const TIcon = iconMap[block.data?.icon] || Building2;
         return (
-          <div key={block.id} className="iz-card" style={{ ...sCard, marginBottom: 16, display: "flex", gap: 16, alignItems: "flex-start" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><TIcon size={22} color={C.pink} /></div>
-            <div><h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 8px" }}>{tr('titre')}</h3><p style={{ fontSize: 13, lineHeight: 1.7, color: C.textLight, margin: 0 }}>{tr('contenu')}</p></div>
-          </div>
+          <section key={block.id} style={{ padding: sectionPad, borderBottom: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "start" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 2, marginBottom: 18, textTransform: "uppercase" }}>{eyebrowText("À propos de nous")}</div>
+              <h2 style={{ fontSize: 26, fontWeight: 700, color: C.text, lineHeight: 1.3, margin: 0, fontFamily: font }}>{tr('titre')}</h2>
+            </div>
+            <div style={{ fontSize: 15, lineHeight: 1.75, color: C.text }}>{tr('contenu')}</div>
+          </section>
         );
       case 'mission':
         return (
-          <div key={block.id} style={{ background: "#1a1a2e", borderRadius: 16, padding: "32px 36px", color: "#fff", marginBottom: 16, position: "relative", overflow: "hidden", border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 48, fontWeight: 800, color: "rgba(255,255,255,.08)", position: "absolute", top: 12, left: 20 }}>{block.data?.number || "01"}</div>
-            <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px", position: "relative", color: "#fff" }}>{tr('titre')}</h3>
-            <p style={{ fontSize: 14, lineHeight: 1.6, opacity: .8, margin: 0, position: "relative", color: "#fff" }}>{tr('contenu')}</p>
-          </div>
+          <section key={block.id} style={{ padding: sectionPad, borderBottom: `1px solid ${C.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "start" }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 2, marginBottom: 18, textTransform: "uppercase" }}>{eyebrowText(block.data?.number ? `Section ${block.data.number}` : "Notre mission")}</div>
+              <h2 style={{ fontSize: 30, fontWeight: 700, color: C.text, lineHeight: 1.25, margin: 0, fontFamily: font }}>{tr('titre')}</h2>
+            </div>
+            <div>
+              {tr('contenu') && (
+                <p style={{ fontSize: 15, lineHeight: 1.7, color: C.text, margin: "0 0 24px" }}>{tr('contenu')}</p>
+              )}
+              {block.data?.highlight_title && (
+                <div style={{ borderLeft: `3px solid ${C.pink}`, padding: "12px 18px", background: C.pinkBg + "80", borderRadius: "0 8px 8px 0" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.pink, marginBottom: 6 }}>{block.data.highlight_title}</div>
+                  <div style={{ fontSize: 13, lineHeight: 1.6, color: C.text }}>{block.data.highlight_text || ""}</div>
+                </div>
+              )}
+            </div>
+          </section>
         );
       case 'stats':
         return (
-          <div key={block.id} style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{tr('titre')}</h3>
-            <p style={{ fontSize: 12, color: C.textLight, margin: "0 0 12px" }}>{tr('contenu')}</p>
-            {block.data?.badge && <div style={{ display: "inline-block", padding: "6px 14px", borderRadius: 8, background: C.greenLight, color: C.green, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>{block.data.badge}</div>}
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${(block.data?.items || []).length}, 1fr)`, gap: 12 }}>
+          <section key={block.id} style={{ padding: sectionPad, borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, marginBottom: 36, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 2, marginBottom: 18, textTransform: "uppercase" }}>{eyebrowText("Un groupe formidable où travailler")}</div>
+                <h2 style={{ fontSize: 30, fontWeight: 700, color: C.text, lineHeight: 1.25, margin: 0, fontFamily: font }}>{tr('titre') || "Nous sommes une formidable équipe"}</h2>
+              </div>
+              {block.data?.badge && (
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 999, background: C.greenLight, color: C.green, fontSize: 12, fontWeight: 600 }}>
+                  <Check size={14} /> {block.data.badge}
+                </div>
+              )}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, (block.data?.items || []).length)}, 1fr)`, gap: 0, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
               {(block.data?.items || []).map((s: any, i: number) => (
-                <div key={i} className="iz-card" style={{ ...sCard, textAlign: "center" }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: C.pink }}>{s.value}</div>
-                  <div style={{ fontSize: 12, color: C.textLight, marginTop: 4, lineHeight: 1.4 }}>{s.label}</div>
+                <div key={i} style={{ padding: "44px 36px", borderRight: i < (block.data?.items || []).length - 1 ? `1px solid ${C.border}` : "none" }}>
+                  <div style={{ fontSize: 88, fontWeight: 600, color: C.pink, lineHeight: 1, fontFamily: '"Playfair Display", Georgia, serif', fontStyle: "italic", letterSpacing: -2, marginBottom: 24 }}>{s.value}</div>
+                  <div style={{ fontSize: 13, color: C.textLight, lineHeight: 1.55 }}>{s.label}</div>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         );
       case 'values':
         return (
-          <div key={block.id} style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 16px" }}>{tr('titre')}</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+          <section key={block.id} style={{ padding: sectionPad, borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ marginBottom: 36 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 2, marginBottom: 18, textTransform: "uppercase" }}>{eyebrowText("Nos valeurs")}</div>
+              <h2 style={{ fontSize: 30, fontWeight: 700, color: C.text, lineHeight: 1.25, margin: 0, fontFamily: font }}>{tr('titre') || "Ce qui nous anime"}</h2>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(4, Math.max(1, (block.data?.items || []).length))}, 1fr)`, gap: 32 }}>
               {(block.data?.items || []).map((v: any, i: number) => {
                 const VIcon = iconMap[v.icon] || Star;
                 return (
-                  <div key={i} className="iz-card" style={{ ...sCard, display: "flex", gap: 14, alignItems: "flex-start" }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><VIcon size={20} color={C.pink} /></div>
-                    <div><div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{v.title}</div><div style={{ fontSize: 12, color: C.textLight, lineHeight: 1.5 }}>{v.desc}</div></div>
+                  <div key={i} style={{ paddingTop: 24, borderTop: `2px solid ${C.pink}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: .5 }}>{String(i + 1).padStart(2, "0")}</span>
+                      <VIcon size={14} color={C.pink} />
+                    </div>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 8, fontFamily: font }}>{v.title}</div>
+                    <div style={{ fontSize: 13, color: C.textLight, lineHeight: 1.55 }}>{v.desc}</div>
                   </div>
                 );
               })}
             </div>
-          </div>
+          </section>
         );
       case 'video':
         return (
-          <div key={block.id} style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 12px" }}>{tr('titre')}</h3>
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min((block.data?.videos || []).length, 2)}, 1fr)`, gap: 16 }}>
+          <section key={block.id} style={{ padding: sectionPad, borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ marginBottom: 36 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 2, marginBottom: 18, textTransform: "uppercase" }}>{eyebrowText("Découvrir Illizeo en vidéo")}</div>
+              <h2 style={{ fontSize: 30, fontWeight: 700, color: C.text, lineHeight: 1.25, margin: 0, fontFamily: font }}>{tr('titre') || "Voir Illizeo en action"}</h2>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(2, Math.max(1, (block.data?.videos || []).length))}, 1fr)`, gap: 24 }}>
               {(block.data?.videos || []).map((v: any, i: number) => (
-                <div key={i} className="iz-card" style={{ ...sCard, overflow: "hidden", padding: 0 }}>
-                  <div style={{ width: "100%", aspectRatio: "16/9", background: C.dark }}>
+                <div key={i}>
+                  <div style={{ width: "100%", aspectRatio: "16/9", borderRadius: 12, overflow: "hidden", background: C.dark }}>
                     {v.youtube_id ? (
                       <iframe src={`https://www.youtube.com/embed/${v.youtube_id}`} title={v.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ width: "100%", height: "100%", border: "none" }} />
                     ) : (
@@ -1835,28 +2031,31 @@ export function createEmployeeRenders(ctx: any) {
                       </div>
                     )}
                   </div>
-                  <div style={{ padding: "12px 16px", fontSize: 14, fontWeight: 500 }}>{v.title}</div>
+                  <div style={{ padding: "12px 0 0", fontSize: 13, color: C.textLight }}>{v.title}</div>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         );
       case 'team':
         return (
-          <div key={block.id} style={{ marginBottom: 24 }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 16px" }}>{tr('titre')}</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          <section key={block.id} style={{ padding: sectionPad, borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ marginBottom: 36 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 2, marginBottom: 18, textTransform: "uppercase" }}>{eyebrowText("L'équipe qui vous accompagne")}</div>
+              <h2 style={{ fontSize: 30, fontWeight: 700, color: C.text, lineHeight: 1.25, margin: 0, fontFamily: font }}>{tr('titre') || "Vos contacts"}</h2>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(4, Math.max(1, (block.data?.members || []).length))}, 1fr)`, gap: 18 }}>
               {(block.data?.members || []).map((m: any, i: number) => (
-                <div key={i} className="iz-card" style={{ ...sCard, textAlign: "center" }}>
-                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: m.color || C.pink, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 600, color: C.white, margin: "0 auto 10px" }}>{m.initials}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{m.name}</div>
-                  <div style={{ fontSize: 11, color: C.textLight, marginBottom: 6 }}>{m.role}</div>
-                  {m.email && <div style={{ fontSize: 11, color: C.blue, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}><Mail size={11} />{m.email}</div>}
-                  {m.phone && <div style={{ fontSize: 11, color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 2 }}><MapPin size={11} />{m.phone}</div>}
+                <div key={i} style={{ padding: "22px 22px 24px", border: `1px solid ${C.border}`, borderRadius: 12, background: C.white }}>
+                  <div style={{ width: 44, height: 44, borderRadius: "50%", background: m.color || C.pink, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: C.white, marginBottom: 18 }}>{m.initials}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 2, fontFamily: font }}>{m.name}</div>
+                  <div style={{ fontSize: 12, color: C.textLight, marginBottom: 14 }}>{m.role}</div>
+                  {m.email && <div style={{ fontSize: 12, color: C.textLight, display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}><Mail size={12} color={C.textMuted} />{m.email}</div>}
+                  {m.phone && <div style={{ fontSize: 12, color: C.textLight, display: "flex", alignItems: "center", gap: 6 }}><Phone size={12} color={C.textMuted} />{m.phone}</div>}
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         );
       case 'culture_quiz': {
         const questions = block.data?.questions || [];
@@ -1899,16 +2098,27 @@ export function createEmployeeRenders(ctx: any) {
     }
   };
 
-  const renderEntreprise = () => (
-    <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
-      {companyBlocks.filter(b => b.actif).length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>
-          <Building2 size={48} color={C.border} style={{ marginBottom: 12 }} />
-          <p>Page entreprise non configurée</p>
-        </div>
-      ) : companyBlocks.filter(b => b.actif).map(renderCompanyBlock)}
-    </div>
-  );
+  const renderEntreprise = () => {
+    const active = companyBlocks.filter(b => b.actif);
+    // Editorial section numbering — hero blocks (intro) don't get a number,
+    // every other section gets 01, 02, 03… in order.
+    let n = 0;
+    return (
+      <div style={{ flex: 1, overflow: "auto", background: C.white }}>
+        {active.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 60, color: C.textMuted }}>
+            <Building2 size={48} color={C.border} style={{ marginBottom: 12 }} />
+            <p>Page entreprise non configurée</p>
+          </div>
+        ) : (
+          active.map(b => {
+            const idx = b.type === "hero" ? 0 : ++n;
+            return renderCompanyBlock(b, idx);
+          })
+        )}
+      </div>
+    );
+  };
 
   const _oldRenderEntreprise = () => (
     <div style={{ flex: 1, padding: "32px 40px" }}>
@@ -2055,17 +2265,28 @@ export function createEmployeeRenders(ctx: any) {
   );
 
   // ─── WELCOME MODAL ───────────────────────────────────────
-  const renderWelcomeModal = () => (
+  const renderWelcomeModal = () => {
+    const welcomeFirstName = auth.user?.name?.split(" ")[0] || "";
+    const welcomeInitials = auth.user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?";
+    return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
       <div style={{ background: C.white, borderRadius: 20, width: 700, padding: "48px 40px", textAlign: "center", position: "relative" }}>
         <button onClick={() => setShowWelcomeModal(false)} style={{ position: "absolute", top: 20, right: 20, background: "none", border: "none", cursor: "pointer" }}><X size={24} color={C.textLight} /></button>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: -8, marginBottom: 24 }}>
-          <div style={{ width: 80, height: 80, borderRadius: "50%", background: "linear-gradient(135deg, #E91E8C, #E41076)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 600, color: C.white, border: `3px solid ${C.white}`, zIndex: 1 }}>NF</div>
+          <div style={{ width: 80, height: 80, borderRadius: "50%", background: avatarImage ? "none" : "linear-gradient(135deg, #E91E8C, #E41076)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 600, color: C.white, border: `3px solid ${C.white}`, zIndex: 1, overflow: "hidden", position: "relative" }}>
+            {avatarImage ? (
+              <img src={avatarImage} alt="" style={{
+                width: `${avatarZoom || 100}%`, height: `${avatarZoom || 100}%`, objectFit: "cover", position: "relative",
+                left: `${(50 - (avatarPos?.x || 50)) * ((avatarZoom || 100) - 100) / 100}%`,
+                top: `${(50 - (avatarPos?.y || 50)) * ((avatarZoom || 100) - 100) / 100}%`,
+              }} />
+            ) : welcomeInitials}
+          </div>
           <div style={{ width: 60, height: 60, borderRadius: "50%", background: C.white, display: "flex", alignItems: "center", justifyContent: "center", marginLeft: -16, border: `2px solid ${C.border}` }}>
             <span style={{ fontSize: 12, fontWeight: 800, color: C.pink, letterSpacing: 1 }}>illizeo</span>
           </div>
         </div>
-        <h2 style={{ fontSize: 24, fontWeight: 600, color: C.text, margin: "0 0 12px" }}>Bienvenue chez Illizeo Nadia</h2>
+        <h2 style={{ fontSize: 24, fontWeight: 600, color: C.pink, margin: "0 0 12px" }}>Bienvenue chez Illizeo {welcomeFirstName}</h2>
         <p style={{ fontSize: 14, color: C.textLight, lineHeight: 1.6, margin: "0 0 32px", maxWidth: 500, marginInline: "auto" }}>
           Pour faciliter votre arrivée, nous avons conçu un parcours d'intégration rien que pour vous. Ce parcours est organisé autour de 4 phases distinctes que voici
         </p>
@@ -2090,7 +2311,8 @@ export function createEmployeeRenders(ctx: any) {
         <button onClick={() => setShowWelcomeModal(false)} style={{ ...sBtn("dark"), padding: "12px 36px", fontSize: 15 }}>Commencer mon parcours</button>
       </div>
     </div>
-  );
+    );
+  };
 
   // ─── DOCUMENT PANEL ──────────────────────────────────────
   const renderDocPanel = () => {
@@ -2468,49 +2690,65 @@ export function createEmployeeRenders(ctx: any) {
               </div>
             );
           })()}
-          {/* Individual pieces upload */}
+          {/* Individual pieces upload — rich dropzone per piece */}
           {tpl && tpl.piecesRequises && tpl.piecesRequises.length > 0 && !isDone && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span>Pièces à fournir ({tpl.piecesRequises.filter(p => uploadedPieces[`${tpl.id}-${p}`]).length}/{tpl.piecesRequises.length})</span>
-                <span style={{ fontSize: 11, color: C.textMuted }}>Cliquer pour charger</span>
+                <span style={{ fontSize: 11, color: C.textMuted }}>Glissez ou cliquez</span>
               </div>
               {tpl.piecesRequises.map((piece, pi) => {
                 const key = `${tpl.id}-${piece}`;
                 const status = uploadedPieces[key];
+                const handleFile = async (file: File) => {
+                  if (!myCollab?.id) { addToast("Profil collaborateur introuvable", "error"); return; }
+                  setUploadedPieces(prev => ({ ...prev, [key]: "uploaded" }));
+                  try {
+                    await uploadDocument(file, myCollab.id, action.title, piece);
+                    addToast(`"${piece}" envoyé`, "success");
+                  } catch (err: any) {
+                    setUploadedPieces(prev => { const s = { ...prev }; delete s[key]; return s; });
+                    addToast(`Échec de l'envoi : ${err?.message || "erreur inconnue"}`, "error");
+                  }
+                };
                 return (
-                  <div key={pi} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", marginBottom: 6, borderRadius: 8, border: `1px solid ${status === "validated" ? C.green : status === "refused" ? C.red : status === "uploaded" ? C.amber : C.border}`, background: status === "validated" ? C.greenLight : status === "refused" ? C.redLight : status === "uploaded" ? C.amberLight : C.white }}>
-                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: status === "validated" ? C.green : status === "refused" ? C.red : status === "uploaded" ? C.amber : C.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      {status === "validated" && <CheckCircle size={14} color={C.white} />}
-                      {status === "refused" && <XCircle size={14} color={C.white} />}
-                      {status === "uploaded" && <Clock size={14} color={C.white} />}
-                      {!status && <Upload size={14} color={C.textMuted} />}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{piece}</div>
-                      <div style={{ fontSize: 11, color: status === "validated" ? C.green : status === "refused" ? C.red : status === "uploaded" ? C.amber : C.textMuted }}>
-                        {status === "validated" ? "Validé par RH" : status === "refused" ? "Refusé — à renvoyer" : status === "uploaded" ? "En attente de validation" : "À charger"}
+                  <div key={pi} style={{ marginBottom: 14 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 6 }}>{piece}</div>
+                    {status === "validated" ? (
+                      <div className="iz-fade-in" style={{ padding: "14px 16px", background: C.greenLight, borderRadius: 12, display: "flex", alignItems: "center", gap: 10 }}>
+                        <CheckCircle size={18} color={C.green} />
+                        <div style={{ fontSize: 13, fontWeight: 500, color: C.green }}>Validé par RH</div>
                       </div>
-                    </div>
-                    {(!status || status === "refused") && (
-                      <label className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "5px 14px", fontSize: 11, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4, background: status === "refused" ? C.red : undefined }}>
+                    ) : status === "uploaded" ? (
+                      <div className="iz-fade-in" style={{ padding: "14px 16px", background: C.amberLight, borderRadius: 12, display: "flex", alignItems: "center", gap: 10 }}>
+                        <Clock size={18} color={C.amber} />
+                        <div style={{ fontSize: 13, fontWeight: 500, color: C.amber }}>En attente de validation</div>
+                      </div>
+                    ) : (
+                      <label
+                        className="iz-upload-zone"
+                        style={{ display: "block", borderRadius: 12, padding: "24px 20px", textAlign: "center", cursor: "pointer", border: `2px dashed ${status === "refused" ? C.red : C.border}`, background: status === "refused" ? C.redLight : "transparent", transition: "border-color .15s, background .15s" }}
+                        onDragOver={e => { e.preventDefault(); (e.currentTarget as HTMLElement).style.borderColor = C.pink; (e.currentTarget as HTMLElement).style.background = C.pinkBg; }}
+                        onDragLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = status === "refused" ? C.red : C.border; (e.currentTarget as HTMLElement).style.background = status === "refused" ? C.redLight : "transparent"; }}
+                        onDrop={async e => {
+                          e.preventDefault();
+                          (e.currentTarget as HTMLElement).style.borderColor = status === "refused" ? C.red : C.border;
+                          (e.currentTarget as HTMLElement).style.background = status === "refused" ? C.redLight : "transparent";
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) await handleFile(file);
+                        }}
+                      >
                         <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.csv" style={{ display: "none" }} onChange={async e => {
                           const file = e.target.files?.[0]; if (!file) return;
-                          if (!myCollab?.id) { addToast("Profil collaborateur introuvable", "error"); return; }
-                          setUploadedPieces(prev => ({ ...prev, [key]: "uploaded" }));
-                          try {
-                            await uploadDocument(file, myCollab.id, action.title, piece);
-                            addToast(`"${piece}" envoyé`, "success");
-                          } catch (err: any) {
-                            setUploadedPieces(prev => { const s = { ...prev }; delete s[key]; return s; });
-                            addToast(`Échec de l'envoi : ${err?.message || "erreur inconnue"}`, "error");
-                          } finally { e.target.value = ""; }
+                          await handleFile(file);
+                          e.target.value = "";
                         }} />
-                        {status === "refused" ? "Renvoyer" : "Charger"}
+                        <Upload size={22} color={status === "refused" ? C.red : C.textLight} style={{ marginBottom: 6 }} />
+                        <div style={{ fontSize: 13, color: C.text }}>Glisser-déposer ou <span style={{ color: status === "refused" ? C.red : C.pink, fontWeight: 600, textDecoration: "underline" }}>{status === "refused" ? "Renvoyer" : "Importer"}</span> un fichier</div>
+                        <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Image (png, jpeg…), PDF, Office (word, excel, txt, csv…)</div>
+                        {status === "refused" && <div style={{ fontSize: 11, color: C.red, fontWeight: 600, marginTop: 6 }}>Document refusé — merci de le renvoyer</div>}
                       </label>
                     )}
-                    {status === "uploaded" && <span style={{ fontSize: 10, color: C.amber, fontWeight: 600 }}>En attente</span>}
-                    {status === "validated" && <CheckCircle size={16} color={C.green} />}
                   </div>
                 );
               })}
@@ -3464,15 +3702,24 @@ export function createEmployeeRenders(ctx: any) {
                     </div>
                   );
                 }) : (
-                  <div style={{ textAlign: "center", padding: "48px 24px" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowDocPanel("admin")}
+                    style={{ display: "block", width: "100%", textAlign: "center", padding: "48px 24px", background: "transparent", border: `1px dashed ${C.border}`, borderRadius: 12, cursor: "pointer", fontFamily: font, transition: "background .15s, border-color .15s" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = C.pinkBg + "55"; (e.currentTarget as HTMLElement).style.borderColor = C.pink; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.borderColor = C.border; }}
+                  >
                     <div style={{ width: 64, height: 64, borderRadius: "50%", background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                       <FolderOpen size={28} color={C.pink} />
                     </div>
                     <h3 style={{ fontSize: 16, fontWeight: 600, color: C.text, margin: "0 0 8px" }}>Documents administratifs</h3>
-                    <p style={{ fontSize: 13, color: C.textLight, margin: 0, maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>
-                      Vos documents administratifs seront disponibles ici quand votre dossier RH sera configuré.
+                    <p style={{ fontSize: 13, color: C.textLight, margin: "0 0 12px", maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>
+                      Cliquez pour ouvrir le panneau et envoyer vos pièces administratives.
                     </p>
-                  </div>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 8, background: C.pink, color: C.white, fontSize: 12, fontWeight: 600 }}>
+                      <Upload size={14} /> Compléter mon dossier
+                    </span>
+                  </button>
                 )}
               </div>
 
@@ -3480,7 +3727,8 @@ export function createEmployeeRenders(ctx: any) {
               {(() => {
                 const formActions = actions.filter((a: any) => {
                   const tp = (a.type || "").toLowerCase();
-                  return tp === "formulaire" || tp === "form" || tp.includes("formulaire") || tp.includes("form");
+                  // Strict match — "form" substring would falsely capture "formation", "formateur", etc.
+                  return tp === "formulaire" || tp === "form";
                 });
                 if (formActions.length === 0) return null;
                 return (
@@ -3527,70 +3775,89 @@ export function createEmployeeRenders(ctx: any) {
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 0", color: C.green, fontSize: 13 }}>
                                   <CheckCircle size={16} /> Ce formulaire a été complété avec succès.
                                 </div>
-                              ) : (
-                                <div>
-                                  <div style={{ display: "grid", gap: 14, marginBottom: 16 }}>
-                                    {/* Text field: Nom complet */}
-                                    <div>
-                                      <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: "block", marginBottom: 4 }}>Nom complet</label>
-                                      <input
-                                        type="text"
-                                        placeholder="Votre nom complet"
-                                        value={formFieldValues[`${fa.id}_nom`] || ""}
-                                        onChange={(e) => setFormFieldValues((prev: any) => ({ ...prev, [`${fa.id}_nom`]: e.target.value }))}
-                                        style={{ ...sInput, width: "100%", boxSizing: "border-box" as const }}
-                                      />
+                              ) : (() => {
+                                // Read dynamic fields configured by admin from action.options.champs
+                                const opts = (fa as any).options || {};
+                                const champs: Array<{ label: string; type: string; options?: string[]; required?: boolean }> = Array.isArray(opts.champs) ? opts.champs.filter((c: any) => c && c.label) : [];
+                                if (champs.length === 0) {
+                                  return (
+                                    <div style={{ padding: "16px 0", fontSize: 13, color: C.textMuted, textAlign: "center", fontStyle: "italic" }}>
+                                      Aucun champ n'a été configuré pour ce formulaire. Contactez votre RH.
                                     </div>
-                                    {/* Date field */}
-                                    <div>
-                                      <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: "block", marginBottom: 4 }}>Date</label>
-                                      <input
-                                        type="date"
-                                        value={formFieldValues[`${fa.id}_date`] || ""}
-                                        onChange={(e) => setFormFieldValues((prev: any) => ({ ...prev, [`${fa.id}_date`]: e.target.value }))}
-                                        style={{ ...sInput, width: "100%", boxSizing: "border-box" as const }}
-                                      />
-                                    </div>
-                                    {/* Commentaire / notes */}
-                                    <div>
-                                      <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: "block", marginBottom: 4 }}>Commentaire</label>
-                                      <textarea
-                                        placeholder="Informations supplémentaires..."
-                                        rows={3}
-                                        value={formFieldValues[`${fa.id}_comment`] || ""}
-                                        onChange={(e) => setFormFieldValues((prev: any) => ({ ...prev, [`${fa.id}_comment`]: e.target.value }))}
-                                        style={{ ...sInput, width: "100%", boxSizing: "border-box" as const, resize: "vertical" as const, fontFamily: font }}
-                                      />
-                                    </div>
-                                    {/* File upload */}
-                                    <div>
-                                      <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: "block", marginBottom: 4 }}>Pièce jointe</label>
-                                      <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: C.pinkBg, color: C.pink, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
-                                        <Upload size={14} />
-                                        {formFieldValues[`${fa.id}_file_name`] ? formFieldValues[`${fa.id}_file_name`] : "Choisir un fichier"}
-                                        <input type="file" style={{ display: "none" }} onChange={(e) => {
-                                          const file = e.target.files?.[0];
-                                          if (file) {
-                                            setFormFieldValues((prev: any) => ({ ...prev, [`${fa.id}_file`]: file, [`${fa.id}_file_name`]: file.name }));
+                                  );
+                                }
+                                return (
+                                  <div>
+                                    <div style={{ display: "grid", gap: 14, marginBottom: 16 }}>
+                                      {champs.map((ch, ci) => {
+                                        const key = `${fa.id}_field_${ci}`;
+                                        const val = formFieldValues[key] ?? "";
+                                        const setVal = (v: any) => setFormFieldValues((prev: any) => ({ ...prev, [key]: v }));
+                                        const labelEl = (
+                                          <label style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, display: "block", marginBottom: 4 }}>
+                                            {ch.label}{ch.required && <span style={{ color: C.red, marginLeft: 4 }}>*</span>}
+                                          </label>
+                                        );
+                                        const baseStyle = { ...sInput, width: "100%", boxSizing: "border-box" as const };
+                                        switch (ch.type) {
+                                          case "textarea":
+                                            return (
+                                              <div key={ci}>{labelEl}
+                                                <textarea rows={3} value={val} onChange={e => setVal(e.target.value)} style={{ ...baseStyle, resize: "vertical" as const, fontFamily: font }} />
+                                              </div>
+                                            );
+                                          case "nombre":
+                                            return (<div key={ci}>{labelEl}<input type="number" value={val} onChange={e => setVal(e.target.value)} style={baseStyle} /></div>);
+                                          case "date":
+                                            return (<div key={ci}>{labelEl}<input type="date" value={val} onChange={e => setVal(e.target.value)} style={baseStyle} /></div>);
+                                          case "email":
+                                            return (<div key={ci}>{labelEl}<input type="email" value={val} onChange={e => setVal(e.target.value)} style={baseStyle} /></div>);
+                                          case "choix": {
+                                            const choices = Array.isArray(ch.options) && ch.options.length > 0 ? ch.options : [];
+                                            return (
+                                              <div key={ci}>{labelEl}
+                                                <select value={val} onChange={e => setVal(e.target.value)} style={{ ...baseStyle, cursor: "pointer" }}>
+                                                  <option value="">— Sélectionner —</option>
+                                                  {choices.map((o: string, oi: number) => <option key={oi} value={o}>{o}</option>)}
+                                                </select>
+                                              </div>
+                                            );
                                           }
-                                        }} />
-                                      </label>
+                                          case "fichier":
+                                          case "file":
+                                            return (
+                                              <div key={ci}>{labelEl}
+                                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: C.pinkBg, color: C.pink, fontSize: 12, fontWeight: 500, cursor: "pointer" }}>
+                                                  <Upload size={14} />
+                                                  {formFieldValues[`${key}_name`] || "Choisir un fichier"}
+                                                  <input type="file" style={{ display: "none" }} onChange={e => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) setFormFieldValues((prev: any) => ({ ...prev, [key]: file, [`${key}_name`]: file.name }));
+                                                  }} />
+                                                </label>
+                                              </div>
+                                            );
+                                          case "texte":
+                                          default:
+                                            return (<div key={ci}>{labelEl}<input type="text" value={val} onChange={e => setVal(e.target.value)} style={baseStyle} /></div>);
+                                        }
+                                      })}
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                      <button
+                                        onClick={() => {
+                                          handleCompleteAction(fa.id, (fa as any).assignment_id);
+                                          setExpandedFormId(null);
+                                          if (addToast) addToast("Formulaire sauvegardé avec succès", "success");
+                                        }}
+                                        style={{ ...sBtn("pink"), padding: "8px 24px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}
+                                      >
+                                        <Check size={14} /> Sauvegarder
+                                      </button>
                                     </div>
                                   </div>
-                                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                                    <button
-                                      onClick={() => {
-                                        handleCompleteAction(fa.id, (fa as any).assignment_id);
-                                        setExpandedFormId(null);
-                                        if (addToast) addToast("Formulaire sauvegardé avec succès", "success");
-                                      }}
-                                      style={{ ...sBtn("pink"), padding: "8px 24px", fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}
-                                    >
-                                      <Check size={14} /> Sauvegarder
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
+                                );
+                              })()}
                             </div>
                           )}
                         </div>
@@ -3635,13 +3902,30 @@ export function createEmployeeRenders(ctx: any) {
                   const formations = actions.filter((a: any) => a.type === "formation");
                   return formations.length > 0 ? formations.map((a: any, i: number) => {
                     const isDone = a.assignment_status === "termine" || completedActions.has(a.id);
+                    const lien = (a as any).lienExterne || (a as any).lien_externe || (a as any).options?.lienExterne || (a as any).options?.lien_externe;
+                    const handleClick = () => {
+                      if (lien) {
+                        window.open(lien, "_blank", "noopener,noreferrer");
+                      } else {
+                        setShowActionDetail(a.id);
+                      }
+                    };
                     return (
-                      <div key={a.id || i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.bg, borderRadius: 8, marginBottom: 8 }}>
+                      <div
+                        key={a.id || i}
+                        onClick={handleClick}
+                        title={lien ? `Ouvrir : ${lien}` : "Voir le détail"}
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.bg, borderRadius: 8, marginBottom: 8, cursor: "pointer", transition: "background .15s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = C.greenLight; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = C.bg; }}
+                      >
                         <GraduationCap size={16} color={isDone ? C.green : C.textMuted} />
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 500, color: C.text, textDecoration: isDone ? "line-through" : "none" }}>{a.titre}</div>
                         </div>
+                        {lien && !isDone && <Link size={13} color={C.green} />}
                         {isDone && <Check size={14} color={C.green} />}
+                        {!isDone && <ChevronRight size={14} color={C.textMuted} />}
                       </div>
                     );
                   }) : (
@@ -3660,12 +3944,20 @@ export function createEmployeeRenders(ctx: any) {
                   return lectures.length > 0 ? lectures.map((a: any, i: number) => {
                     const isDone = a.assignment_status === "termine" || completedActions.has(a.id);
                     return (
-                      <div key={a.id || i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.bg, borderRadius: 8, marginBottom: 8 }}>
+                      <div
+                        key={a.id || i}
+                        onClick={() => setShowActionDetail(a.id)}
+                        title="Lire le document"
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.bg, borderRadius: 8, marginBottom: 8, cursor: "pointer", transition: "background .15s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = C.amberLight; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = C.bg; }}
+                      >
                         <BookOpen size={16} color={isDone ? C.green : C.amber} />
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{a.titre}</div>
                         </div>
                         {isDone && <Check size={14} color={C.green} />}
+                        {!isDone && <ChevronRight size={14} color={C.textMuted} />}
                       </div>
                     );
                   }) : (
@@ -3684,12 +3976,20 @@ export function createEmployeeRenders(ctx: any) {
                   return quizzes.length > 0 ? quizzes.map((a: any, i: number) => {
                     const isDone = a.assignment_status === "termine" || completedActions.has(a.id);
                     return (
-                      <div key={a.id || i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.bg, borderRadius: 8, marginBottom: 8 }}>
+                      <div
+                        key={a.id || i}
+                        onClick={() => setShowActionDetail(a.id)}
+                        title="Remplir le questionnaire"
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: C.bg, borderRadius: 8, marginBottom: 8, cursor: "pointer", transition: "background .15s" }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = C.purple + "15"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = C.bg; }}
+                      >
                         <ClipboardList size={16} color={isDone ? C.green : C.purple} />
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{a.titre}</div>
                         </div>
                         {isDone && <Check size={14} color={C.green} />}
+                        {!isDone && <ChevronRight size={14} color={C.textMuted} />}
                       </div>
                     );
                   }) : (
@@ -3780,7 +4080,17 @@ export function createEmployeeRenders(ctx: any) {
                       )}
                     </div>
                   )}
-                  <button onClick={() => { setDashPage("messagerie"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 18px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                  <button onClick={async () => {
+                    const user = msgUsers.find(u => u.name === memberName) || (m.email ? msgUsers.find(u => u.email === m.email) : undefined);
+                    if (user) {
+                      const existing = msgConversations.find(c => c.other_user?.id === user.id);
+                      if (existing) { setMsgActiveConvId(existing.id); }
+                      else {
+                        try { const msg = await apiSendMessage(user.id, "👋"); await getConversations().then(setMsgConversations); setMsgActiveConvId(msg.conversation_id); } catch {}
+                      }
+                    }
+                    setDashPage("messagerie");
+                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 18px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
                     <MessageCircle size={13} /> Envoyer un message
                   </button>
                 </div>

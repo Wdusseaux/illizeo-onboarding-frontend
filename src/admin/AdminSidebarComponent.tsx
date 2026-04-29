@@ -187,7 +187,7 @@ export function createAdminSidebarComponent(ctx: any) {
       admin_2fa: "sso",
       admin_provisioning: "provisioning",
     };
-    const isEditorTenant = (localStorage.getItem("illizeo_tenant_id") || "illizeo") === "illizeo";
+    const isEditorTenant = ["illizeo", "illizeo2"].includes(localStorage.getItem("illizeo_tenant_id") || "illizeo");
     const trialStart = localStorage.getItem("illizeo_trial_start");
     const isInTrial = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) <= 14 * 24 * 60 * 60 * 1000;
     const trialExpired = trialStart && !isInTrial;
@@ -218,7 +218,6 @@ export function createAdminSidebarComponent(ctx: any) {
         { id: "admin_equipes" as AdminPage, label: t('admin.teams_groups'), icon: Users },
         { id: "admin_messagerie" as AdminPage, label: t('admin.messaging'), icon: MessageCircle },
         { id: "admin_calendar" as AdminPage, label: t('calendar.title'), icon: CalendarDays },
-        { id: "admin_orgchart" as AdminPage, label: t('org.title'), icon: Users },
         { id: "admin_buddy" as AdminPage, label: t('buddy.title'), icon: Handshake },
       ]},
       { section: t('admin.automation'), items: [

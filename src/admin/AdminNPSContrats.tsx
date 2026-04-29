@@ -1,4 +1,119 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
+
+// ─── COLLAB SEARCH PICKER (file-level for stable component identity) ───
+// Defined outside any factory so its reference is stable across renders;
+// otherwise React would unmount/remount it on every parent re-render and reset its open state.
+type CollabSearchPickerProps = {
+  collaborateurs: any[];
+  value: number | null;
+  onChange: (id: number) => void;
+  inputStyle?: React.CSSProperties;
+  colors: { white: string; border: string; bg: string; pink: string; pinkBg: string; text: string; textMuted: string };
+  companySettings?: Record<string, any>;
+};
+const resolveAvatar = (c: any, settings?: Record<string, any>): string | null => {
+  return c?.avatar_url || c?.avatar || c?.photo_url || c?.photo || (c?.user_id && settings ? (settings[`avatar_${c.user_id}`] || null) : null);
+};
+const CollabSearchPicker: React.FC<CollabSearchPickerProps> = ({ collaborateurs, value, onChange, inputStyle, colors, companySettings }) => {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  const selected = collaborateurs.find((c: any) => c.id === value);
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? collaborateurs.filter((c: any) => `${c.prenom} ${c.nom} ${c.poste || ""} ${c.site || ""} ${c.email || ""}`.toLowerCase().includes(q))
+    : collaborateurs;
+
+  const updatePos = useCallback(() => {
+    if (!inputRef.current) return;
+    const r = inputRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + 4, left: r.left, width: r.width });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    const onScroll = () => updatePos();
+    const onResize = () => updatePos();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
+    return () => { window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", onResize); };
+  }, [open, updatePos]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (inputRef.current?.contains(target)) return;
+      if (dropdownRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const id = window.setTimeout(() => document.addEventListener("mousedown", onDocDown), 0);
+    return () => { window.clearTimeout(id); document.removeEventListener("mousedown", onDocDown); };
+  }, [open]);
+
+  const selectedAvatarUrl = selected ? resolveAvatar(selected, companySettings) : null;
+  const selectedInitials = selected ? (selected.initials || `${(selected.prenom || '?').charAt(0)}${(selected.nom || '').charAt(0)}`.toUpperCase()) : "";
+  const showPrefix = !!selected && !open;
+  return (
+    <div style={{ position: "relative" }}>
+      {showPrefix && (
+        <div style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", width: 26, height: 26, borderRadius: "50%", background: selectedAvatarUrl ? "transparent" : (selected.color || colors.pink), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 600, color: colors.white, overflow: "hidden", pointerEvents: "none", zIndex: 1 }}>
+          {selectedAvatarUrl ? <img src={selectedAvatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : selectedInitials}
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="text"
+        value={open ? query : (selected ? `${selected.prenom} ${selected.nom} — ${selected.poste || ""} (${selected.site || ""})` : "")}
+        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => { setQuery(""); setOpen(true); }}
+        placeholder="Rechercher un collaborateur (nom, poste, site, email)…"
+        style={{ ...(inputStyle || {}), fontSize: 13, width: "100%", paddingLeft: showPrefix ? 42 : ((inputStyle as any)?.paddingLeft || 12) }}
+      />
+      {open && pos && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, maxHeight: 280, overflow: "auto", background: colors.white, border: `1px solid ${colors.border}`, borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,.18)", zIndex: 2000 }}
+        >
+          {filtered.length === 0 ? (
+            <div style={{ padding: "12px 14px", fontSize: 12, color: colors.textMuted }}>Aucun collaborateur trouvé</div>
+          ) : filtered.slice(0, 50).map((c: any) => {
+            const initials = c.initials || `${(c.prenom || '?').charAt(0)}${(c.nom || '').charAt(0)}`.toUpperCase();
+            const avatarUrl = resolveAvatar(c, companySettings);
+            return (
+              <div
+                key={c.id}
+                onClick={() => { onChange(c.id); setOpen(false); setQuery(""); }}
+                style={{ padding: "8px 12px", fontSize: 13, cursor: "pointer", borderBottom: `1px solid ${colors.border}`, background: c.id === value ? colors.pinkBg : "transparent", display: "flex", alignItems: "center", gap: 10 }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = colors.bg; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = c.id === value ? colors.pinkBg : "transparent"; }}
+              >
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: avatarUrl ? "transparent" : (c.color || colors.pink), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: colors.white, flexShrink: 0, overflow: "hidden" }}>
+                  {avatarUrl ? <img src={avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : initials}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 500, color: colors.text }}>{c.prenom} {c.nom}</div>
+                  <div style={{ fontSize: 11, color: colors.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.poste || "—"}{c.site ? ` · ${c.site}` : ""}{c.email ? ` · ${c.email}` : ""}</div>
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length > 50 && (
+            <div style={{ padding: "8px 12px", fontSize: 11, color: colors.textMuted, fontStyle: "italic", borderTop: `1px solid ${colors.border}` }}>
+              {filtered.length - 50} autres résultats — affinez votre recherche
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 import { t, getLang, setLang, getAllLangs, LANG_META, type Lang } from "../i18n";
 import {
   Users, FileText, MessageCircle, Bell, Building2, LayoutDashboard, Zap,
@@ -185,7 +300,7 @@ export function createAdminNPSContrats(ctx: any) {
       admin_2fa: "sso",
       admin_provisioning: "provisioning",
     };
-    const isEditorTenant = (localStorage.getItem("illizeo_tenant_id") || "illizeo") === "illizeo";
+    const isEditorTenant = ["illizeo", "illizeo2"].includes(localStorage.getItem("illizeo_tenant_id") || "illizeo");
     const trialStart = localStorage.getItem("illizeo_trial_start");
     const isInTrial = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) <= 14 * 24 * 60 * 60 * 1000;
     const trialExpired = trialStart && !isInTrial;
@@ -1003,100 +1118,6 @@ export function createAdminNPSContrats(ctx: any) {
         </>)}
 
         {contratsPageTab === "signatures" && renderSignaturesTab()}
-
-        {/* ── Generate contract modal ─────────────────────── */}
-        {generateContrat && (
-          <>
-            <div onClick={() => { setGenerateContrat(null); setGenerateData(null); setGenerateCollabId(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1100 }} />
-            <div className="iz-modal iz-scale-in" style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: C.white, borderRadius: 16, width: 640, maxHeight: "80vh", overflow: "auto", zIndex: 1101 }}>
-              <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
-                  <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>Prévisualiser un contrat</h2>
-                  <p style={{ fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{generateContrat.nom} — {generateContrat.type}</p>
-                </div>
-                <button onClick={() => { setGenerateContrat(null); setGenerateData(null); setGenerateCollabId(null); }} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
-              </div>
-              <div style={{ padding: "20px 24px" }}>
-                {/* Step 1: Select collaborateur */}
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>1. Sélectionnez un collaborateur</label>
-                  <select value={generateCollabId || ""} onChange={e => { const id = Number(e.target.value); setGenerateCollabId(id); setGenerateData(null); }} style={{ ...sInput, fontSize: 13, width: "100%" }}>
-                    <option value="">— Choisir un collaborateur —</option>
-                    {COLLABORATEURS.map((c: any) => <option key={c.id} value={c.id}>{c.prenom} {c.nom} — {c.poste} ({c.site})</option>)}
-                  </select>
-                </div>
-
-                {generateCollabId && !generateData && (
-                  <button onClick={async () => {
-                    setGenerateLoading(true);
-                    try {
-                      const data = await getContratGenerated(generateContrat.id, generateCollabId);
-                      setGenerateData(data);
-                    } catch { addToast_admin("Erreur lors de la génération"); }
-                    finally { setGenerateLoading(false); }
-                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, marginBottom: 16 }}>
-                    {generateLoading ? "Chargement..." : "2. Prévisualiser les variables"}
-                  </button>
-                )}
-
-                {/* Step 2: Variable preview */}
-                {generateData && (
-                  <>
-                    {generateData.template_missing && (
-                      <div style={{ marginBottom: 16, padding: "12px 14px", background: C.amberLight, border: `1px solid ${C.amber}`, borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                        <AlertTriangle size={18} color={C.amber} style={{ flexShrink: 0, marginTop: 1 }} />
-                        <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5 }}>
-                          <div style={{ fontWeight: 700, color: C.amber, marginBottom: 2 }}>Aucun template uploadé sur ce contrat</div>
-                          La génération réelle d'un fichier (DOCX/PDF) nécessite un template. Vous pouvez voir ci-dessous les variables qui SERAIENT remplacées. Pour activer le téléchargement, éditez ce contrat et uploadez un fichier <code style={{ background: C.white, padding: "1px 4px", borderRadius: 3 }}>.docx</code>.
-                        </div>
-                      </div>
-                    )}
-                    <div style={{ marginBottom: 16 }}>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>2. Variables du contrat</label>
-                      <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", maxHeight: 300, overflow: "auto" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                          <thead>
-                            <tr style={{ background: C.bg }}>
-                              <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 10, color: C.textLight, textTransform: "uppercase" }}>Variable</th>
-                              <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 10, color: C.textLight, textTransform: "uppercase" }}>Valeur</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {Object.entries(generateData.variables).map(([key, val]: [string, any]) => (
-                              <tr key={key} style={{ borderTop: `1px solid ${C.border}` }}>
-                                <td style={{ padding: "6px 12px", fontFamily: "monospace", fontSize: 11, color: C.pink }}>${'{' + key + '}'}</td>
-                                <td style={{ padding: "6px 12px", color: val ? C.text : C.textMuted }}>{val || "—"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    {/* Step 3: Download — disabled if no template */}
-                    <div>
-                      <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>3. Télécharger le contrat généré</label>
-                      <div style={{ display: "flex", gap: 10 }}>
-                        <button disabled={generateData.template_missing} onClick={async () => {
-                          try { await downloadContratMerged(generateContrat.id, generateCollabId!, 'docx'); addToast_admin("Contrat DOCX téléchargé"); }
-                          catch { addToast_admin("Erreur lors du téléchargement"); }
-                        }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center", opacity: generateData.template_missing ? 0.5 : 1, cursor: generateData.template_missing ? "not-allowed" : "pointer" }}>
-                          <Download size={14} /> DOCX
-                        </button>
-                        <button disabled={generateData.template_missing} onClick={async () => {
-                          try { await downloadContratMerged(generateContrat.id, generateCollabId!, 'pdf'); addToast_admin("Contrat PDF téléchargé"); }
-                          catch { addToast_admin("Erreur lors du téléchargement PDF"); }
-                        }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center", opacity: generateData.template_missing ? 0.5 : 1, cursor: generateData.template_missing ? "not-allowed" : "pointer" }}>
-                          <Download size={14} /> PDF
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </>
-        )}
       </div>
     );
 
@@ -1266,8 +1287,134 @@ export function createAdminNPSContrats(ctx: any) {
 
 
 
+  // ─── GLOBAL CONTRACT GENERATION MODAL ───────────────────
+  // Rendered globally so it works from any page (e.g. collab profile)
+
+  const renderGenerateContratModal = () => {
+    if (!generateContrat) return null;
+    const close = () => { setGenerateContrat(null); setGenerateData(null); setGenerateCollabId(null); };
+    return (
+      <div onClick={close} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 1100, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div className="iz-modal iz-scale-in" onClick={e => e.stopPropagation()} style={{ background: C.white, borderRadius: 16, width: 640, maxWidth: "100%", maxHeight: "85vh", overflow: "auto", zIndex: 1101 }}>
+          <div style={{ padding: "20px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>Prévisualiser un contrat</h2>
+              <p style={{ fontSize: 12, color: C.textMuted, margin: "2px 0 0" }}>{generateContrat.nom} — {generateContrat.type}</p>
+            </div>
+            <button onClick={close} style={{ background: "none", border: "none", cursor: "pointer" }}><X size={20} color={C.textLight} /></button>
+          </div>
+          <div style={{ padding: "20px 24px" }}>
+            {/* Contract template selector — pre-filled by smart matching, but editable */}
+            {(() => {
+              const allContrats = (ctx.contrats || []).filter((c: any) => c.actif);
+              if (allContrats.length <= 1) return null;
+              return (
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Modèle de contrat</label>
+                  <select
+                    value={generateContrat.id}
+                    onChange={e => {
+                      const id = Number(e.target.value);
+                      const found = allContrats.find((c: any) => c.id === id);
+                      if (found) { setGenerateContrat(found); setGenerateData(null); }
+                    }}
+                    style={{ ...sInput, fontSize: 13, width: "100%", cursor: "pointer" }}
+                  >
+                    {allContrats.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nom}{c.type ? ` — ${c.type}` : ""}{c.juridiction ? ` — ${c.juridiction}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+                    Pré-sélectionné automatiquement selon le type de contrat et le pays du collaborateur.
+                  </div>
+                </div>
+              );
+            })()}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>1. Sélectionnez un collaborateur</label>
+              <CollabSearchPicker
+                collaborateurs={COLLABORATEURS}
+                value={generateCollabId}
+                onChange={(id) => { setGenerateCollabId(id); setGenerateData(null); }}
+                inputStyle={sInput}
+                colors={{ white: C.white, border: C.border, bg: C.bg, pink: C.pink, pinkBg: C.pinkBg, text: C.text, textMuted: C.textMuted }}
+                companySettings={ctx.allCompanySettings}
+              />
+            </div>
+            {generateCollabId && !generateData && (
+              <button onClick={async () => {
+                setGenerateLoading(true);
+                try {
+                  const data = await getContratGenerated(generateContrat.id, generateCollabId);
+                  setGenerateData(data);
+                } catch { addToast_admin("Erreur lors de la génération"); }
+                finally { setGenerateLoading(false); }
+              }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, marginBottom: 16 }}>
+                {generateLoading ? "Chargement..." : "2. Prévisualiser les variables"}
+              </button>
+            )}
+            {generateData && (
+              <>
+                {generateData.template_missing && (
+                  <div style={{ marginBottom: 16, padding: "12px 14px", background: C.amberLight, border: `1px solid ${C.amber}`, borderRadius: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <AlertTriangle size={18} color={C.amber} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5 }}>
+                      <div style={{ fontWeight: 700, color: C.amber, marginBottom: 2 }}>Aucun template uploadé sur ce contrat</div>
+                      La génération réelle d'un fichier (DOCX/PDF) nécessite un template. Vous pouvez voir ci-dessous les variables qui SERAIENT remplacées. Pour activer le téléchargement, éditez ce contrat et uploadez un fichier <code style={{ background: C.white, padding: "1px 4px", borderRadius: 3 }}>.docx</code>.
+                    </div>
+                  </div>
+                )}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>2. Variables du contrat</label>
+                  <div style={{ border: `1px solid ${C.border}`, borderRadius: 10, overflow: "auto", maxHeight: 300 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: C.bg }}>
+                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 10, color: C.textLight, textTransform: "uppercase" }}>Variable</th>
+                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, fontSize: 10, color: C.textLight, textTransform: "uppercase" }}>Valeur</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(generateData.variables).map(([key, val]: [string, any]) => (
+                          <tr key={key} style={{ borderTop: `1px solid ${C.border}` }}>
+                            <td style={{ padding: "6px 12px", fontFamily: "monospace", fontSize: 11, color: C.pink }}>${'{' + key + '}'}</td>
+                            <td style={{ padding: "6px 12px", color: val ? C.text : C.textMuted }}>{val || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>3. Télécharger le contrat généré</label>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button disabled={generateData.template_missing} onClick={async () => {
+                      try { await downloadContratMerged(generateContrat.id, generateCollabId!, 'docx'); addToast_admin("Contrat DOCX téléchargé"); }
+                      catch { addToast_admin("Erreur lors du téléchargement"); }
+                    }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center", opacity: generateData.template_missing ? 0.5 : 1, cursor: generateData.template_missing ? "not-allowed" : "pointer" }}>
+                      <Download size={14} /> DOCX
+                    </button>
+                    <button disabled={generateData.template_missing} onClick={async () => {
+                      try { await downloadContratMerged(generateContrat.id, generateCollabId!, 'pdf'); addToast_admin("Contrat PDF téléchargé"); }
+                      catch { addToast_admin("Erreur lors du téléchargement PDF"); }
+                    }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, display: "flex", alignItems: "center", gap: 6, flex: 1, justifyContent: "center", opacity: generateData.template_missing ? 0.5 : 1, cursor: generateData.template_missing ? "not-allowed" : "pointer" }}>
+                      <Download size={14} /> PDF
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return {
     renderNPS,
     renderContrats,
+    renderGenerateContratModal,
   };
 }

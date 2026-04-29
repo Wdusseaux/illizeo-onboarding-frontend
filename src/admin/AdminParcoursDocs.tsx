@@ -185,7 +185,7 @@ export function createAdminParcoursDocs(ctx: any) {
       admin_2fa: "sso",
       admin_provisioning: "provisioning",
     };
-    const isEditorTenant = (localStorage.getItem("illizeo_tenant_id") || "illizeo") === "illizeo";
+    const isEditorTenant = ["illizeo", "illizeo2"].includes(localStorage.getItem("illizeo_tenant_id") || "illizeo");
     const trialStart = localStorage.getItem("illizeo_trial_start");
     const isInTrial = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) <= 14 * 24 * 60 * 60 * 1000;
     const trialExpired = trialStart && !isInTrial;

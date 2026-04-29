@@ -2,7 +2,7 @@
 
 // ─── TYPES ───────────────────────────────────────────────────
 export type OnboardingStep = "email" | "welcome_banner" | "create_account" | "photo_profile" | "collect_info" | "welcome_modal" | "dashboard";
-export type DashboardPage = "tableau_de_bord" | "mes_actions" | "messagerie" | "notifications" | "entreprise" | "rapports" | "suivi" | "mon_profil" | "cooptation" | "satisfaction" | "assistant_ia" | "organigramme" | "mes_rdv" | "documents" | "mes_signatures" | "formations" | "bureaux";
+export type DashboardPage = "tableau_de_bord" | "mes_actions" | "messagerie" | "notifications" | "entreprise" | "rapports" | "suivi" | "mon_profil" | "cooptation" | "satisfaction" | "assistant_ia" | "organigramme" | "mes_rdv" | "documents" | "mes_signatures" | "formations" | "bureaux" | "badges";
 export type DashboardTab = "toutes" | "onboarding";
 export type UserRole = "employee" | "rh";
 export type AdminPage = "admin_dashboard" | "admin_parcours" | "admin_suivi" | "admin_documents" | "admin_actions" | "admin_workflows" | "admin_templates" | "admin_phases" | "admin_equipes" | "admin_messagerie" | "admin_notifications" | "admin_entreprise" | "admin_profil" | "admin_gamification" | "admin_nps" | "admin_feedback_hub" | "admin_livret" | "admin_contrats" | "admin_integrations" | "admin_users" | "admin_fields" | "admin_provisioning" | "admin_cooptation" | "admin_apparence" | "admin_donnees" | "admin_2fa" | "admin_abonnement" | "admin_equipements" | "admin_signatures" | "admin_roles" | "admin_calendar" | "admin_orgchart" | "admin_buddy" | "admin_audit" | "admin_password_policy" | "admin_assistant_ia" | "admin_manager_view" | "admin_cohorte_rh" | "admin_templates_profil" | "admin_quotes" | "admin_recurring_meetings";
