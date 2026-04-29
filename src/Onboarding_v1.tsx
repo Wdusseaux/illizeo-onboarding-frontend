@@ -615,7 +615,7 @@ export default function OnboardingModule() {
   const [visibleRoleIds, setVisibleRoleIds] = useState<number[]>([]);
   const [rolesDropdownOpen, setRolesDropdownOpen] = useState(false);
   const [effectivePermUserId, setEffectivePermUserId] = useState<number | null>(null);
-  const [securitySubTab, setSecuritySubTab] = useState<"2fa" | "password" | "ip_whitelist">("2fa");
+  const [securitySubTab, setSecuritySubTab] = useState<"password" | "ip_whitelist" | "sessions" | "login_history" | "advanced">("password");
   const [ipWhitelist, setIpWhitelist] = useState<{ enabled: boolean; entries: any[]; current_ip: string } | null>(null);
   const [secSessions, setSecSessions] = useState<any[] | null>(null);
   const [secLoginHistory, setSecLoginHistory] = useState<any[] | null>(null);
@@ -2309,12 +2309,19 @@ export default function OnboardingModule() {
                       </div>
                     </div>
                     <div style={{ padding: "6px 0" }}>
-                      <button onClick={() => { setAvatarMenuOpen(false); setAdminPage("admin_2fa" as any); }}
+                      <button onClick={() => {
+                        // "Sécurité" ouvre la page admin_password_policy directement
+                        // sur le tab Mot de passe (le tab par défaut "2fa" n'existe
+                        // plus dans cette page — l'ancien default était mort).
+                        setAvatarMenuOpen(false);
+                        setSecuritySubTab("password");
+                        setAdminPage("admin_password_policy" as any);
+                      }}
                         style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 18px", background: "none", border: "none", cursor: "pointer", fontFamily: font, fontSize: 13, color: C.text, transition: "background .12s" }}
                         onMouseEnter={e => e.currentTarget.style.background = C.bg}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                         <ShieldCheck size={15} color={C.textMuted} />
-                        <span>{lang === "fr" ? "Mon 2FA" : "My 2FA"}</span>
+                        <span>{lang === "fr" ? "Sécurité" : "Security"}</span>
                       </button>
                       {/* Super Admin — visible seulement pour les comptes
                           plateforme Illizeo, pas pour les tenants clients. */}
