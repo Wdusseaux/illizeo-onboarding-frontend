@@ -499,9 +499,10 @@ export function createAuthPages(ctx: any) {
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 56px", flexShrink: 0 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {/* Iconic Illizeo "O" mark — hardcoded via ILLIZEO_LOGO_URI, never
-                customized by tenants on the public auth shell. */}
-            <img src={ILLIZEO_LOGO_URI} alt="" style={{ height: 32, width: 32, objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+            {/* Iconic Illizeo "O" mark — extracted from the official brand SVG
+                and hardcoded here so tenants can never override the public
+                auth surface. White rendering via brightness/invert filter. */}
+            <img src="/illizeo-brand-icon.png" alt="" style={{ height: 34, width: 34, objectFit: "contain", filter: "brightness(0) invert(1)" }} />
             <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: 2, color: C.white, lineHeight: 1, fontFamily: font }}>
               ILLIZEO
             </span>
