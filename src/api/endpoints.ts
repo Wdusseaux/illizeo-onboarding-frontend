@@ -533,6 +533,13 @@ export async function createUser(data: { name: string; email: string; password: 
   return apiFetch<any>('/users', { method: 'POST', body: JSON.stringify(data) });
 }
 
+// Invite a user — creates the account with an unguessable random password and
+// sends a "set your password" email backed by the password reset infra. Used
+// by the setup wizard team step and the admin "Inviter" actions.
+export async function inviteUser(data: { name: string; email: string; role: string }) {
+  return apiFetch<{ id: number; email: string; invited: boolean }>('/users/invite', { method: 'POST', body: JSON.stringify(data) });
+}
+
 export async function updateUser(id: number, data: Record<string, any>) {
   return apiFetch<any>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }

@@ -35,7 +35,7 @@ import {
   createWorkflow as apiCreateWorkflow, updateWorkflow as apiUpdateWorkflow, deleteWorkflow as apiDeleteWorkflow,
   createEmailTemplate as apiCreateEmailTpl, updateEmailTemplate as apiUpdateEmailTpl, deleteEmailTemplate as apiDeleteEmailTpl,
   createContrat as apiCreateContrat, updateContrat as apiUpdateContrat, deleteContrat as apiDeleteContrat,
-  getUsers, createUser as apiCreateUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser,
+  getUsers, createUser as apiCreateUser, inviteUser, updateUser as apiUpdateUser, deleteUser as apiDeleteUser,
   getFieldConfig, updateFieldConfig as apiUpdateFieldConfig, createFieldConfig as apiCreateFieldConfig, deleteFieldConfig as apiDeleteFieldConfig,
   getOnboardingTeams, createOnboardingTeam as apiCreateTeam, updateOnboardingTeam as apiUpdateTeam, deleteOnboardingTeam as apiDeleteTeam,
   getADGroupMappings, createADGroupMapping, deleteADGroupMapping, syncADUsers, getADGroups,
@@ -166,9 +166,7 @@ export function createSetupWizard(ctx: any) {
     { id: "appearance", title: t('wiz.step_appearance'), desc: t('wiz.step_appearance_desc'), icon: Palette, required: false },
     { id: "team", title: t('wiz.step_team'), desc: t('wiz.step_team_desc'), icon: Users, required: true },
     { id: "parcours", title: t('wiz.step_parcours'), desc: t('wiz.step_parcours_desc'), icon: Route, required: true },
-    { id: "documents", title: t('wiz.step_documents'), desc: t('wiz.step_documents_desc'), icon: FileText, required: true },
     { id: "email", title: t('wiz.step_email'), desc: t('wiz.step_email_desc'), icon: Mail, required: false },
-    { id: "first_collab", title: t('wiz.step_first_collab'), desc: t('wiz.step_first_collab_desc'), icon: UserPlus, required: false },
   ];
   const SECTORS = ["Technologie", "Finance & Banque", "Santé", "Industrie", "Commerce & Retail", "Services", "Éducation", "Immobilier", "Hôtellerie & Restauration", "Transport & Logistique", "Conseil", "Autre"];
   const COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"];
@@ -342,12 +340,21 @@ export function createSetupWizard(ctx: any) {
                     const validEmails = setupData.invited_emails.filter((e: string) => e.trim() && e.includes("@"));
                     if (validEmails.length === 0) { addToast_admin(t('wiz.add_valid_email')); return; }
                     let sent = 0;
+                    let failed = 0;
+                    // Use the new inviteUser endpoint: backend generates an
+                    // unguessable random password + a signup token, and emails
+                    // a "set your password" link. No more shared "Welcome1!"
+                    // password sitting in everyone's account.
                     for (let i = 0; i < setupData.invited_emails.length; i++) {
                       const email = setupData.invited_emails[i].trim();
                       if (!email || !email.includes("@")) continue;
-                      try { await apiCreateUser({ email, name: email.split("@")[0], password: "Welcome1!", role: setupData.invited_roles[i] }); sent++; } catch {}
+                      try {
+                        await inviteUser({ email, name: email.split("@")[0], role: setupData.invited_roles[i] });
+                        sent++;
+                      } catch { failed++; }
                     }
                     if (sent > 0) { addToast_admin(`${sent} ${t('wiz.invitations_sent')}`); markSetupStepDone("team"); }
+                    if (failed > 0) addToast_admin(`${failed} ${lang === "fr" ? "invitation(s) échouée(s) — adresse déjà utilisée ou erreur" : "invitation(s) failed — email already used or error"}`);
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6 }}><Send size={14} /> {t('wiz.send_invitations')}</button>
                 </div>
               </div>
@@ -385,27 +392,6 @@ export function createSetupWizard(ctx: any) {
               </div>
             )}
 
-            {/* ─── Step 5: Documents ─── */}
-            {currentStep.id === "documents" && (
-              <div className="iz-fade-up">
-                <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: "0 0 4px" }}>{t('wiz.docs_title')}</h2>
-                <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>{t('wiz.docs_desc')}</p>
-                <div style={{ maxWidth: 500, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  {SETUP_DOCS.map(doc => {
-                    const checked = (setupData.docs_checked as string[]).includes(doc.id);
-                    return (
-                      <label key={doc.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, border: `2px solid ${checked ? C.pink : C.border}`, background: C.bg, cursor: "pointer", transition: "all .15s" }}>
-                        <input type="checkbox" checked={checked} onChange={() => {
-                          setSetupData(d => ({ ...d, docs_checked: checked ? d.docs_checked.filter((id: string) => id !== doc.id) : [...d.docs_checked, doc.id] }));
-                        }} style={{ accentColor: C.pink }} />
-                        <span style={{ fontSize: 13, color: checked ? C.pink : C.text, fontWeight: checked ? 600 : 400 }}>{doc.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* ─── Step 6: Email ─── */}
             {currentStep.id === "email" && (
               <div className="iz-fade-up">
@@ -426,47 +412,16 @@ export function createSetupWizard(ctx: any) {
                     <span style={{ display: "inline-block", padding: "8px 20px", background: C.pink, color: C.white, borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{t('wiz.access_my_space')}</span>
                   </div>
                   <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                    <button onClick={() => { markSetupStepDone("email"); setSetupStep(s => s + 1); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Check size={14} /> {t('wiz.template_ok')}</button>
+                    <button onClick={() => { markSetupStepDone("email"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Check size={14} /> {t('wiz.template_ok')}</button>
                     <button onClick={() => { setShowSetupWizard(false); setAdminPage("admin_templates"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6 }}><FilePen size={14} /> {t('wiz.customize_btn')}</button>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* ─── Step 7: First collaborateur ─── */}
-            {currentStep.id === "first_collab" && (
-              <div className="iz-fade-up">
-                <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: "0 0 4px" }}>{t('wiz.first_collab_title')}</h2>
-                <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>{t('wiz.first_collab_desc')}</p>
-                <div style={{ maxWidth: 500, display: "flex", flexDirection: "column", gap: 14 }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('wiz.first_name')} *</label>
-                      <input value={setupData.first_prenom || ""} onChange={e => setSetupData(d => ({ ...d, first_prenom: e.target.value }))} placeholder="Marie" style={{ ...sInput, fontSize: 13, padding: "10px 14px" }} /></div>
-                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('wiz.last_name')} *</label>
-                      <input value={setupData.first_nom || ""} onChange={e => setSetupData(d => ({ ...d, first_nom: e.target.value }))} placeholder="Dupont" style={{ ...sInput, fontSize: 13, padding: "10px 14px" }} /></div>
-                  </div>
-                  <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>Email *</label>
-
-                    <input type="email" value={setupData.first_email || ""} onChange={e => setSetupData(d => ({ ...d, first_email: e.target.value }))} placeholder="marie.dupont@entreprise.com" style={{ ...sInput, fontSize: 13, padding: "10px 14px" }} /></div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('wiz.position')}</label>
-                      <input value={setupData.first_poste || ""} onChange={e => setSetupData(d => ({ ...d, first_poste: e.target.value }))} placeholder="Développeur" style={{ ...sInput, fontSize: 13, padding: "10px 14px" }} /></div>
-                    <div><label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('wiz.start_date')}</label>
-                      <input type="date" value={setupData.first_date || ""} onChange={e => setSetupData(d => ({ ...d, first_date: e.target.value }))} style={{ ...sInput, fontSize: 13, padding: "10px 14px" }} /></div>
-                  </div>
-                  <button onClick={async () => {
-                    if (!setupData.first_prenom?.trim() || !setupData.first_nom?.trim() || !setupData.first_email?.trim()) { addToast_admin(t('wiz.fields_required')); return; }
-                    try {
-                      await apiCreateCollab({ prenom: setupData.first_prenom, nom: setupData.first_nom, email: setupData.first_email, poste: setupData.first_poste || "", site: setupData.site_principal || "", departement: "", dateDebut: setupData.first_date || new Date().toISOString().slice(0, 10) } as any);
-                      refetchCollaborateurs();
-                      addToast_admin(`${setupData.first_prenom} ${t('wiz.collab_added')}`);
-                      markSetupStepDone("first_collab");
-                    } catch { addToast_admin(t('wiz.create_error')); }
-                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6 }}><UserPlus size={14} /> {t('wiz.add_collab')}</button>
-                </div>
-
-                {/* Completion card */}
-                <div style={{ marginTop: 40, padding: "28px 32px", borderRadius: 16, background: C.bg, border: `1px solid ${C.border}`, maxWidth: 500 }}>
+                {/* ── Completion card — affichée sur la dernière étape (email)
+                    après suppression du step "Premier collaborateur". Permet de
+                    finaliser le wizard et accéder à l'espace, avec en option
+                    le purge des collaborateurs de démo. */}
+                <div style={{ marginTop: 32, padding: "28px 32px", borderRadius: 16, background: C.bg, border: `1px solid ${C.border}`, maxWidth: 550 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                     <PartyPopper size={28} color={C.pink} />
                     <div>
@@ -477,7 +432,6 @@ export function createSetupWizard(ctx: any) {
                   <p style={{ fontSize: 13, color: C.textLight, lineHeight: 1.6, margin: "0 0 16px" }}>
                     {t('wiz.finalize_desc')}
                   </p>
-                  {/* Purge demo data checkbox */}
                   <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, background: C.white, border: `1px solid ${C.border}`, cursor: "pointer", marginBottom: 16 }}>
                     <input type="checkbox" id="purge-demo" style={{ marginTop: 2, accentColor: C.pink, width: 16, height: 16 }} />
                     <div>
@@ -503,7 +457,7 @@ export function createSetupWizard(ctx: any) {
             )}
 
             {/* Navigation buttons */}
-            {currentStep.id !== "first_collab" && (
+            {(
               <div style={{ display: "flex", gap: 10, marginTop: 32 }}>
                 {setupStep > 0 && <button onClick={() => setSetupStep(s => s - 1)} className="iz-btn-outline" style={sBtn("outline")}>{t('misc.return')}</button>}
                 {!currentStep.required && !setupCompleted.includes(currentStep.id) && (
@@ -515,23 +469,6 @@ export function createSetupWizard(ctx: any) {
                     updateCompanySettings({ company_name: setupData.company_name, sector: setupData.sector, company_size: setupData.company_size, site_principal: setupData.site_principal }).catch(() => {});
                     markSetupStepDone("company");
                   } else if (currentStep.id === "appearance") { markSetupStepDone("appearance"); }
-                  else if (currentStep.id === "documents") {
-                    // Create document templates for checked docs
-                    const checkedDocs = setupData.docs_checked as string[];
-                    if (checkedDocs.length > 0 && ADMIN_DOC_CATEGORIES.length > 0) {
-                      const defaultCatId = ADMIN_DOC_CATEGORIES[0]?.id;
-                      if (defaultCatId) {
-                        for (const docId of checkedDocs) {
-                          const docData = SETUP_DOCS_DATA[docId];
-                          if (docData) {
-                            try { await createDocumentTemplate({ nom: docData.fr, obligatoire: ["piece_identite", "rib", "attestation_securite_sociale", "photo_identite"].includes(docId), type: "upload", categorie_id: defaultCatId }); } catch {}
-                          }
-                        }
-                        addToast_admin(`${checkedDocs.length} ${t('wiz.documents')} ${lang === "fr" ? "créés" : "created"}`);
-                      }
-                    }
-                    markSetupStepDone("documents");
-                  }
                   if (setupStep < SETUP_STEPS.length - 1) setSetupStep(s => s + 1);
                 }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}>
                   {t('wiz.continue')} <ChevronRight size={14} />
