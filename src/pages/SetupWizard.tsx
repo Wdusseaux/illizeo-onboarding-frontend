@@ -304,29 +304,16 @@ export function createSetupWizard(ctx: any) {
               <div className="iz-fade-up">
                 <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: "0 0 4px" }}>{t('wiz.customize')}</h2>
                 <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>{t('wiz.customize_desc')}</p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, maxWidth: 600 }}>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{t('wiz.company_logo')}</label>
-                    <div style={{ width: 120, height: 120, borderRadius: 16, border: `2px dashed ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: C.bg, cursor: "pointer", position: "relative" }}>
-                      <img src={customLogoFull || ILLIZEO_FULL_LOGO_URI} alt="Logo" style={{ maxHeight: 60, maxWidth: 100, objectFit: "contain" }} />
-                      <label style={{ position: "absolute", inset: 0, cursor: "pointer", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 6 }}>
-                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-                          const file = e.target.files?.[0]; if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = () => { const url = reader.result as string; saveSetting("custom_logo_full", url, setCustomLogoFull); };
-                          reader.readAsDataURL(file);
-                        }} />
-                        <span style={{ fontSize: 10, color: C.pink, fontWeight: 600, background: "rgba(255,255,255,.9)", padding: "2px 8px", borderRadius: 4 }}>{t('wiz.change')}</span>
-                      </label>
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{t('wiz.theme_color')}</label>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      {["#E41076","#1A73E8","#2E7D32","#7B5EA7","#E65100","#37474F","#C62828","#00897B"].map(color => (
-                        <button key={color} onClick={() => { saveSetting("theme_color", color, setThemeColor); }} style={{ width: 40, height: 40, borderRadius: "50%", background: color, border: themeColor === color ? `3px solid ${C.text}` : "3px solid transparent", cursor: "pointer", transition: "all .15s" }} />
-                      ))}
-                    </div>
+                {/* Logo upload retiré : le logo Illizeo est hardcodé sur le
+                    shell auth et la sidebar (politique brand). Le client ne
+                    peut plus le changer ici. Seule la couleur de thème reste
+                    customisable. */}
+                <div style={{ maxWidth: 600 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{t('wiz.theme_color')}</label>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {["#E41076","#1A73E8","#2E7D32","#7B5EA7","#E65100","#37474F","#C62828","#00897B"].map(color => (
+                      <button key={color} onClick={() => { saveSetting("theme_color", color, setThemeColor); }} style={{ width: 40, height: 40, borderRadius: "50%", background: color, border: themeColor === color ? `3px solid ${C.text}` : "3px solid transparent", cursor: "pointer", transition: "all .15s" }} />
+                    ))}
                   </div>
                 </div>
               </div>
