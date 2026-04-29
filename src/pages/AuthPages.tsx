@@ -497,20 +497,12 @@ export function createAuthPages(ctx: any) {
           override. The auth shell is the public brand surface; tenants only get
           their own logo *after* login (in the app sidebar), never here. */}
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 56px", flexShrink: 0 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {/* Iconic Illizeo "O" mark — extracted from the official brand SVG
-                and hardcoded here so tenants can never override the public
-                auth surface. White rendering via brightness/invert filter. */}
-            <img src="/illizeo-brand-icon.png" alt="" style={{ height: 34, width: 34, objectFit: "contain", filter: "brightness(0) invert(1)" }} />
-            <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: 2, color: C.white, lineHeight: 1, fontFamily: font }}>
-              ILLIZEO
-            </span>
-          </div>
-          <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.85)", paddingLeft: 42 }}>
-            The all-in-one HR solution
-          </span>
-        </div>
+        {/* Official Illizeo logo — single asset (icon + wordmark + tagline) read
+            directly from /illizeo-Logo-site.png, NEVER through getLogoFullUri()
+            which can be overridden by tenants. White rendering via brightness/
+            invert so the magenta brand asset becomes pure white on the magenta
+            shell. */}
+        <img src="/illizeo-Logo-site.png" alt="Illizeo" style={{ height: 44, objectFit: "contain", filter: "brightness(0) invert(1)" }} />
         <a href="https://illizeo.com" target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 18px", borderRadius: 999, border: "1px solid rgba(255,255,255,.5)", color: C.white, fontSize: 12, fontWeight: 600, textDecoration: "none", letterSpacing: 1, textTransform: "uppercase" }}>
           <ArrowRight size={12} style={{ transform: "rotate(-45deg)" }} /> ILLIZEO.COM
         </a>
