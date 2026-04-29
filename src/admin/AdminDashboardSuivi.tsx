@@ -91,6 +91,93 @@ import { apiFetch } from "../api/client";
 /**
  * Dashboard + Suivi + CollabProfile render functions.
  */
+/**
+ * SearchableSelect — replacement for native <select> with an integrated search
+ * input. Used by the suivi page for site / department / parcours filters where
+ * a tenant may have dozens of values and scrolling a native dropdown is slow.
+ *
+ * Behavior: click the trigger to open, type to filter, click an option (or the
+ * "Tous les …" sentinel) to select. Closes on outside click or Escape.
+ */
+function SearchableSelect({ value, onChange, options, allLabel, minWidth = 140 }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  allLabel: string;
+  minWidth?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("keydown", esc);
+    setTimeout(() => inputRef.current?.focus(), 50);
+    return () => { document.removeEventListener("mousedown", handler); document.removeEventListener("keydown", esc); };
+  }, [open]);
+
+  const filtered = options.filter(o => !query || o.label.toLowerCase().includes(query.toLowerCase()));
+  const selected = options.find(o => o.value === value);
+  const displayLabel = selected ? selected.label : allLabel;
+
+  return (
+    <div ref={ref} style={{ position: "relative", minWidth }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{
+          ...sInput, padding: "6px 10px", paddingRight: 28, fontSize: 11, width: "100%",
+          textAlign: "left", cursor: "pointer", color: value ? C.text : C.textMuted,
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayLabel}</span>
+        <ChevronRight size={12} color={C.textMuted} style={{ transform: open ? "rotate(90deg)" : "rotate(90deg)", transition: "transform .15s", flexShrink: 0, position: "absolute", right: 8, top: "50%", marginTop: -6 }} />
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, minWidth: 220,
+          background: C.white, border: `1px solid ${C.border}`, borderRadius: 8, boxShadow: "0 8px 24px rgba(0,0,0,.12)",
+          zIndex: 50, overflow: "hidden",
+        }}>
+          <div style={{ padding: "8px 10px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 6, background: C.bg }}>
+            <Search size={12} color={C.textLight} />
+            <input ref={inputRef} value={query} onChange={e => setQuery(e.target.value)} placeholder="Rechercher…"
+              style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 12, fontFamily: font, color: C.text, minWidth: 0 }} />
+            {query && (
+              <button type="button" onClick={() => setQuery("")} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted, padding: 0, display: "flex" }}>
+                <X size={12} />
+              </button>
+            )}
+          </div>
+          <div style={{ maxHeight: 240, overflowY: "auto" }}>
+            <button type="button" onClick={() => { onChange(""); setOpen(false); setQuery(""); }}
+              style={{ width: "100%", padding: "8px 12px", border: "none", background: !value ? C.pinkLight : "transparent", color: !value ? C.pink : C.text, fontSize: 12, fontFamily: font, fontWeight: !value ? 600 : 400, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ flex: 1 }}>{allLabel}</span>
+              {!value && <Check size={12} color={C.pink} />}
+            </button>
+            {filtered.length === 0 ? (
+              <div style={{ padding: "12px", fontSize: 12, color: C.textMuted, textAlign: "center" }}>Aucun résultat</div>
+            ) : filtered.map(o => (
+              <button key={o.value} type="button" onClick={() => { onChange(o.value); setOpen(false); setQuery(""); }}
+                style={{ width: "100%", padding: "8px 12px", border: "none", background: o.value === value ? C.pinkLight : "transparent", color: o.value === value ? C.pink : C.text, fontSize: 12, fontFamily: font, fontWeight: o.value === value ? 600 : 400, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 8 }}
+                onMouseEnter={e => { if (o.value !== value) e.currentTarget.style.background = C.bg; }}
+                onMouseLeave={e => { if (o.value !== value) e.currentTarget.style.background = "transparent"; }}>
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.label}</span>
+                {o.value === value && <Check size={12} color={C.pink} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function createAdminDashboardSuivi(ctx: any) {
   const {
     loginEmail, setLoginEmail, loginPassword, setLoginPassword, loginLoading, setLoginLoading, forgotMode, setForgotMode,
@@ -772,21 +859,24 @@ export function createAdminDashboardSuivi(ctx: any) {
 
         {/* Advanced filters */}
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <select value={siteFilter} onChange={e => setSuiviSiteFilter(e.target.value)}
-            style={{ ...sInput, padding: "6px 10px", fontSize: 11, minWidth: 140, color: siteFilter ? C.text : C.textMuted }}>
-            <option value="">Tous les sites</option>
-            {uniqueSites.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={deptFilter} onChange={e => setSuiviDeptFilter(e.target.value)}
-            style={{ ...sInput, padding: "6px 10px", fontSize: 11, minWidth: 140, color: deptFilter ? C.text : C.textMuted }}>
-            <option value="">Tous les départements</option>
-            {uniqueDepts.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select value={suiviParcoursFilter || ''} onChange={e => setSuiviParcoursFilter(e.target.value || null)}
-            style={{ ...sInput, padding: "6px 10px", fontSize: 11, minWidth: 140, color: suiviParcoursFilter ? C.text : C.textMuted }}>
-            <option value="">Tous les parcours</option>
-            {PARCOURS_TEMPLATES.map((p: any) => <option key={p.id} value={p.nom}>{p.nom}</option>)}
-          </select>
+          <SearchableSelect
+            value={siteFilter}
+            onChange={v => setSuiviSiteFilter(v)}
+            options={uniqueSites.map(s => ({ value: s, label: s }))}
+            allLabel="Tous les sites"
+          />
+          <SearchableSelect
+            value={deptFilter}
+            onChange={v => setSuiviDeptFilter(v)}
+            options={uniqueDepts.map(d => ({ value: d, label: d }))}
+            allLabel="Tous les départements"
+          />
+          <SearchableSelect
+            value={suiviParcoursFilter || ''}
+            onChange={v => setSuiviParcoursFilter(v || null)}
+            options={PARCOURS_TEMPLATES.map((p: any) => ({ value: p.nom, label: p.nom }))}
+            allLabel="Tous les parcours"
+          />
           {activeFilterCount > 0 && (
             <button onClick={() => { setSuiviSiteFilter(''); setSuiviDeptFilter(''); setSuiviParcoursFilter(null); }}
               style={{ background: "none", border: "none", cursor: "pointer", fontSize: 11, color: C.pink, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
