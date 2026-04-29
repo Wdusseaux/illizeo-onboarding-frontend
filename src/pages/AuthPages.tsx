@@ -244,11 +244,11 @@ export function createAuthPages(ctx: any) {
       }} style={{ maxWidth: 540 }}>
         <div style={{ marginBottom: 14 }}>
           <label style={sShellLabel}>Nouveau mot de passe</label>
-          <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder={`Min. ${pwdPolicy?.min_length ?? 8} caractères`} required style={sShellInput} />
+          <input type="password" name="new-password" autoComplete="new-password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} placeholder={`Min. ${pwdPolicy?.min_length ?? 8} caractères`} required style={sShellInput} />
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={sShellLabel}>Confirmer le mot de passe</label>
-          <input type="password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} placeholder="Répétez le mot de passe" required style={sShellInput} />
+          <input type="password" name="new-password-confirm" autoComplete="new-password" value={resetConfirm} onChange={e => setResetConfirm(e.target.value)} placeholder="Répétez le mot de passe" required style={sShellInput} />
         </div>
         {resetPassword && (
           <div style={{ marginBottom: 16, padding: "12px 14px", background: "rgba(0,0,0,.18)", borderRadius: 10, border: "1px solid rgba(255,255,255,.12)" }}>
@@ -307,7 +307,7 @@ export function createAuthPages(ctx: any) {
         </div>
         <div style={{ marginBottom: 18 }}>
           <label style={sShellLabel}>Code à 6 chiffres</label>
-          <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={twoFactorCode} onChange={e => setTwoFactorCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" autoFocus
+          <input type="text" name="totp-code" autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={twoFactorCode} onChange={e => setTwoFactorCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" autoFocus
             style={{ ...sShellInput, textAlign: "center", fontSize: 28, fontWeight: 700, letterSpacing: 12, padding: "20px" }} />
         </div>
         {auth.error && <div style={{ fontSize: 12, color: "#FFD0D0", marginBottom: 12 }}>{auth.error}</div>}
@@ -735,16 +735,16 @@ export function createAuthPages(ctx: any) {
       </div>
       <div style={{ marginBottom: 14 }}>
         <label style={sShellLabel}>Email professionnel *</label>
-        <input type="email" value={regData.admin_email} onChange={e => setRegData((p: any) => ({ ...p, admin_email: e.target.value }))} placeholder="vous@entreprise.com" required style={sShellInput} />
+        <input type="email" name="email" autoComplete="email" value={regData.admin_email} onChange={e => setRegData((p: any) => ({ ...p, admin_email: e.target.value }))} placeholder="vous@entreprise.com" required style={sShellInput} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
         <div>
           <label style={sShellLabel}>Mot de passe *</label>
-          <input type="password" value={regData.password} onChange={e => setRegData((p: any) => ({ ...p, password: e.target.value }))} placeholder={`Min. ${defaultPolicy.min_length} caractères`} required style={sShellInput} />
+          <input type="password" name="new-password" autoComplete="new-password" value={regData.password} onChange={e => setRegData((p: any) => ({ ...p, password: e.target.value }))} placeholder={`Min. ${defaultPolicy.min_length} caractères`} required style={sShellInput} />
         </div>
         <div>
           <label style={sShellLabel}>Confirmer *</label>
-          <input type="password" value={regData.password_confirmation} onChange={e => setRegData((p: any) => ({ ...p, password_confirmation: e.target.value }))} placeholder="Répéter" required style={sShellInput} />
+          <input type="password" name="new-password-confirm" autoComplete="new-password" value={regData.password_confirmation} onChange={e => setRegData((p: any) => ({ ...p, password_confirmation: e.target.value }))} placeholder="Répéter" required style={sShellInput} />
         </div>
       </div>
       {regData.password && (
@@ -830,11 +830,11 @@ export function createAuthPages(ctx: any) {
         <form onSubmit={submit}>
           <div style={{ marginBottom: 14 }}>
             <label style={sShellLabel}>Email</label>
-            <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="votre@email.com" required autoFocus style={sShellInput} />
+            <input type="email" name="email" autoComplete="username" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="votre@email.com" required autoFocus style={sShellInput} />
           </div>
           <div style={{ marginBottom: 18 }}>
             <label style={sShellLabel}>Mot de passe</label>
-            <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" required style={sShellInput} />
+            <input type="password" name="password" autoComplete="current-password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="••••••••" required style={sShellInput} />
           </div>
           <button type="submit" disabled={loginLoading} style={sShellPrimaryBtn(loginLoading)}>
             {loginLoading ? "Connexion…" : "Se connecter"} <ArrowRight size={18} />
@@ -884,7 +884,7 @@ export function createAuthPages(ctx: any) {
               <>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Réinitialiser le mot de passe</div>
                 <div style={{ fontSize: 12, color: "rgba(255,255,255,.75)", marginBottom: 12 }}>Entrez votre email pour recevoir un lien.</div>
-                <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="votre@email.com" style={{ ...sShellInput, marginBottom: 10 }} />
+                <input type="email" name="email" autoComplete="username" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="votre@email.com" style={{ ...sShellInput, marginBottom: 10 }} />
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => setForgotMode(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1px solid rgba(255,255,255,.3)", background: "transparent", color: C.white, fontSize: 12, cursor: "pointer", fontFamily: font }}>{t('common.cancel')}</button>
                   <button disabled={forgotLoading || !forgotEmail.trim()} onClick={async () => {
