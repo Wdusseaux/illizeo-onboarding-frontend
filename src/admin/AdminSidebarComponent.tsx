@@ -336,34 +336,8 @@ export function createAdminSidebarComponent(ctx: any) {
               </div>
             )}
           </div>
-          {!collapsed && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 8 }}>
-              <div style={{ display: "flex", gap: 3, padding: "4px 8px" }}>
-                {activeLanguages.map(l => (
-                  <button key={l} onClick={() => switchLang(l)} title={LANG_META[l].nativeName} style={{
-                    padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: lang === l ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font,
-                    background: lang === l ? C.pinkBg : "transparent", color: lang === l ? C.pink : C.textMuted, transition: "all .15s",
-                  }}>{LANG_META[l].flag} {l.toUpperCase()}</button>
-                ))}
-              </div>
-              <button onClick={() => setAdminPage("admin_2fa" as any)} className="iz-sidebar-item" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "none", background: adminPage === "admin_2fa" ? C.pinkBg : "transparent", cursor: "pointer", fontFamily: font, fontSize: 11, color: adminPage === "admin_2fa" ? C.pink : C.textMuted, width: "100%", transition: "all .15s" }}>
-                <ShieldCheck size={13} /> {lang === "fr" ? "Mon 2FA" : "My 2FA"}
-              </button>
-              <button onClick={() => { const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `/${tid}` : "/"; }); }} className="iz-sidebar-item" style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, border: "none", background: "transparent", cursor: "pointer", fontFamily: font, fontSize: 11, color: C.textMuted, width: "100%", transition: "all .15s" }}>
-                <LogOut size={13} /> {t('auth.logout')}
-              </button>
-            </div>
-          )}
-          {collapsed && (
-            <div style={{ display: "flex", gap: 3, justifyContent: "center", marginTop: 8 }}>
-              {activeLanguages.map(l => (
-                <button key={l} onClick={() => switchLang(l)} title={LANG_META[l].nativeName} style={{
-                  padding: "4px", borderRadius: 4, fontSize: 14, fontWeight: lang === l ? 600 : 400, border: "none", cursor: "pointer", fontFamily: font,
-                  background: lang === l ? C.pinkBg : "transparent", color: lang === l ? C.pink : C.textMuted, transition: "all .15s",
-                }}>{LANG_META[l].flag}</button>
-              ))}
-            </div>
-          )}
+          {/* Langue / Mon 2FA / Déconnexion ont été déplacés dans le dropdown
+              avatar du topbar admin (cohérent avec le portail employé). */}
         </div>
       </div>
     );

@@ -2282,9 +2282,74 @@ export default function OnboardingModule() {
                 </div>
               )}
             </div>
-            {/* User avatar */}
-            <div style={{ width: 32, height: 32, borderRadius: "50%", background: `linear-gradient(135deg, ${C.pinkSoft}, ${C.pink})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: C.white }}>
-              {auth.user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+            {/* User avatar dropdown — même style que le topbar employé. Le
+                bas de la sidebar admin ne contient plus que le nom de l'admin ;
+                Langue / Mon 2FA / Déconnexion ont été déplacés ici. */}
+            <div style={{ position: "relative" }} data-admin-avatar-menu>
+              <button onClick={() => setAvatarMenuOpen(!avatarMenuOpen)}
+                style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 8px 4px 4px", background: avatarMenuOpen ? C.bg : "transparent", border: `1px solid ${avatarMenuOpen ? C.border : "transparent"}`, borderRadius: 22, cursor: "pointer", fontFamily: font, transition: "all .15s" }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: `linear-gradient(135deg, ${C.pinkSoft}, ${C.pink})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 600, color: C.white }}>
+                  {auth.user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                </div>
+                <ChevronRight size={14} color={C.textMuted} style={{ transform: avatarMenuOpen ? "rotate(90deg)" : "rotate(0)", transition: "transform .15s" }} />
+              </button>
+              {avatarMenuOpen && (
+                <>
+                  <div onClick={() => setAvatarMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 100 }} />
+                  <div className="iz-fade-up" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 260, background: C.white, borderRadius: 12, boxShadow: "0 8px 28px rgba(0,0,0,.12)", border: `1px solid ${C.border}`, zIndex: 101, overflow: "hidden" }}>
+                    <div style={{ padding: "16px 18px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 44, height: 44, borderRadius: "50%", background: `linear-gradient(135deg, ${C.pinkSoft}, ${C.pink})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: C.white }}>
+                        {auth.user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{auth.user?.name || "Admin"}</div>
+                        {auth.user?.email && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{auth.user.email}</div>}
+                      </div>
+                    </div>
+                    <div style={{ padding: "6px 0" }}>
+                      <button onClick={() => { setAvatarMenuOpen(false); setAdminPage("admin_2fa" as any); }}
+                        style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 18px", background: "none", border: "none", cursor: "pointer", fontFamily: font, fontSize: 13, color: C.text, transition: "background .12s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = C.bg}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <ShieldCheck size={15} color={C.textMuted} />
+                        <span>{lang === "fr" ? "Mon 2FA" : "My 2FA"}</span>
+                      </button>
+                    </div>
+                    {/* Language selector */}
+                    <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 18px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                        <Languages size={15} color={C.textMuted} />
+                        <span style={{ fontSize: 13, color: C.text }}>{lang === "fr" ? "Langue" : "Language"}</span>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(activeLanguages.length, 3)}, 1fr)`, gap: 4 }}>
+                        {activeLanguages.map((l: any) => (
+                          <button key={l} onClick={() => switchLang(l)} style={{
+                            padding: "6px 8px", borderRadius: 6, fontSize: 11, fontWeight: lang === l ? 600 : 400,
+                            border: `1px solid ${lang === l ? C.pink : C.border}`,
+                            background: lang === l ? C.pinkBg : C.white,
+                            color: lang === l ? C.pink : C.textMuted,
+                            cursor: "pointer", fontFamily: font, transition: "all .15s",
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                          }}>
+                            <span>{LANG_META[l].flag}</span>
+                            <span>{l.toUpperCase()}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ borderTop: `1px solid ${C.border}`, padding: "6px 0" }}>
+                      <button
+                        onClick={() => { setAvatarMenuOpen(false); const tid = localStorage.getItem("illizeo_tenant_id"); auth.logout().catch(() => {}).finally(() => { window.location.href = tid ? `/${tid}` : "/"; }); }}
+                        style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 18px", background: "none", border: "none", cursor: "pointer", fontFamily: font, fontSize: 13, color: C.red, transition: "background .12s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#FFEBEE"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <LogOut size={15} color={C.red} />
+                        <span>{t('auth.logout')}</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
