@@ -1684,13 +1684,14 @@ export default function OnboardingModule() {
     }
   }, [auth.isAuthenticated, adminPage]);
 
-  // ─── Favicon effect ────────────────────────────────────────
+  // ─── Favicon effect — hardcoded to the Illizeo brand mark, never customized
+  // by tenants. Runs once on mount to override any link[rel=icon] that the
+  // index.html might already provide (kept here for SPA route-change cases).
   useEffect(() => {
-    const href = customFavicon || ILLIZEO_LOGO_URI;
     let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement | null;
     if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
-    link.href = href;
-  }, [customFavicon]);
+    link.href = ILLIZEO_LOGO_URI;
+  }, []);
 
   // ─── Reset password from URL ────────────────────────────────
   useEffect(() => {

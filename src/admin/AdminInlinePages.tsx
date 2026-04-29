@@ -2736,31 +2736,6 @@ Tout changement dans la liste des personnes autorisées doit être notifié à I
             <h1 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 8px" }}>{t('admin.appearance')}</h1>
             <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>{t('settings.appearance_desc')}</p>
 
-            {/* ── Favicon ──────────────────────────────────── */}
-            <div style={sSection}>
-              <h2 style={sSectionTitle}><Globe size={18} color="#7B5EA7" /> {t('settings.favicon')}</h2>
-              <p style={sSectionDesc}>{t('settings.favicon_desc')}</p>
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 10, border: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: C.bg }}>
-                  <img src={customFavicon || ILLIZEO_LOGO_URI} alt="Favicon" style={{ width: 32, height: 32, objectFit: "contain" }} />
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <label style={{ cursor: "pointer" }}>
-                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => { const url = reader.result as string; saveSetting("custom_favicon", url, setCustomFavicon); addToast_admin(t('settings.favicon_updated')); };
-                      reader.readAsDataURL(file);
-                    }} />
-                    <span className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}><Upload size={12} /> {t('settings.change')}</span>
-                  </label>
-                  {customFavicon && <button onClick={() => { saveSetting("custom_favicon", "", setCustomFavicon); addToast_admin(t('settings.reset')); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>{t('settings.reset')}</button>}
-                </div>
-                <div style={{ fontSize: 10, color: C.textMuted }}>{t('settings.favicon_hint')}</div>
-              </div>
-            </div>
-
             {/* ── Langues ────────────────────────────────────── */}
             <div style={sSection}>
               <h2 style={sSectionTitle}><Moon size={18} color={darkMode ? C.amber : C.textMuted} /> {t('settings.dark_mode')}</h2>
