@@ -497,11 +497,16 @@ export function createAuthPages(ctx: any) {
           override. The auth shell is the public brand surface; tenants only get
           their own logo *after* login (in the app sidebar), never here. */}
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "32px 56px", flexShrink: 0 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, filter: "brightness(0) invert(1)" }}>
-            <img src={ILLIZEO_FULL_LOGO_URI} alt="Illizeo" style={{ height: 30, objectFit: "contain", display: "block" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* Iconic Illizeo "O" mark — hardcoded via ILLIZEO_LOGO_URI, never
+                customized by tenants on the public auth shell. */}
+            <img src={ILLIZEO_LOGO_URI} alt="" style={{ height: 32, width: 32, objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+            <span style={{ fontSize: 22, fontWeight: 800, letterSpacing: 2, color: C.white, lineHeight: 1, fontFamily: font }}>
+              ILLIZEO
+            </span>
           </div>
-          <span style={{ fontSize: 8, fontWeight: 600, letterSpacing: 1.8, textTransform: "uppercase", color: "rgba(255,255,255,.85)", paddingLeft: 38 }}>
+          <span style={{ fontSize: 9, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.85)", paddingLeft: 42 }}>
             The all-in-one HR solution
           </span>
         </div>
