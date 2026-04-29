@@ -166,7 +166,6 @@ export function createSetupWizard(ctx: any) {
     { id: "appearance", title: t('wiz.step_appearance'), desc: t('wiz.step_appearance_desc'), icon: Palette, required: false },
     { id: "team", title: t('wiz.step_team'), desc: t('wiz.step_team_desc'), icon: Users, required: true },
     { id: "parcours", title: t('wiz.step_parcours'), desc: t('wiz.step_parcours_desc'), icon: Route, required: true },
-    { id: "email", title: t('wiz.step_email'), desc: t('wiz.step_email_desc'), icon: Mail, required: false },
   ];
   const SECTORS = ["Technologie", "Finance & Banque", "Santé", "Industrie", "Commerce & Retail", "Services", "Éducation", "Immobilier", "Hôtellerie & Restauration", "Transport & Logistique", "Conseil", "Autre"];
   const COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"];
@@ -378,8 +377,44 @@ export function createSetupWizard(ctx: any) {
                       </div>
                     ))}
                     <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                      <button onClick={() => { markSetupStepDone("parcours"); setSetupStep(s => s + 1); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Check size={14} /> {t('wiz.default_ok')}</button>
+                      <button onClick={() => { markSetupStepDone("parcours"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Check size={14} /> {t('wiz.default_ok')}</button>
                       <button onClick={() => { setShowSetupWizard(false); setAdminPage("admin_parcours"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6 }}><FilePen size={14} /> {t('wiz.customize_btn')}</button>
+                    </div>
+
+                    {/* Completion card — Parcours est désormais la dernière
+                        étape du wizard (4 étapes au total : Entreprise ·
+                        Apparence · Équipe · Parcours). */}
+                    <div style={{ marginTop: 32, padding: "28px 32px", borderRadius: 16, background: C.bg, border: `1px solid ${C.border}` }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                        <PartyPopper size={28} color={C.pink} />
+                        <div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{t('wiz.almost_done')}</div>
+                          <div style={{ fontSize: 12, color: C.textMuted }}>{setupCompleted.length}/{SETUP_STEPS.length} {t('wiz.steps_completed')}</div>
+                        </div>
+                      </div>
+                      <p style={{ fontSize: 13, color: C.textLight, lineHeight: 1.6, margin: "0 0 16px" }}>
+                        {t('wiz.finalize_desc')}
+                      </p>
+                      <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, background: C.white, border: `1px solid ${C.border}`, cursor: "pointer", marginBottom: 16 }}>
+                        <input type="checkbox" id="purge-demo" style={{ marginTop: 2, accentColor: C.pink, width: 16, height: 16 }} />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{t('wiz.purge_demo')}</div>
+                          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{t('wiz.purge_demo_desc')}</div>
+                        </div>
+                      </label>
+                      <button onClick={async () => {
+                        const purgeCheckbox = document.getElementById('purge-demo') as HTMLInputElement;
+                        if (purgeCheckbox?.checked) {
+                          try {
+                            const res = await purgeDemoCollaborateurs();
+                            addToast_admin(t('wiz.demo_purged') || `${res.deleted} collaborateur(s) de démo supprimé(s)`);
+                            refetchCollaborateurs();
+                          } catch { /* ignore */ }
+                        }
+                        finishSetupWizard();
+                      }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "12px 28px", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                        <Sparkles size={16} /> {t('wiz.access_space')}
+                      </button>
                     </div>
                   </div>
                 ) : (
@@ -389,70 +424,6 @@ export function createSetupWizard(ctx: any) {
                     <button onClick={() => { setShowSetupWizard(false); setAdminPage("admin_parcours"); }} className="iz-btn-pink" style={{ ...sBtn("pink") }}>{t('wiz.create_parcours')}</button>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* ─── Step 6: Email ─── */}
-            {currentStep.id === "email" && (
-              <div className="iz-fade-up">
-                <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: "0 0 4px" }}>{t('wiz.email_title')}</h2>
-                <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>{t('wiz.email_desc')}</p>
-                <div className="iz-card" style={{ ...sCard, padding: "24px", maxWidth: 550 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-                    <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center" }}><Mail size={18} color={C.pink} /></div>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{t('wiz.welcome_at')} {"{{entreprise}}"}</div>
-                      <div style={{ fontSize: 11, color: C.textMuted }}>{t('wiz.sent_on_create')}</div>
-                    </div>
-                  </div>
-                  <div style={{ padding: "16px", background: C.bg, borderRadius: 10, fontSize: 13, color: C.textLight, lineHeight: 1.7 }}>
-                    {lang === "fr" ? "Bonjour" : "Hello"} <strong>{"{{prenom}}"}</strong>,<br /><br />
-                    {t('wiz.welcome_email_body')}<br /><br />
-                    {t('wiz.welcome_email_body2')} <strong>{"{{date_debut}}"}</strong>. {t('wiz.welcome_email_body3')}<br /><br />
-                    <span style={{ display: "inline-block", padding: "8px 20px", background: C.pink, color: C.white, borderRadius: 6, fontSize: 12, fontWeight: 600 }}>{t('wiz.access_my_space')}</span>
-                  </div>
-                  <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                    <button onClick={() => { markSetupStepDone("email"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Check size={14} /> {t('wiz.template_ok')}</button>
-                    <button onClick={() => { setShowSetupWizard(false); setAdminPage("admin_templates"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6 }}><FilePen size={14} /> {t('wiz.customize_btn')}</button>
-                  </div>
-                </div>
-
-                {/* ── Completion card — affichée sur la dernière étape (email)
-                    après suppression du step "Premier collaborateur". Permet de
-                    finaliser le wizard et accéder à l'espace, avec en option
-                    le purge des collaborateurs de démo. */}
-                <div style={{ marginTop: 32, padding: "28px 32px", borderRadius: 16, background: C.bg, border: `1px solid ${C.border}`, maxWidth: 550 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                    <PartyPopper size={28} color={C.pink} />
-                    <div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{t('wiz.almost_done')}</div>
-                      <div style={{ fontSize: 12, color: C.textMuted }}>{setupCompleted.length}/{SETUP_STEPS.length} {t('wiz.steps_completed')}</div>
-                    </div>
-                  </div>
-                  <p style={{ fontSize: 13, color: C.textLight, lineHeight: 1.6, margin: "0 0 16px" }}>
-                    {t('wiz.finalize_desc')}
-                  </p>
-                  <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, background: C.white, border: `1px solid ${C.border}`, cursor: "pointer", marginBottom: 16 }}>
-                    <input type="checkbox" id="purge-demo" style={{ marginTop: 2, accentColor: C.pink, width: 16, height: 16 }} />
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{t('wiz.purge_demo')}</div>
-                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{t('wiz.purge_demo_desc')}</div>
-                    </div>
-                  </label>
-                  <button onClick={async () => {
-                    const purgeCheckbox = document.getElementById('purge-demo') as HTMLInputElement;
-                    if (purgeCheckbox?.checked) {
-                      try {
-                        const res = await purgeDemoCollaborateurs();
-                        addToast_admin(t('wiz.demo_purged') || `${res.deleted} collaborateur(s) de démo supprimé(s)`);
-                        refetchCollaborateurs();
-                      } catch { /* ignore */ }
-                    }
-                    finishSetupWizard();
-                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "12px 28px", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
-                    <Sparkles size={16} /> {t('wiz.access_space')}
-                  </button>
-                </div>
               </div>
             )}
 
