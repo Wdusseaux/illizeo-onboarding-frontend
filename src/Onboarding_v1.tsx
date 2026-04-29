@@ -2974,6 +2974,11 @@ export default function OnboardingModule() {
         {adminPanels.renderCollabPanel()}
         {adminPanels.renderParcoursPanel()}
         {adminPanels.renderPhasePanel()}
+        {/* Profile modal (Mon profil / Mot de passe / Notifications) — réutilise
+            le composant employé. Sans ce render ici, les items du dropdown
+            avatar admin déclenchaient setShowProfile(true) mais le modal n'était
+            jamais monté côté admin. */}
+        {renderProfileModal()}
       </div>
     );
   }
