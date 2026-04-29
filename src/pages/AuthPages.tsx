@@ -463,9 +463,35 @@ export function createAuthPages(ctx: any) {
     <div style={{ minHeight: "100vh", background: ILLIZEO_BG, fontFamily: font, color: C.white, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
       <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
       <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-      {/* Decorative corner sparks (visual flourish from the design) */}
-      <div aria-hidden style={{ position: "absolute", top: 60, right: -40, width: 200, height: 200, opacity: .15, background: "radial-gradient(circle, #fff 0%, transparent 60%)", pointerEvents: "none" }} />
-      <div aria-hidden style={{ position: "absolute", bottom: 80, left: -60, width: 240, height: 240, opacity: .12, background: "radial-gradient(circle, #fff 0%, transparent 60%)", pointerEvents: "none" }} />
+      {/* Decorative corner motifs (mirror illizeo.com layout):
+          1. Sparkle burst near the .COM button (top-right)
+          2. ShieldCheck outline bottom-right
+          3. Curved arrow back-up bottom-left
+          The Users icon next to the BIENVENUE badge is rendered inside the
+          left column header, not here, since it must stay aligned with the
+          actual badge position. */}
+      <svg aria-hidden width={70} height={70} viewBox="0 0 70 70"
+        style={{ position: "absolute", top: 38, right: 230, opacity: .85, pointerEvents: "none" }}>
+        {/* small radiating dashes around an invisible center */}
+        {Array.from({ length: 8 }).map((_, i) => {
+          const angle = (i / 8) * Math.PI * 2;
+          const r1 = 18, r2 = 28;
+          const x1 = 35 + Math.cos(angle) * r1;
+          const y1 = 35 + Math.sin(angle) * r1;
+          const x2 = 35 + Math.cos(angle) * r2;
+          const y2 = 35 + Math.sin(angle) * r2;
+          return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#fff" strokeWidth={2} strokeLinecap="round" opacity={.7} />;
+        })}
+      </svg>
+      <div aria-hidden style={{ position: "absolute", bottom: 70, right: 60, opacity: .25, pointerEvents: "none" }}>
+        <ShieldCheck size={88} color="#fff" strokeWidth={1.4} />
+      </div>
+      <svg aria-hidden width={90} height={90} viewBox="0 0 90 90"
+        style={{ position: "absolute", bottom: 60, left: 56, opacity: .35, pointerEvents: "none" }}>
+        {/* curved arrow looping back up — outlined */}
+        <path d="M 70 70 Q 30 65 22 30 L 14 38 M 22 30 L 32 36"
+          fill="none" stroke="#fff" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
 
       {/* Top bar — Illizeo brand logo HARDCODED, bypasses any tenant custom_logo
           override. The auth shell is the public brand surface; tenants only get
@@ -489,9 +515,16 @@ export function createAuthPages(ctx: any) {
         {/* Left column */}
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", maxWidth: 620 }}>
           {opts.badge && (
-            <div style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 8, padding: "6px 14px", borderRadius: 999, border: "1px solid rgba(255,255,255,.4)", background: "rgba(255,255,255,.08)", fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 28 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />
-              {opts.badge}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28, position: "relative" }}>
+              {/* Users icon outline echoing the illizeo.com decorative motif —
+                  faded white outline floating just above the badge. */}
+              <div aria-hidden style={{ position: "absolute", left: -8, top: -36, opacity: .35, pointerEvents: "none" }}>
+                <Users size={42} color="#fff" strokeWidth={1.4} />
+              </div>
+              <div style={{ display: "inline-flex", alignSelf: "flex-start", alignItems: "center", gap: 8, padding: "6px 14px", borderRadius: 999, border: "1px solid rgba(255,255,255,.4)", background: "rgba(255,255,255,.08)", fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#fff" }} />
+                {opts.badge}
+              </div>
             </div>
           )}
           <h1 style={{ fontFamily: fontDisplay, fontSize: "clamp(48px, 6.5vw, 88px)", fontWeight: 800, lineHeight: 0.95, letterSpacing: "-0.02em", margin: "0 0 24px", color: C.white }}>
