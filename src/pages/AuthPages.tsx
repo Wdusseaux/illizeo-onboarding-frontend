@@ -533,9 +533,12 @@ export function createAuthPages(ctx: any) {
             const num = String(idx + 1).padStart(2, '0');
             return (
               <button key={r.slug} onClick={() => {
+                // Full navigation rather than in-place state update: guarantees
+                // a re-mount with the new URL/tenant context, avoids any stale
+                // closure or React batching surprises that prevented the swap
+                // to renderLogin in some cases.
                 localStorage.setItem("illizeo_tenant_id", r.slug);
-                pushTenantRoot(r.slug);
-                setTenantResolved(true);
+                window.location.href = `/${r.slug}`;
               }} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.06)", color: C.white, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "all .15s" }}
                 onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,.12)"; e.currentTarget.style.transform = "translateX(2px)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,.06)"; e.currentTarget.style.transform = "translateX(0)"; }}>
