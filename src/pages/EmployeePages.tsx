@@ -390,6 +390,67 @@ export function createEmployeeRenders(ctx: any) {
           style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s" }}>
           {darkMode ? <Sun size={16} color={C.amber} /> : <Moon size={16} color={C.textMuted} />}
         </button>
+        {/* Notification bell — même pattern que le topbar admin. La page
+            "Notifications" a été retirée de la sidebar employé en faveur de
+            ce dropdown contextuel. */}
+        <div data-notif-dropdown style={{ position: "relative" }}>
+          <button onClick={() => ctx.setShowNotifDropdown?.(!ctx.showNotifDropdown)}
+            title={t('sidebar.notifications')}
+            style={{ width: 36, height: 36, borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", position: "relative", transition: "all .15s" }}>
+            <Bell size={16} color={C.textMuted} />
+            {(ctx.notifUnread || 0) > 0 && (
+              <div style={{ position: "absolute", top: -3, right: -3, minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8, background: C.pink, color: C.white, fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {ctx.notifUnread > 9 ? "9+" : ctx.notifUnread}
+              </div>
+            )}
+          </button>
+          {ctx.showNotifDropdown && (
+            <>
+              <div onClick={() => ctx.setShowNotifDropdown?.(false)} style={{ position: "fixed", inset: 0, zIndex: 100 }} />
+              <div className="iz-fade-up" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, width: 380, maxHeight: 480, background: C.white, borderRadius: 12, boxShadow: "0 8px 28px rgba(0,0,0,.15)", border: `1px solid ${C.border}`, zIndex: 101, overflow: "hidden" }}>
+                <div style={{ padding: "14px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 15, fontWeight: 600 }}>{t('sidebar.notifications')}</span>
+                  {(ctx.notifUnread || 0) > 0 && (
+                    <button onClick={async () => {
+                      try { await (await import('../api/endpoints')).markAllNotifsRead(); } catch {}
+                      try { ctx.setUserNotifs?.(await (await import('../api/endpoints')).getUserNotifications()); } catch {}
+                      ctx.setNotifUnread?.(0);
+                    }} style={{ background: "none", border: "none", color: C.pink, fontSize: 11, cursor: "pointer", fontFamily: font }}>{lang === "fr" ? "Tout marquer comme lu" : "Mark all read"}</button>
+                  )}
+                </div>
+                <div style={{ maxHeight: 400, overflow: "auto" }}>
+                  {(!ctx.userNotifs || ctx.userNotifs.length === 0) && (
+                    <div style={{ padding: "30px 16px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{lang === "fr" ? "Aucune notification" : "No notifications"}</div>
+                  )}
+                  {(ctx.userNotifs || []).slice(0, 15).map((n: any) => (
+                    <div key={n.id} onClick={async () => {
+                      if (!n.read_at) {
+                        try {
+                          const ep = await import('../api/endpoints');
+                          await ep.markNotifRead(n.id);
+                          ctx.setUserNotifs?.(await ep.getUserNotifications());
+                          ctx.setNotifUnread?.(Math.max(0, (ctx.notifUnread || 0) - 1));
+                        } catch {}
+                      }
+                      ctx.setShowNotifDropdown?.(false);
+                    }}
+                      style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", background: n.read_at ? "transparent" : C.pinkBg + "30", transition: "background .15s" }}
+                      className="iz-sidebar-item">
+                      <div style={{ display: "flex", alignItems: "start", gap: 10 }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: n.read_at ? "transparent" : C.pink, flexShrink: 0, marginTop: 5 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: n.read_at ? 400 : 600, color: C.text }}>{n.titre || n.title}</div>
+                          <div style={{ fontSize: 11, color: C.textLight, marginTop: 2 }}>{n.contenu || n.message || ""}</div>
+                          <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>{fmtDateTimeShort(n.created_at)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
         {/* Avatar dropdown */}
         <div style={{ position: "relative" }}>
           <button onClick={() => setOpen(!open)}

@@ -1856,7 +1856,9 @@ export default function OnboardingModule() {
       { id: "mon_profil" as const, label: "Mon profil", icon: UserCheck },
       { id: "assistant_ia" as const, label: "Assistant IA", icon: Sparkles },
       { id: "cooptation" as const, label: t('admin.cooptation'), icon: Handshake },
-      { id: "notifications" as const, label: t('sidebar.notifications'), icon: Bell, badge: notifUnread > 0 ? notifUnread : undefined },
+      // Notifications retirées de la sidebar : la cloche dans le topbar
+      // employé (à côté de l'avatar) ouvre désormais le dropdown notif —
+      // cohérent avec le pattern admin.
     ]},
   ];
   ctx.SIDEBAR_ITEMS = SIDEBAR_ITEMS;
@@ -2314,6 +2316,17 @@ export default function OnboardingModule() {
                         <ShieldCheck size={15} color={C.textMuted} />
                         <span>{lang === "fr" ? "Mon 2FA" : "My 2FA"}</span>
                       </button>
+                      {/* Super Admin — visible seulement pour les comptes
+                          plateforme Illizeo, pas pour les tenants clients. */}
+                      {isEditorTenant && (auth.user?.email === "wilfrid@illizeo.com" || auth.user?.email === "admin@illizeo.com") && (
+                        <button onClick={() => { setAvatarMenuOpen(false); setSuperAdminMode(true); setSaDashData(null); setSaPlans([]); setSaTenants([]); setSaSubscriptions([]); setSaLoaded(false); }}
+                          style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 18px", background: "none", border: "none", cursor: "pointer", fontFamily: font, fontSize: 13, color: C.amber, transition: "background .12s" }}
+                          onMouseEnter={e => e.currentTarget.style.background = C.bg}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                          <Crown size={15} color={C.amber} />
+                          <span>{t('role.super_admin')}</span>
+                        </button>
+                      )}
                     </div>
                     {/* Language selector */}
                     <div style={{ borderTop: `1px solid ${C.border}`, padding: "10px 18px" }}>

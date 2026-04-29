@@ -309,36 +309,9 @@ export function createAdminSidebarComponent(ctx: any) {
             </div>
           ))}
         </div>
-        {/* Bottom: Settings + User */}
-        <div style={{ borderTop: `1px solid ${C.border}`, padding: collapsed ? "8px 0" : "8px 10px" }}>
-          {/* Super Admin shortcut (visible for super_admin role OR platform admin email) */}
-          {isEditorTenant && (auth.user?.email === "wilfrid@illizeo.com" || auth.user?.email === "admin@illizeo.com") && (
-            <button onClick={() => { setSuperAdminMode(true); setSaDashData(null); setSaPlans([]); setSaTenants([]); setSaSubscriptions([]); setSaLoaded(false); }} title={t('role.super_admin')} className="iz-sidebar-item" style={{
-              display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10,
-              width: "100%", padding: collapsed ? "10px 0" : "8px 10px", borderRadius: 8, border: "none",
-              background: "transparent", color: C.amber, cursor: "pointer", fontFamily: font, fontSize: 13, transition: "all .15s",
-            }}>
-              <Crown size={18} />
-              {!collapsed && <span>{t('role.super_admin')}</span>}
-            </button>
-          )}
-          {/* Settings shortcut — hidden for now */}
-        </div>
-        {/* User avatar + menu */}
-        <div style={{ borderTop: `1px solid ${C.border}`, padding: collapsed ? "12px 0" : "10px 12px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10 }}>
-            <div onClick={() => { if (collapsed) setSidebarCollapsed(false); }} style={{ width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(135deg, ${C.pinkSoft}, ${C.pink})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: C.white, cursor: "pointer", flexShrink: 0 }}>
-              {auth.user?.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase() || "?"}
-            </div>
-            {!collapsed && (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.dark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{auth.user?.name || "Admin"}</div>
-              </div>
-            )}
-          </div>
-          {/* Langue / Mon 2FA / Déconnexion ont été déplacés dans le dropdown
-              avatar du topbar admin (cohérent avec le portail employé). */}
-        </div>
+        {/* Avatar admin + Super Admin + Langue / 2FA / Déconnexion ont tous
+            été déplacés dans le dropdown avatar du topbar admin (en haut à
+            droite), cohérent avec le portail employé. */}
       </div>
     );
 
