@@ -860,7 +860,7 @@ export function createAuthPages(ctx: any) {
     return renderAuthShell({
       badge: `Connexion · ${tenantId}.onboarding.illizeo.com`,
       title: <>BIENVENUE,<br /><span style={{ color: "rgba(255,255,255,.55)" }}>RECONNECTEZ-VOUS</span><br />À VOTRE ESPACE.</>,
-      subtitle: "Retrouvez vos collaborateurs, parcours, signatures et tous vos outils RH au même endroit.",
+      subtitle: "Retrouvez vos on, cross, re, off-boardings, parcours, signatures, gestion du matériel, cooptations au même endroit.",
       leftBody,
       rightPanel: renderRecentSpacesPanel(),
     });
