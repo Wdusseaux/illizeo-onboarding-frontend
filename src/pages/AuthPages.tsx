@@ -759,7 +759,7 @@ export function createAuthPages(ctx: any) {
   );
 
   const renderRegisterRightPanel = () => (
-    <div style={{ background: "rgba(0,0,0,.18)", border: "1px solid rgba(255,255,255,.18)", borderRadius: 18, padding: "28px 30px", backdropFilter: "blur(8px)" }}>
+    <div style={{ padding: "0 4px" }}>
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.85)", marginBottom: 22 }}>↳ Tout inclus dès le 1er jour</div>
       {[
         { icon: Sparkles, title: "Essai 14 jours offerts", desc: "Aucune carte requise. Annulez à tout moment." },
@@ -864,7 +864,7 @@ export function createAuthPages(ctx: any) {
         </div>
 
         {forgotMode && (
-          <div style={{ marginTop: 18, padding: "18px 20px", background: "rgba(0,0,0,.22)", border: "1px solid rgba(255,255,255,.18)", borderRadius: 12 }}>
+          <div style={{ marginTop: 18, padding: "0 4px" }}>
             {forgotSent ? (
               <div style={{ textAlign: "center" }}>
                 <CheckCircle size={24} color="#A8FFD2" style={{ marginBottom: 8 }} />

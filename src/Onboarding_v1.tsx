@@ -1514,11 +1514,15 @@ export default function OnboardingModule() {
         if (s.demo_mode !== undefined) { const dm = s.demo_mode === "true" || s.demo_mode === true; setDemoMode(dm); localStorage.setItem("illizeo_demo_mode", String(dm)); }
         if (s.login_gradient_start) { setLoginGradientStart(s.login_gradient_start); localStorage.setItem("illizeo_login_gradient_start", s.login_gradient_start); }
         if (s.login_gradient_end) { setLoginGradientEnd(s.login_gradient_end); localStorage.setItem("illizeo_login_gradient_end", s.login_gradient_end); }
-        // Setup wizard: show for new tenants (no setup_completed flag)
+        // Setup wizard: show for new tenants (no setup_completed flag).
+        // Hydrate de setupData ALWAYS run (même si déjà setup) — le wizard peut
+        // être réouvert manuellement et doit afficher la valeur sauvegardée.
+        if (s.company_name) setSetupData(prev => ({ ...prev, company_name: s.company_name }));
+        if (s.sector) setSetupData(prev => ({ ...prev, sector: s.sector }));
+        if (s.company_size) setSetupData(prev => ({ ...prev, company_size: s.company_size }));
         if (auth.isAdmin && !s.setup_completed) {
           setShowSetupWizard(true);
           if (s.setup_steps_done) try { setSetupCompleted(JSON.parse(s.setup_steps_done)); } catch {}
-          if (s.company_name) setSetupData(prev => ({ ...prev, company_name: s.company_name }));
         }
         // Load avatar & banner per user
         const avatarKey = `avatar_${auth.user?.id}`;

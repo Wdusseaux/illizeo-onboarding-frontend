@@ -165,7 +165,6 @@ export function createSetupWizard(ctx: any) {
     { id: "company", title: t('wiz.step_company'), desc: t('wiz.step_company_desc'), icon: Building2, required: true },
     { id: "appearance", title: t('wiz.step_appearance'), desc: t('wiz.step_appearance_desc'), icon: Palette, required: false },
     { id: "team", title: t('wiz.step_team'), desc: t('wiz.step_team_desc'), icon: Users, required: true },
-    { id: "parcours", title: t('wiz.step_parcours'), desc: t('wiz.step_parcours_desc'), icon: Route, required: true },
   ];
   const SECTORS = ["Technologie", "Finance & Banque", "Santé", "Industrie", "Commerce & Retail", "Services", "Éducation", "Immobilier", "Hôtellerie & Restauration", "Transport & Logistique", "Conseil", "Autre"];
   const COMPANY_SIZES = ["1-10", "11-50", "51-200", "201-500", "501-1000", "1000+"];
@@ -288,10 +287,9 @@ export function createSetupWizard(ctx: any) {
                       {COMPANY_SIZES.map(s => <option key={s} value={s}>{s} {t('wiz.employees')}</option>)}
                     </select>
                   </div>
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('wiz.main_site')}</label>
-                    <input value={setupData.site_principal} onChange={e => setSetupData(d => ({ ...d, site_principal: e.target.value }))} placeholder={lang === "fr" ? "Ex: Genève, Siège social" : "E.g.: Geneva, Headquarters"} style={{ ...sInput, fontSize: 13, padding: "12px 16px" }} />
-                  </div>
+                  {/* "Site principal" retiré : champ texte libre sans impact réel.
+                      Les vrais sites sont gérés depuis le module collaborateurs
+                      / champs personnalisés. */}
                 </div>
               </div>
             )}
@@ -356,96 +354,67 @@ export function createSetupWizard(ctx: any) {
                     if (failed > 0) addToast_admin(`${failed} ${lang === "fr" ? "invitation(s) échouée(s) — adresse déjà utilisée ou erreur" : "invitation(s) failed — email already used or error"}`);
                   }} className="iz-btn-pink" style={{ ...sBtn("pink"), alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6 }}><Send size={14} /> {t('wiz.send_invitations')}</button>
                 </div>
-              </div>
-            )}
 
-            {/* ─── Step 4: Parcours ─── */}
-            {currentStep.id === "parcours" && (
-              <div className="iz-fade-up">
-                <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text, margin: "0 0 4px" }}>{t('wiz.onboarding_path')}</h2>
-                <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>{t('wiz.onboarding_path_desc')}</p>
-                {PARCOURS_TEMPLATES.filter(p => p.status === "actif").length > 0 ? (
-                  <div style={{ maxWidth: 600 }}>
-                    {PARCOURS_TEMPLATES.filter(p => p.status === "actif").slice(0, 3).map(p => (
-                      <div key={p.id} className="iz-card" style={{ ...sCard, padding: "16px 20px", marginBottom: 12, display: "flex", alignItems: "center", gap: 16 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center" }}><Route size={20} color={C.pink} /></div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{p.nom}</div>
-                          <div style={{ fontSize: 12, color: C.textMuted }}>{p.phases.length} {t('wiz.phases')} · {p.actionsCount} {t('wiz.actions')} · {p.docsCount} {t('wiz.documents')}</div>
-                        </div>
-                        <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: C.greenLight, color: C.green }}>{t('wiz.active')}</span>
-                      </div>
-                    ))}
-                    <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                      <button onClick={() => { markSetupStepDone("parcours"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Check size={14} /> {t('wiz.default_ok')}</button>
-                      <button onClick={() => { setShowSetupWizard(false); setAdminPage("admin_parcours"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6 }}><FilePen size={14} /> {t('wiz.customize_btn')}</button>
-                    </div>
-
-                    {/* Completion card — Parcours est désormais la dernière
-                        étape du wizard (4 étapes au total : Entreprise ·
-                        Apparence · Équipe · Parcours). */}
-                    <div style={{ marginTop: 32, padding: "28px 32px", borderRadius: 16, background: C.bg, border: `1px solid ${C.border}` }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                        <PartyPopper size={28} color={C.pink} />
-                        <div>
-                          <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{t('wiz.almost_done')}</div>
-                          <div style={{ fontSize: 12, color: C.textMuted }}>{setupCompleted.length}/{SETUP_STEPS.length} {t('wiz.steps_completed')}</div>
-                        </div>
-                      </div>
-                      <p style={{ fontSize: 13, color: C.textLight, lineHeight: 1.6, margin: "0 0 16px" }}>
-                        {t('wiz.finalize_desc')}
-                      </p>
-                      <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, background: C.white, border: `1px solid ${C.border}`, cursor: "pointer", marginBottom: 16 }}>
-                        <input type="checkbox" id="purge-demo" style={{ marginTop: 2, accentColor: C.pink, width: 16, height: 16 }} />
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{t('wiz.purge_demo')}</div>
-                          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{t('wiz.purge_demo_desc')}</div>
-                        </div>
-                      </label>
-                      <button onClick={async () => {
-                        const purgeCheckbox = document.getElementById('purge-demo') as HTMLInputElement;
-                        if (purgeCheckbox?.checked) {
-                          try {
-                            const res = await purgeDemoCollaborateurs();
-                            addToast_admin(t('wiz.demo_purged') || `${res.deleted} collaborateur(s) de démo supprimé(s)`);
-                            refetchCollaborateurs();
-                          } catch { /* ignore */ }
-                        }
-                        finishSetupWizard();
-                      }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "12px 28px", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
-                        <Sparkles size={16} /> {t('wiz.access_space')}
-                      </button>
+                {/* Completion card — Équipe est désormais la dernière étape du
+                    wizard (3 étapes au total : Entreprise · Apparence · Équipe). */}
+                <div style={{ marginTop: 32, padding: "28px 32px", borderRadius: 16, background: C.bg, border: `1px solid ${C.border}`, maxWidth: 600 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <PartyPopper size={28} color={C.pink} />
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{t('wiz.almost_done')}</div>
+                      <div style={{ fontSize: 12, color: C.textMuted }}>{setupCompleted.length}/{SETUP_STEPS.length} {t('wiz.steps_completed')}</div>
                     </div>
                   </div>
-                ) : (
-                  <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted }}>
-                    <Route size={40} color={C.border} style={{ marginBottom: 12 }} />
-                    <div style={{ fontSize: 14, marginBottom: 12 }}>{t('wiz.no_parcours')}</div>
-                    <button onClick={() => { setShowSetupWizard(false); setAdminPage("admin_parcours"); }} className="iz-btn-pink" style={{ ...sBtn("pink") }}>{t('wiz.create_parcours')}</button>
-                  </div>
-                )}
+                  <p style={{ fontSize: 13, color: C.textLight, lineHeight: 1.6, margin: "0 0 16px" }}>
+                    {t('wiz.finalize_desc')}
+                  </p>
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 10, background: C.white, border: `1px solid ${C.border}`, cursor: "pointer", marginBottom: 16 }}>
+                    <input type="checkbox" id="purge-demo" style={{ marginTop: 2, accentColor: C.pink, width: 16, height: 16 }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{t('wiz.purge_demo')}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{t('wiz.purge_demo_desc')}</div>
+                    </div>
+                  </label>
+                  <button onClick={async () => {
+                    const purgeCheckbox = document.getElementById('purge-demo') as HTMLInputElement;
+                    if (purgeCheckbox?.checked) {
+                      try {
+                        const res = await purgeDemoCollaborateurs();
+                        addToast_admin(t('wiz.demo_purged') || `${res.deleted} collaborateur(s) de démo supprimé(s)`);
+                        refetchCollaborateurs();
+                      } catch { /* ignore */ }
+                    }
+                    finishSetupWizard();
+                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "12px 28px", fontSize: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                    <Sparkles size={16} /> {t('wiz.access_space')}
+                  </button>
+                </div>
               </div>
             )}
 
-            {/* Navigation buttons */}
-            {(
-              <div style={{ display: "flex", gap: 10, marginTop: 32 }}>
-                {setupStep > 0 && <button onClick={() => setSetupStep(s => s - 1)} className="iz-btn-outline" style={sBtn("outline")}>{t('misc.return')}</button>}
-                {!currentStep.required && !setupCompleted.includes(currentStep.id) && (
-                  <button onClick={() => { setSetupStep(s => s + 1); }} className="iz-btn-outline" style={{ ...sBtn("outline"), color: C.textMuted }}>{t('wiz.skip_step')}</button>
-                )}
-                <button onClick={async () => {
-                  // Save step data and mark as done
-                  if (currentStep.id === "company" && setupData.company_name.trim()) {
-                    updateCompanySettings({ company_name: setupData.company_name, sector: setupData.sector, company_size: setupData.company_size, site_principal: setupData.site_principal }).catch(() => {});
-                    markSetupStepDone("company");
-                  } else if (currentStep.id === "appearance") { markSetupStepDone("appearance"); }
-                  if (setupStep < SETUP_STEPS.length - 1) setSetupStep(s => s + 1);
-                }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}>
-                  {t('wiz.continue')} <ChevronRight size={14} />
-                </button>
-              </div>
-            )}
+            {/* Navigation buttons — sur la dernière étape (Équipe), seul Retour
+                est exposé : la completion card sous le formulaire contient déjà
+                le bouton "Accéder à mon espace" qui termine le wizard. */}
+            <div style={{ display: "flex", gap: 10, marginTop: 32 }}>
+              {setupStep > 0 && <button onClick={() => setSetupStep(s => s - 1)} className="iz-btn-outline" style={sBtn("outline")}>{t('misc.return')}</button>}
+              {currentStep.id !== "team" && (
+                <>
+                  {!currentStep.required && !setupCompleted.includes(currentStep.id) && (
+                    <button onClick={() => { setSetupStep(s => s + 1); }} className="iz-btn-outline" style={{ ...sBtn("outline"), color: C.textMuted }}>{t('wiz.skip_step')}</button>
+                  )}
+                  <button onClick={async () => {
+                    // Save step data and mark as done
+                    if (currentStep.id === "company" && setupData.company_name.trim()) {
+                      updateCompanySettings({ company_name: setupData.company_name, sector: setupData.sector, company_size: setupData.company_size }).catch(() => {});
+                      markSetupStepDone("company");
+                    } else if (currentStep.id === "appearance") { markSetupStepDone("appearance"); }
+                    if (setupStep < SETUP_STEPS.length - 1) setSetupStep(s => s + 1);
+                  }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}>
+                    {t('wiz.continue')} <ChevronRight size={14} />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
