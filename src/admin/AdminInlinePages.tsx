@@ -2736,68 +2736,6 @@ Tout changement dans la liste des personnes autorisées doit être notifié à I
             <h1 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 8px" }}>{t('admin.appearance')}</h1>
             <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>{t('settings.appearance_desc')}</p>
 
-            {/* ── Logo ──────────────────────────────────────── */}
-            <div style={sSection}>
-              <h2 style={sSectionTitle}><Building2 size={18} color={C.blue} /> {t('settings.company_logo')}</h2>
-              <p style={sSectionDesc}>{t('settings.logo_desc')}</p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-                {/* Icône (carré) */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{t('settings.icon_square')}</label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ width: 64, height: 64, borderRadius: 12, border: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: C.bg }}>
-                      <img src={customLogo || ILLIZEO_LOGO_URI} alt="Logo" style={{ width: 48, height: 48, objectFit: "contain" }} />
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <label style={{ cursor: "pointer" }}>
-                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = () => { const url = reader.result as string; saveSetting("custom_logo", url, setCustomLogo); addToast_admin(t('settings.icon_updated')); };
-                          reader.readAsDataURL(file);
-                        }} />
-                        <span className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}><Upload size={12} /> {t('settings.change')}</span>
-                      </label>
-                      {customLogo && <button onClick={() => { saveSetting("custom_logo", "", setCustomLogo); addToast_admin(t('settings.reset')); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>{t('settings.reset')}</button>}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6 }}>{t('settings.logo_hint_icon')}</div>
-                </div>
-                {/* Logo complet (horizontal) */}
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>{t('settings.logo_horizontal')}</label>
-                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div style={{ width: 180, height: 64, borderRadius: 12, border: `2px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", background: C.bg, padding: "0 12px" }}>
-                      <img src={customLogoFull || ILLIZEO_FULL_LOGO_URI} alt="Logo" style={{ height: 32, objectFit: "contain", maxWidth: "100%" }} />
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      <label style={{ cursor: "pointer" }}>
-                        <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = () => { const url = reader.result as string; saveSetting("custom_logo_full", url, setCustomLogoFull); addToast_admin(t('settings.logo_updated')); };
-                          reader.readAsDataURL(file);
-                        }} />
-                        <span className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}><Upload size={12} /> {t('settings.change')}</span>
-                      </label>
-                      {customLogoFull && <button onClick={() => { saveSetting("custom_logo_full", "", setCustomLogoFull); addToast_admin(t('settings.reset')); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>{t('settings.reset')}</button>}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6 }}>{t('settings.logo_hint_full')}</div>
-                </div>
-              </div>
-              {/* Preview */}
-              <div style={{ marginTop: 16, padding: "16px 20px", borderRadius: 10, background: C.bg }}>
-                <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>{t('settings.sidebar_preview')}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, background: C.white, padding: "12px 16px", borderRadius: 10, border: `1px solid ${C.border}`, width: "fit-content" }}>
-                  <img src={customLogo || ILLIZEO_LOGO_URI} alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />
-                  <img src={customLogoFull || ILLIZEO_FULL_LOGO_URI} alt="" style={{ height: 22, objectFit: "contain" }} />
-                </div>
-              </div>
-            </div>
-
             {/* ── Favicon ──────────────────────────────────── */}
             <div style={sSection}>
               <h2 style={sSectionTitle}><Globe size={18} color="#7B5EA7" /> {t('settings.favicon')}</h2>
@@ -2820,56 +2758,6 @@ Tout changement dans la liste des personnes autorisées doit être notifié à I
                   {customFavicon && <button onClick={() => { saveSetting("custom_favicon", "", setCustomFavicon); addToast_admin(t('settings.reset')); }} style={{ background: "none", border: "none", color: C.red, fontSize: 11, cursor: "pointer", padding: 0, textAlign: "left" }}>{t('settings.reset')}</button>}
                 </div>
                 <div style={{ fontSize: 10, color: C.textMuted }}>{t('settings.favicon_hint')}</div>
-              </div>
-            </div>
-
-            {/* ── Fond page de connexion ─────────────────────── */}
-            <div style={sSection}>
-              <h2 style={sSectionTitle}><Clapperboard size={18} color={C.pink} /> {t('settings.login_bg')}</h2>
-              <p style={sSectionDesc}>{t('settings.login_bg_desc')}</p>
-              <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
-                <div style={{ width: 240, height: 140, borderRadius: 12, border: `2px solid ${C.border}`, overflow: "hidden", background: loginBgImage ? `url(${loginBgImage}) center/cover no-repeat` : `linear-gradient(135deg, ${loginGradientStart} 0%, ${loginGradientEnd} 100%)`, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 }}>
-                  <div style={{ width: 80, background: "rgba(255,255,255,.9)", borderRadius: 8, padding: "8px", textAlign: "center" }}>
-                    <div style={{ fontSize: 7, fontWeight: 700, color: C.dark }}>Connexion</div>
-                    <div style={{ width: "100%", height: 4, borderRadius: 2, background: C.bg, margin: "3px 0" }} />
-                    <div style={{ width: "100%", height: 4, borderRadius: 2, background: C.bg, marginBottom: 3 }} />
-                    <div style={{ width: "100%", height: 8, borderRadius: 3, background: C.pink }} />
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <label style={{ cursor: "pointer" }}>
-                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 5 * 1024 * 1024) { addToast_admin(t('settings.image_too_large')); return; }
-                      const reader = new FileReader();
-                      reader.onload = () => { const url = reader.result as string; saveSetting("login_bg_image", url, setLoginBgImage); addToast_admin(t('settings.login_bg_updated')); };
-                      reader.readAsDataURL(file);
-                    }} />
-                    <span className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 18px", fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}><Upload size={13} /> {t('settings.choose_image')}</span>
-                  </label>
-                  {loginBgImage && <button onClick={() => { saveSetting("login_bg_image", "", setLoginBgImage); addToast_admin(t('settings.reset')); }} style={{ ...sBtn("outline"), padding: "6px 14px", fontSize: 11, color: C.red, borderColor: C.red }}>{t('settings.reset')}</button>}
-
-                  {/* Gradient color pickers */}
-                  {!loginBgImage && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: C.text }}>Couleurs du dégradé</div>
-                      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <input type="color" value={loginGradientStart} onChange={e => { setLoginGradientStart(e.target.value); localStorage.setItem("illizeo_login_gradient_start", e.target.value); }} style={{ width: 32, height: 32, border: `2px solid ${C.border}`, borderRadius: 6, cursor: "pointer", padding: 0 }} />
-                          <span style={{ fontSize: 10, color: C.textMuted }}>Début</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <input type="color" value={loginGradientEnd} onChange={e => { setLoginGradientEnd(e.target.value); localStorage.setItem("illizeo_login_gradient_end", e.target.value); }} style={{ width: 32, height: 32, border: `2px solid ${C.border}`, borderRadius: 6, cursor: "pointer", padding: 0 }} />
-                          <span style={{ fontSize: 10, color: C.textMuted }}>Fin</span>
-                        </div>
-                        <button onClick={() => { saveSetting("login_gradient_start", loginGradientStart, setLoginGradientStart); saveSetting("login_gradient_end", loginGradientEnd, setLoginGradientEnd); addToast_admin("Dégradé sauvegardé"); }} className="iz-btn-outline" style={{ ...sBtn("outline"), padding: "4px 12px", fontSize: 10 }}>Sauvegarder</button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{ fontSize: 10, color: C.textMuted, lineHeight: 1.5, maxWidth: 240 }}>{t('settings.login_bg_hint')}</div>
-                </div>
               </div>
             </div>
 

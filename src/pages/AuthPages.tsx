@@ -555,7 +555,7 @@ export function createAuthPages(ctx: any) {
   const renderRecentSpacesPanel = () => {
     const recents = getRecentTenants();
     return (
-      <div style={{ background: "rgba(0,0,0,.18)", border: "1px solid rgba(255,255,255,.18)", borderRadius: 18, padding: "26px 28px", backdropFilter: "blur(8px)" }}>
+      <div style={{ padding: "0 4px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
           <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.85)" }}>↳ Vos espaces récents</span>
           <span style={{ fontSize: 10, color: "rgba(255,255,255,.65)", letterSpacing: 1, textTransform: "uppercase" }}>{recents.length} accès</span>
