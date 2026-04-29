@@ -1320,6 +1320,18 @@ export async function updateCompanySettings(settings: Record<string, any>) {
   return apiFetch<{ message: string }>('/company-settings', { method: 'PUT', body: JSON.stringify({ settings }) });
 }
 
+// Avatar/banner endpoints accessible to all authenticated users (employees too).
+// Use these instead of updateCompanySettings({ avatar_<id>: ... }) which requires admin role.
+export async function saveMyAvatar(dataUrl: string) {
+  return apiFetch<{ ok: boolean }>('/me/avatar', { method: 'POST', body: JSON.stringify({ avatar: dataUrl }) });
+}
+export async function deleteMyAvatar() {
+  return apiFetch<{ ok: boolean }>('/me/avatar', { method: 'DELETE' });
+}
+export async function saveMyBanner(payload: { image?: string | null; color?: string | null }) {
+  return apiFetch<{ ok: boolean }>('/me/banner', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 // ─── Password Policy (public, no auth) ─────────────────────
 export interface PasswordPolicy {
   min_length: number;

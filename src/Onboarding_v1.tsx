@@ -39,6 +39,7 @@ import {
   get2FAStatus, setup2FA, confirm2FA, disable2FA, regenerate2FARecoveryCodes,
   registerTenant, checkTenantAvailability,
   getCompanySettings, updateCompanySettings, getTenantBranding,
+  saveMyAvatar, deleteMyAvatar, saveMyBanner,
   getBadges, getMyBadges, getBadgeTemplates, createBadgeTemplate as apiCreateBadgeTpl, updateBadgeTemplate as apiUpdateBadgeTpl, deleteBadgeTemplate as apiDeleteBadgeTpl, awardBadge, revokeBadge,
   type Badge, type BadgeTemplate,
   getPlans, type PlanData,
@@ -1521,7 +1522,18 @@ export default function OnboardingModule() {
         }
         // Load avatar & banner per user
         const avatarKey = `avatar_${auth.user?.id}`;
-        if (s[avatarKey]) { setAvatarImage(s[avatarKey]); localStorage.setItem("illizeo_avatar", s[avatarKey]); }
+        if (s[avatarKey]) {
+          setAvatarImage(s[avatarKey]);
+          localStorage.setItem("illizeo_avatar", s[avatarKey]);
+        } else if (auth.user?.id) {
+          // Self-heal: avatar in localStorage but missing from backend (previous
+          // updateCompanySettings calls were 403 for non-admins). Push it now via
+          // the new /me/avatar endpoint so admins can finally see it.
+          const localAv = localStorage.getItem("illizeo_avatar");
+          if (localAv && localAv.length > 100) {
+            saveMyAvatar(localAv).catch(() => {});
+          }
+        }
         const bannerColorKey = `banner_color_${auth.user?.id}`;
         if (s[bannerColorKey]) { setEmployeeBannerColor(s[bannerColorKey]); localStorage.setItem("illizeo_banner_color", s[bannerColorKey]); }
         const bannerImageKey = `banner_image_${auth.user?.id}`;
@@ -2107,7 +2119,7 @@ export default function OnboardingModule() {
                           setAvatarPos({ x: 50, y: 50 });
                           localStorage.setItem("illizeo_avatar", compressed);
                           if (auth.user?.id) {
-                            updateCompanySettings({ [`avatar_${auth.user.id}`]: compressed })
+                            saveMyAvatar(compressed)
                               .then(() => addToast("Photo enregistrée", "success"))
                               .catch((err: any) => addToast("Échec de l'enregistrement : " + (err?.message || ""), "error"));
                           }
@@ -4927,7 +4939,7 @@ export default function OnboardingModule() {
                 setAvatarImage(compressed); setAvatarZoom(100); setAvatarPos({ x: 50, y: 50 });
                 localStorage.setItem("illizeo_avatar", compressed);
                 if (auth.user?.id) {
-                  updateCompanySettings({ [`avatar_${auth.user.id}`]: compressed })
+                  saveMyAvatar(compressed)
                     .then(() => addToast("Photo enregistrée", "success"))
                     .catch((err: any) => { addToast("Échec de l'enregistrement de la photo : " + (err?.message || ""), "error"); });
                 }
@@ -4965,7 +4977,7 @@ export default function OnboardingModule() {
               <div style={{ display: "flex", gap: 8 }}>
                 <button onClick={() => { setShowAvatarEditor(false); localStorage.setItem("illizeo_avatar_zoom", String(avatarZoom)); localStorage.setItem("illizeo_avatar_pos", JSON.stringify(avatarPos)); addToast("Photo mise à jour", "success"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), flex: 1, fontSize: 13 }}>Valider</button>
                 <button onClick={() => document.getElementById("avatar-upload")?.click()} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13 }}>Changer</button>
-                <button onClick={() => { setAvatarImage(null); setAvatarZoom(100); setAvatarPos({ x: 50, y: 50 }); localStorage.removeItem("illizeo_avatar"); localStorage.removeItem("illizeo_avatar_zoom"); localStorage.removeItem("illizeo_avatar_pos"); updateCompanySettings({ [`avatar_${auth.user?.id}`]: "" }).catch(() => {}); }} style={{ background: "none", border: `1px solid ${C.red}`, borderRadius: 8, padding: "8px 16px", fontSize: 13, color: C.red, cursor: "pointer", fontFamily: font }}>Retirer</button>
+                <button onClick={() => { setAvatarImage(null); setAvatarZoom(100); setAvatarPos({ x: 50, y: 50 }); localStorage.removeItem("illizeo_avatar"); localStorage.removeItem("illizeo_avatar_zoom"); localStorage.removeItem("illizeo_avatar_pos"); deleteMyAvatar().catch(() => {}); }} style={{ background: "none", border: `1px solid ${C.red}`, borderRadius: 8, padding: "8px 16px", fontSize: 13, color: C.red, cursor: "pointer", fontFamily: font }}>Retirer</button>
               </div>
             </>
           ) : (
@@ -4992,7 +5004,7 @@ export default function OnboardingModule() {
             <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 8 }}>Couleur du bandeau</label>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {["#2D1B3D", "#1A1A2E", "#0D3B66", "#1B4332", "#3C1518", "#2B2D42", "#264653", "#6D214F"].map(col => (
-                <div key={col} onClick={() => { setEmployeeBannerColor(col); localStorage.setItem("illizeo_banner_color", col); updateCompanySettings({ [`banner_color_${auth.user?.id}`]: col }).catch(() => {}); }} style={{ width: 32, height: 32, borderRadius: "50%", background: col, cursor: "pointer", border: employeeBannerColor === col ? "3px solid #E91E8C" : "3px solid transparent", transition: "all .15s", transform: employeeBannerColor === col ? "scale(1.15)" : "scale(1)" }} />
+                <div key={col} onClick={() => { setEmployeeBannerColor(col); localStorage.setItem("illizeo_banner_color", col); saveMyBanner({ color: col }).catch(() => {}); }} style={{ width: 32, height: 32, borderRadius: "50%", background: col, cursor: "pointer", border: employeeBannerColor === col ? "3px solid #E91E8C" : "3px solid transparent", transition: "all .15s", transform: employeeBannerColor === col ? "scale(1.15)" : "scale(1)" }} />
               ))}
             </div>
           </div>
@@ -5005,7 +5017,7 @@ export default function OnboardingModule() {
                 <div style={{ display: "flex", gap: 8 }}>
                   <button onClick={() => { setEmployeeBannerCustom(false); setBannerEditMode(true); }} className="iz-btn-outline" style={{ ...sBtn("outline"), flex: 1, padding: "6px 10px", fontSize: 11 }}>Repositionner</button>
                   <button onClick={() => { handleBannerFileUpload(); }} className="iz-btn-outline" style={{ ...sBtn("outline"), flex: 1, padding: "6px 10px", fontSize: 11 }}>Changer</button>
-                  <button onClick={() => { setBannerImage(null); setBannerZoom(100); setBannerPos({ x: 50, y: 50 }); localStorage.removeItem("illizeo_banner_image"); localStorage.removeItem("illizeo_banner_zoom"); localStorage.removeItem("illizeo_banner_pos"); updateCompanySettings({ [`banner_image_${auth.user?.id}`]: "" }).catch(() => {}); addToast_admin("Image retirée"); }} style={{ background: "none", border: `1px solid ${C.red}`, borderRadius: 8, padding: "6px 10px", fontSize: 11, color: C.red, cursor: "pointer", fontFamily: font }}>Retirer</button>
+                  <button onClick={() => { setBannerImage(null); setBannerZoom(100); setBannerPos({ x: 50, y: 50 }); localStorage.removeItem("illizeo_banner_image"); localStorage.removeItem("illizeo_banner_zoom"); localStorage.removeItem("illizeo_banner_pos"); saveMyBanner({ image: "" }).catch(() => {}); addToast_admin("Image retirée"); }} style={{ background: "none", border: `1px solid ${C.red}`, borderRadius: 8, padding: "6px 10px", fontSize: 11, color: C.red, cursor: "pointer", fontFamily: font }}>Retirer</button>
                 </div>
               </div>
             ) : (

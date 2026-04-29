@@ -57,6 +57,7 @@ import {
   get2FAStatus, setup2FA, confirm2FA, disable2FA, regenerate2FARecoveryCodes,
   registerTenant, checkTenantAvailability,
   getCompanySettings, updateCompanySettings,
+  saveMyBanner,
   getBadges, getMyBadges, getBadgeTemplates, createBadgeTemplate as apiCreateBadgeTpl, updateBadgeTemplate as apiUpdateBadgeTpl, deleteBadgeTemplate as apiDeleteBadgeTpl, awardBadge, revokeBadge,
   type Badge, type BadgeTemplate,
   getPlans, type PlanData,
@@ -500,7 +501,7 @@ export function createEmployeeRenders(ctx: any) {
         const dataUrl = ev.target?.result as string;
         setBannerImage(dataUrl);
         localStorage.setItem("illizeo_banner_image", dataUrl);
-        updateCompanySettings({ [`banner_image_${auth.user?.id}`]: dataUrl }).catch(() => {});
+        saveMyBanner({ image: dataUrl }).catch(() => {});
         setBannerEditMode(true);
         setEmployeeBannerCustom(false);
         setBannerZoom(100);
@@ -695,7 +696,7 @@ export function createEmployeeRenders(ctx: any) {
             </div>
             <button onMouseDown={e => { e.stopPropagation(); setBannerDragging(true); }} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: bannerDragging ? C.pinkBg : C.white, fontSize: 11, fontWeight: 500, cursor: "grab", fontFamily: font, color: C.text }}>Glisser</button>
             <button onClick={() => { setBannerEditMode(false); localStorage.setItem("illizeo_banner_zoom", String(bannerZoom)); localStorage.setItem("illizeo_banner_pos", JSON.stringify(bannerPos)); addToast("Position sauvegardée", "success"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "4px 14px", fontSize: 11 }}>Valider</button>
-            <button onClick={() => { setBannerImage(null); setBannerEditMode(false); setBannerZoom(100); setBannerPos({ x: 50, y: 50 }); localStorage.removeItem("illizeo_banner_image"); localStorage.removeItem("illizeo_banner_zoom"); localStorage.removeItem("illizeo_banner_pos"); updateCompanySettings({ [`banner_image_${auth.user?.id}`]: "" }).catch(() => {}); addToast("Image retirée", "warning"); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted }}><X size={16} /></button>
+            <button onClick={() => { setBannerImage(null); setBannerEditMode(false); setBannerZoom(100); setBannerPos({ x: 50, y: 50 }); localStorage.removeItem("illizeo_banner_image"); localStorage.removeItem("illizeo_banner_zoom"); localStorage.removeItem("illizeo_banner_pos"); saveMyBanner({ image: "" }).catch(() => {}); addToast("Image retirée", "warning"); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted }}><X size={16} /></button>
           </div>
         )}
 
