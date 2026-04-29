@@ -2309,19 +2309,33 @@ export default function OnboardingModule() {
                       </div>
                     </div>
                     <div style={{ padding: "6px 0" }}>
-                      <button onClick={() => {
-                        // "Sécurité" ouvre la page admin_password_policy directement
-                        // sur le tab Mot de passe (le tab par défaut "2fa" n'existe
-                        // plus dans cette page — l'ancien default était mort).
-                        setAvatarMenuOpen(false);
-                        setSecuritySubTab("password");
-                        setAdminPage("admin_password_policy" as any);
-                      }}
+                      {/* Items personnels (réutilisent le ProfileModal employé
+                          qui a déjà les onglets Infos / Mot de passe / Notifs).
+                          Le modal est rendu globalement à la fin du component
+                          via renderProfileModal() — il suffit de le déclencher
+                          avec le bon tab. */}
+                      {[
+                        { id: "infos", label: lang === "fr" ? "Mon profil" : "My profile", Icon: UserCheck },
+                        { id: "password", label: lang === "fr" ? "Mot de passe" : "Password", Icon: KeyRound },
+                        { id: "notifs", label: lang === "fr" ? "Préférences notifications" : "Notification preferences", Icon: Bell },
+                      ].map(item => {
+                        const Icon = item.Icon;
+                        return (
+                          <button key={item.id} onClick={() => { setAvatarMenuOpen(false); setProfileTab(item.id); setShowProfile(true); }}
+                            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 18px", background: "none", border: "none", cursor: "pointer", fontFamily: font, fontSize: 13, color: C.text, transition: "background .12s" }}
+                            onMouseEnter={e => e.currentTarget.style.background = C.bg}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            <Icon size={15} color={C.textMuted} />
+                            <span>{item.label}</span>
+                          </button>
+                        );
+                      })}
+                      <button onClick={() => { setAvatarMenuOpen(false); setAdminPage("admin_2fa" as any); }}
                         style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 18px", background: "none", border: "none", cursor: "pointer", fontFamily: font, fontSize: 13, color: C.text, transition: "background .12s" }}
                         onMouseEnter={e => e.currentTarget.style.background = C.bg}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                         <ShieldCheck size={15} color={C.textMuted} />
-                        <span>{lang === "fr" ? "Sécurité" : "Security"}</span>
+                        <span>{lang === "fr" ? "Mon 2FA" : "My 2FA"}</span>
                       </button>
                       {/* Super Admin — visible seulement pour les comptes
                           plateforme Illizeo, pas pour les tenants clients. */}
