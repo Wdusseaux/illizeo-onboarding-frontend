@@ -530,6 +530,18 @@ export function createAuthPages(ctx: any) {
   }) => (
     <div style={{ minHeight: "100vh", background: ILLIZEO_BG, fontFamily: font, color: C.white, position: "relative", overflow: "hidden", display: "flex", flexDirection: "column" }}>
       <style dangerouslySetInnerHTML={{ __html: ANIM_STYLES }} />
+      {/* Police Illizeo officielle (TTF custom, déposée dans public/fonts/).
+          Utilisée pour le mot "ILLIZEO" dans les titres via la classe iz-brand. */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @font-face {
+          font-family: 'Illizeo';
+          src: url('/fonts/ILLIZEO.ttf') format('truetype');
+          font-weight: normal;
+          font-style: normal;
+          font-display: swap;
+        }
+        .iz-brand { font-family: 'Illizeo', 'Plus Jakarta Sans', sans-serif; letter-spacing: 0.02em; }
+      ` }} />
       <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       {/* Decorative corner motifs (mirror illizeo.com layout):
           1. Sparkle burst near the .COM button (top-right)
@@ -851,7 +863,7 @@ export function createAuthPages(ctx: any) {
 
   const renderRegister = () => renderAuthShell({
     badge: "Créer un espace · Essai 14 jours",
-    title: <>LANCEZ<br /><span style={{ color: "rgba(255,255,255,.55)" }}>VOTRE ESPACE</span><br />ILLIZEO.</>,
+    title: <>LANCEZ<br /><span style={{ color: "rgba(255,255,255,.55)" }}>VOTRE ESPACE</span><br /><span className="iz-brand">ILLIZEO</span>.</>,
     subtitle: "Quelques minutes pour configurer votre plateforme RH. Pas de carte bancaire, pas d'engagement.",
     leftBody: renderRegisterFormLeft(),
     rightPanel: renderRegisterRightPanel(),
@@ -939,7 +951,7 @@ export function createAuthPages(ctx: any) {
 
     return renderAuthShell({
       badge: `Connexion · ${tenantId}.onboarding.illizeo.com`,
-      title: <>BIENVENUE,<br /><span style={{ color: "rgba(255,255,255,.55)" }}>RECONNECTEZ-VOUS</span><br />À VOTRE ESPACE ILLIZEO.</>,
+      title: <>BIENVENUE,<br /><span style={{ color: "rgba(255,255,255,.55)" }}>RECONNECTEZ-VOUS</span><br />À VOTRE ESPACE <span className="iz-brand">ILLIZEO</span>.</>,
       subtitle: "Retrouvez vos on, cross, re, off-boardings, parcours, signatures, gestion du matériel, cooptations au même endroit.",
       leftBody,
       rightPanel: renderRecentSpacesPanel(),
