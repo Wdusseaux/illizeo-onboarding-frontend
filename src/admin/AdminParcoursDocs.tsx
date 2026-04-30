@@ -722,19 +722,23 @@ export function createAdminParcoursDocs(ctx: any) {
                         { code: "LU", flag: "🇱🇺", label: "Luxembourg", desc: "6 docs · CNI, matricule CCSS, IBAN LU…" },
                         { code: "DE", flag: "🇩🇪", label: "Allemagne",  desc: "8 docs · Personalausweis, Steuer-ID, Sozialversicherung…" },
                       ].map(p => (
-                        <button key={p.code} onClick={async () => {
+                        <button key={p.code} onClick={() => {
                           ctx.setCountryPackOpen?.(false);
-                          if (!confirm(`${lang === "fr" ? "Importer le pack documents" : "Import document pack"} ${p.flag} ${p.label} ? ${lang === "fr" ? "Les templates déjà existants ne seront pas dupliqués." : "Existing templates won't be duplicated."}`)) return;
-                          try {
-                            const ep = await import('../api/endpoints');
-                            const res = await ep.importCountryPack(p.code);
-                            addToast_admin(`${p.flag} ${p.label} : ${res.created} ${lang === "fr" ? "documents importés" : "documents imported"}${res.skipped > 0 ? `, ${res.skipped} ${lang === "fr" ? "déjà présents" : "already present"}` : ""}`);
-                            // Recharger les templates pour voir les nouveaux
-                            try { const { getDocumentCategories } = await import('../api/endpoints'); const cats = await getDocumentCategories(); ctx.setRealDocs?.((prev: any) => prev); /* force le refetch */ } catch {}
-                            window.location.reload();
-                          } catch (e: any) {
-                            addToast_admin(e?.message || "Erreur import");
-                          }
+                          // Utilise la modale de confirmation custom du tenant
+                          // (showConfirm) — plus de confirm() natif moche.
+                          showConfirm(
+                            `${lang === "fr" ? "Importer le pack documents" : "Import document pack"} ${p.flag} ${p.label} ? ${lang === "fr" ? "Les templates déjà existants ne seront pas dupliqués." : "Existing templates won't be duplicated."}`,
+                            async () => {
+                              try {
+                                const ep = await import('../api/endpoints');
+                                const res = await ep.importCountryPack(p.code);
+                                addToast_admin(`${p.flag} ${p.label} : ${res.created} ${lang === "fr" ? "documents importés" : "documents imported"}${res.skipped > 0 ? `, ${res.skipped} ${lang === "fr" ? "déjà présents" : "already present"}` : ""}`);
+                                window.location.reload();
+                              } catch (e: any) {
+                                addToast_admin(e?.message || "Erreur import");
+                              }
+                            }
+                          );
                         }}
                           style={{ display: "block", width: "100%", padding: "10px 16px", background: "none", border: "none", borderBottom: `1px solid ${C.border}`, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "background .12s" }}
                           onMouseEnter={e => e.currentTarget.style.background = C.bg}
