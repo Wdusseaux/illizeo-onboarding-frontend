@@ -296,6 +296,74 @@ export function createAuthPages(ctx: any) {
     });
   };
 
+  // ─── Forgot password — page dédiée plein écran ─────────────
+  // Avant: panneau inline qui se dépliait sous le formulaire login.
+  // Maintenant: vraie page dédiée avec le shell auth, accessible via le
+  // lien "Mot de passe oublié ?" du login.
+  const renderForgotPassword = () => {
+    const leftBody = forgotSent ? (
+      <div style={{ maxWidth: 540 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "14px 20px", borderRadius: 12, background: "rgba(0,0,0,.22)", border: "1px solid rgba(168,255,210,.4)", marginBottom: 20 }}>
+          <CheckCircle size={20} color="#A8FFD2" />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#A8FFD2" }}>Email envoyé</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,.85)", marginTop: 2 }}>Vérifiez votre boîte de réception (et les spams).</div>
+          </div>
+        </div>
+        <p style={{ fontSize: 14, color: "rgba(255,255,255,.85)", lineHeight: 1.5, marginBottom: 24 }}>
+          Si l'adresse <span style={{ fontWeight: 700, color: C.white }}>{forgotEmail}</span> est rattachée à un compte Illizeo, un lien de réinitialisation vient d'être envoyé. Cliquez sur le lien pour choisir un nouveau mot de passe.
+        </p>
+        <button onClick={() => { setForgotMode(false); setForgotSent(false); setForgotEmail(""); }}
+          style={sShellPrimaryBtn(false)}>
+          Retour à la connexion <ArrowRight size={18} />
+        </button>
+      </div>
+    ) : (
+      <form onSubmit={async (e) => {
+        e.preventDefault();
+        if (!forgotEmail.trim()) return;
+        setForgotLoading(true);
+        try { await apiFetch('/forgot-password', { method: 'POST', body: JSON.stringify({ email: forgotEmail }) }); }
+        catch { /* on ne révèle pas si l'email existe */ }
+        finally { setForgotSent(true); setForgotLoading(false); }
+      }} style={{ maxWidth: 540 }}>
+        <div style={{ marginBottom: 18 }}>
+          <label style={sShellLabel}>Email</label>
+          <input type="email" name="email" autoComplete="username" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="votre@email.com" required autoFocus style={sShellInput} />
+        </div>
+        <button type="submit" disabled={forgotLoading || !forgotEmail.trim()} style={sShellPrimaryBtn(forgotLoading || !forgotEmail.trim())}>
+          {forgotLoading ? "Envoi…" : "Envoyer le lien de réinitialisation"} <ArrowRight size={18} />
+        </button>
+      </form>
+    );
+
+    const rightPanel = (
+      <div style={{ padding: "0 4px" }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 2, textTransform: "uppercase", color: "rgba(255,255,255,.85)", marginBottom: 18 }}>↳ Comment ça marche</div>
+        {[
+          "Saisissez l'email de votre compte Illizeo.",
+          "Vous recevez un email avec un lien de réinitialisation valable 1 heure.",
+          "Cliquez sur le lien et choisissez votre nouveau mot de passe.",
+          "Vous êtes redirigé(e) vers la page de connexion.",
+        ].map((line, idx) => (
+          <div key={idx} style={{ display: "flex", gap: 12, marginBottom: 14, fontSize: 13, lineHeight: 1.5, color: "rgba(255,255,255,.85)" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", border: "1px solid rgba(255,255,255,.4)", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{idx + 1}</span>
+            <span>{line}</span>
+          </div>
+        ))}
+      </div>
+    );
+
+    return renderAuthShell({
+      badge: "Mot de passe oublié",
+      title: <>RÉCUPÉREZ<br /><span style={{ color: "rgba(255,255,255,.55)" }}>L'ACCÈS</span><br />À VOTRE ESPACE.</>,
+      subtitle: "Saisissez votre email pour recevoir un lien de réinitialisation. Un email arrive en quelques secondes.",
+      leftBody,
+      rightPanel,
+      backLink: { label: "Retour à la connexion", onClick: () => { setForgotMode(false); setForgotSent(false); } },
+    });
+  };
+
   const renderTwoFactorVerify = () => {
     const leftBody = (
       <form onSubmit={async (e) => {
@@ -863,35 +931,9 @@ export function createAuthPages(ctx: any) {
           </button>
         </div>
 
-        {forgotMode && (
-          <div style={{ marginTop: 18, padding: "0 4px" }}>
-            {forgotSent ? (
-              <div style={{ textAlign: "center" }}>
-                <CheckCircle size={24} color="#A8FFD2" style={{ marginBottom: 8 }} />
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#A8FFD2", marginBottom: 4 }}>Email envoyé !</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,.8)" }}>Vérifiez votre boîte de réception.</div>
-                <button onClick={() => setForgotMode(false)} style={{ marginTop: 12, padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(255,255,255,.4)", background: "transparent", color: C.white, fontSize: 12, cursor: "pointer", fontFamily: font }}>Retour à la connexion</button>
-              </div>
-            ) : (
-              <>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Réinitialiser le mot de passe</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,.75)", marginBottom: 12 }}>Entrez votre email pour recevoir un lien.</div>
-                <input type="email" name="email" autoComplete="username" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="votre@email.com" style={{ ...sShellInput, marginBottom: 10 }} />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setForgotMode(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "1px solid rgba(255,255,255,.3)", background: "transparent", color: C.white, fontSize: 12, cursor: "pointer", fontFamily: font }}>{t('common.cancel')}</button>
-                  <button disabled={forgotLoading || !forgotEmail.trim()} onClick={async () => {
-                    setForgotLoading(true);
-                    try { await apiFetch('/forgot-password', { method: 'POST', body: JSON.stringify({ email: forgotEmail }) }); setForgotSent(true); }
-                    catch { setForgotSent(true); }
-                    finally { setForgotLoading(false); }
-                  }} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: C.white, color: C.dark, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: font, opacity: forgotLoading ? 0.6 : 1 }}>
-                    {forgotLoading ? "Envoi…" : "Envoyer"}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+        {/* Panneau inline forgot retiré : "Mot de passe oublié ?" route
+            désormais vers une page dédiée renderForgotPassword (cohérent
+            avec reset password / register / 2FA). */}
       </div>
     );
 
@@ -972,6 +1014,7 @@ export function createAuthPages(ctx: any) {
 
   return {
     renderResetPassword,
+    renderForgotPassword,
     renderTwoFactorVerify,
     renderPricing,
     renderTenantSelection,

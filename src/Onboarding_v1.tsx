@@ -1937,6 +1937,7 @@ export default function OnboardingModule() {
   if (showPricing) return authPages.renderPricing();
   if (!auth.isAuthenticated && !tenantResolved && !showRegister) return authPages.renderTenantSelection();
   if (!auth.isAuthenticated && showRegister) return authPages.renderRegister();
+  if (!auth.isAuthenticated && forgotMode) return authPages.renderForgotPassword();
   if (!auth.isAuthenticated) return authPages.renderLogin();
   if (step === "email") return authPages.renderEmailInvitation();
   // ─── STEP 1: WELCOME (Banner + Video combined) ─────────────
