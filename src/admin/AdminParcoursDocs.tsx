@@ -716,6 +716,7 @@ export function createAdminParcoursDocs(ctx: any) {
                         {lang === "fr" ? "Choisir un pays" : "Choose a country"}
                       </div>
                       {[
+                        { code: "CH", flag: "🇨🇭", label: "Suisse",     desc: "8 docs · CNI, AVS, IBAN CH, permis de travail, justif. domicile…" },
                         { code: "FR", flag: "🇫🇷", label: "France",     desc: "8 docs · CNI, RIB, Carte Vitale, justif. domicile…" },
                         { code: "BE", flag: "🇧🇪", label: "Belgique",   desc: "7 docs · eID, registre national, DIMONA, mutuelle…" },
                         { code: "LU", flag: "🇱🇺", label: "Luxembourg", desc: "6 docs · CNI, matricule CCSS, IBAN LU…" },
