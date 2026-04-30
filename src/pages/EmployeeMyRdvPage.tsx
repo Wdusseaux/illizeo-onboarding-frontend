@@ -45,6 +45,14 @@ export default function EmployeeMyRdvPage({ C, sCard, sBtn, font, myCollab, acti
   const [requestDraft, setRequestDraft] = useState<{ recipient_role: string; recipient_user_id: number | null; preferred_date: string; preferred_time: string; reason: string }>({ recipient_role: "", recipient_user_id: null, preferred_date: "", preferred_time: "", reason: "" });
   const [requestSending, setRequestSending] = useState(false);
   const [prepareRdv, setPrepareRdv] = useState<any | null>(null);
+  // Toast inline pour confirmer/échouer l'envoi de la demande de RDV — remplace
+  // les alert() natifs du navigateur (lock-out + visuel hors-tenant moche).
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  useEffect(() => {
+    if (!feedback) return;
+    const t = setTimeout(() => setFeedback(null), 5000);
+    return () => clearTimeout(t);
+  }, [feedback]);
 
   const startDate = parseStartDate(myCollab?.dateDebut || myCollab?.date_debut);
 
@@ -147,7 +155,23 @@ export default function EmployeeMyRdvPage({ C, sCard, sBtn, font, myCollab, acti
   };
 
   return (
-    <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
+    <div style={{ flex: 1, padding: "32px 40px", overflow: "auto", position: "relative" }}>
+      {/* Toast inline (remplace les alert() natifs) — apparaît top-right de
+          la zone, auto-dismiss après 5s, dismissable manuellement. */}
+      {feedback && (
+        <div className="iz-fade-up" style={{
+          position: "fixed", top: 24, right: 24, zIndex: 2000,
+          padding: "12px 18px", borderRadius: 10,
+          background: feedback.type === "success" ? "#0d9488" : "#dc2626",
+          color: "#fff", fontSize: 13, fontWeight: 500,
+          boxShadow: "0 6px 20px rgba(0,0,0,.2)",
+          display: "flex", alignItems: "center", gap: 10, maxWidth: 420,
+        }}>
+          <Check size={16} />
+          <span style={{ flex: 1 }}>{feedback.message}</span>
+          <button onClick={() => setFeedback(null)} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 0, fontSize: 18, lineHeight: 1 }}>×</button>
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
         <div>
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
@@ -391,8 +415,8 @@ export default function EmployeeMyRdvPage({ C, sCard, sBtn, font, myCollab, acti
                     });
                     setRequestOpen(false);
                     setRequestDraft({ recipient_role: "", recipient_user_id: null, preferred_date: "", preferred_time: "", reason: "" });
-                    alert("Votre demande a été envoyée. Vous serez notifié(e) dès qu'elle est planifiée.");
-                  } catch { alert("Impossible d'envoyer la demande. Réessayez plus tard."); }
+                    setFeedback({ type: "success", message: "Votre demande a été envoyée. Vous serez notifié(e) dès qu'elle est planifiée." });
+                  } catch { setFeedback({ type: "error", message: "Impossible d'envoyer la demande. Réessayez plus tard." }); }
                   finally { setRequestSending(false); }
                 }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 18px", fontSize: 13, opacity: canSend && !requestSending ? 1 : 0.5 }}>
                   {requestSending ? "Envoi…" : "Envoyer la demande"}
