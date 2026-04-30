@@ -1327,6 +1327,19 @@ export async function updateCompanySettings(settings: Record<string, any>) {
   return apiFetch<{ message: string }>('/company-settings', { method: 'PUT', body: JSON.stringify({ settings }) });
 }
 
+// ─── Document country packs ────────────────────────────────
+// Liste les packs pays disponibles + déclenche l'import des templates pour
+// un pays donné (FR, BE, LU, DE…). Idempotent : skip les templates qui
+// existent déjà avec le même nom dans la même catégorie.
+export async function getCountryPacks() {
+  return apiFetch<{ code: string; label: string; docs_count: number }[]>('/document-templates/country-packs');
+}
+export async function importCountryPack(country: string) {
+  return apiFetch<{ country: string; label: string; created: number; skipped: number; documents: any[] }>(
+    '/document-templates/import-country-pack', { method: 'POST', body: JSON.stringify({ country }) }
+  );
+}
+
 // ─── Mon compte ────────────────────────────────────────────
 // Endpoints "Mon compte" pour l'utilisateur authentifié (Mon profil, change
 // password, préférences notifications). Voir MeController.php côté backend.

@@ -703,6 +703,52 @@ export function createAdminParcoursDocs(ctx: any) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('doc.title')}</h1>
           <div style={{ display: "flex", gap: 8 }}>
+            {gedTab === "templates" && (
+              <div style={{ position: "relative" }} data-country-pack-menu>
+                <button onClick={() => ctx.setCountryPackOpen?.(!ctx.countryPackOpen)} className="iz-btn-outline" style={{ ...sBtn("outline"), display: "flex", alignItems: "center", gap: 6 }}>
+                  <Globe size={14} /> {lang === "fr" ? "Importer pack pays" : "Import country pack"} <ChevronRight size={12} style={{ transform: ctx.countryPackOpen ? "rotate(90deg)" : "rotate(0)", transition: "transform .15s" }} />
+                </button>
+                {ctx.countryPackOpen && (
+                  <>
+                    <div onClick={() => ctx.setCountryPackOpen?.(false)} style={{ position: "fixed", inset: 0, zIndex: 99 }} />
+                    <div style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, width: 280, background: C.white, borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,.12)", border: `1px solid ${C.border}`, zIndex: 100, overflow: "hidden" }}>
+                      <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: 1 }}>
+                        {lang === "fr" ? "Choisir un pays" : "Choose a country"}
+                      </div>
+                      {[
+                        { code: "FR", flag: "🇫🇷", label: "France",     desc: "8 docs · CNI, RIB, Carte Vitale, justif. domicile…" },
+                        { code: "BE", flag: "🇧🇪", label: "Belgique",   desc: "7 docs · eID, registre national, DIMONA, mutuelle…" },
+                        { code: "LU", flag: "🇱🇺", label: "Luxembourg", desc: "6 docs · CNI, matricule CCSS, IBAN LU…" },
+                        { code: "DE", flag: "🇩🇪", label: "Allemagne",  desc: "8 docs · Personalausweis, Steuer-ID, Sozialversicherung…" },
+                      ].map(p => (
+                        <button key={p.code} onClick={async () => {
+                          ctx.setCountryPackOpen?.(false);
+                          if (!confirm(`${lang === "fr" ? "Importer le pack documents" : "Import document pack"} ${p.flag} ${p.label} ? ${lang === "fr" ? "Les templates déjà existants ne seront pas dupliqués." : "Existing templates won't be duplicated."}`)) return;
+                          try {
+                            const ep = await import('../api/endpoints');
+                            const res = await ep.importCountryPack(p.code);
+                            addToast_admin(`${p.flag} ${p.label} : ${res.created} ${lang === "fr" ? "documents importés" : "documents imported"}${res.skipped > 0 ? `, ${res.skipped} ${lang === "fr" ? "déjà présents" : "already present"}` : ""}`);
+                            // Recharger les templates pour voir les nouveaux
+                            try { const { getDocumentCategories } = await import('../api/endpoints'); const cats = await getDocumentCategories(); ctx.setRealDocs?.((prev: any) => prev); /* force le refetch */ } catch {}
+                            window.location.reload();
+                          } catch (e: any) {
+                            addToast_admin(e?.message || "Erreur import");
+                          }
+                        }}
+                          style={{ display: "block", width: "100%", padding: "10px 16px", background: "none", border: "none", borderBottom: `1px solid ${C.border}`, cursor: "pointer", fontFamily: font, textAlign: "left", transition: "background .12s" }}
+                          onMouseEnter={e => e.currentTarget.style.background = C.bg}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 2 }}>
+                            <span style={{ fontSize: 16 }}>{p.flag}</span> {p.label}
+                          </div>
+                          <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.4 }}>{p.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             {gedTab === "templates" && <button onClick={() => { setTplPanelDoc({ nom: "", categorie: ADMIN_DOC_CATEGORIES[0]?.id || "", obligatoire: false, type: "upload", description: "", fichier_modele: "" }); resetTr(); setTplPanelOpen("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><Plus size={14} /> {t('doc.new_template')}</button>}
             {gedTab === "validation" && selectedDocsForValidation.size > 0 && (
               <button onClick={async () => {

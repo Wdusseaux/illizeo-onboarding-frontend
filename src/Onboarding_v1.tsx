@@ -859,6 +859,7 @@ export default function OnboardingModule() {
   }, [consoMonth.year, consoMonth.month]);
   useEffect(() => { if (subTab === "consommation") loadConsumption(); }, [consoMonth.year, consoMonth.month, subTab]);
   const [profileTab, setProfileTab] = useState("infos");
+  const [countryPackOpen, setCountryPackOpen] = useState(false);
   // profileForm — état dédié au ProfileModal (Mon compte). Distinct de formData
   // qui sert à l'onboarding employé. Hydraté depuis auth.user + getMyProfile()
   // + getMyNotificationPreferences() à l'ouverture du modal.
@@ -1414,7 +1415,7 @@ export default function OnboardingModule() {
     editingInfoSection, setEditingInfoSection, editInfoData, setEditInfoData, protectionOpenSection, setProtectionOpenSection,
     generateContrat, setGenerateContrat, generateCollabId, setGenerateCollabId, generateData, setGenerateData, generateLoading, setGenerateLoading,
     consoData, setConsoData, consoMonth, setConsoMonth, consoLoading, setConsoLoading, consoFilter, setConsoFilter, consoSearch, setConsoSearch, loadConsumption,
-    profileTab, setProfileTab, profileForm, setProfileForm,
+    profileTab, setProfileTab, profileForm, setProfileForm, countryPackOpen, setCountryPackOpen,
     formData, setFormData,
     passwordVisible, setPasswordVisible,
     acceptCGU, setAcceptCGU,
