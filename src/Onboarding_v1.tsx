@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useApiData } from "./api/useApiData";
 import { apiFetch } from "./api/client";
 import { useAuth } from "./api/useAuth";
@@ -8,7 +8,7 @@ const _BUILD_VERSION = "2.1.0";
 import {
   getCollaborateurs, getParcours, getActions, getGroupes, getPhases,
   getWorkflows, getEmailTemplates, getContrats, getDocumentCategories, createDocumentTemplate,
-  getNotificationsConfig,
+  getNotificationsConfig, getNotificationsRegistry, getPermissionsRegistry,
   getConversations, getMessages as apiGetMessages, sendMessage as apiSendMessage, getAvailableUsers,
   getUserNotifications, markNotifRead, markAllNotifsRead, getNotifUnreadCount,
   getCompanyBlocks, getAllCompanyBlocks, updateCompanyBlock as apiUpdateBlock, createCompanyBlock as apiCreateBlock, deleteCompanyBlock as apiDeleteBlock,
@@ -40,7 +40,7 @@ import {
   registerTenant, checkTenantAvailability,
   getCompanySettings, updateCompanySettings, getTenantBranding,
   saveMyAvatar, deleteMyAvatar, saveMyBanner,
-  getBadges, getMyBadges, getBadgeTemplates, createBadgeTemplate as apiCreateBadgeTpl, updateBadgeTemplate as apiUpdateBadgeTpl, deleteBadgeTemplate as apiDeleteBadgeTpl, awardBadge, revokeBadge,
+  getBadges, getMyBadges, getBadgeTemplates, getMyBadgeTemplates, createBadgeTemplate as apiCreateBadgeTpl, updateBadgeTemplate as apiUpdateBadgeTpl, deleteBadgeTemplate as apiDeleteBadgeTpl, awardBadge, revokeBadge,
   type Badge, type BadgeTemplate,
   getPlans, type PlanData,
   superAdminDashboard, superAdminListTenants, superAdminUpdateTenant, superAdminDeleteTenant,
@@ -58,6 +58,7 @@ import {
   getEquipmentTypes, getEquipments, getEquipmentStats, createEquipment as apiCreateEquip, updateEquipment as apiUpdateEquip, deleteEquipment as apiDeleteEquip,
   createEquipmentType as apiCreateEquipType, updateEquipmentType as apiUpdateEquipType, deleteEquipmentType as apiDeleteEquipType,
   assignEquipment as apiAssignEquip, unassignEquipment as apiUnassignEquip,
+  getMyEquipment,
   type Equipment, type EquipmentType, type EquipmentStats,
   getEquipmentPackages, createEquipmentPackage as apiCreatePkg, updateEquipmentPackage as apiUpdatePkg, deleteEquipmentPackage as apiDeletePkg, provisionPackage as apiProvisionPkg,
   type EquipmentPackage,
@@ -69,6 +70,7 @@ import {
 } from "./api/endpoints";
 import {
   Users, FileText, MessageCircle, Bell, Building2, LayoutDashboard, Zap,
+  HelpCircle,
   ChevronRight, ChevronLeft, X, Upload, Download, Plus, Eye, EyeOff,
   Search, Filter, Clock, AlertTriangle, CheckCircle, Play, BarChart3,
   Calendar, MapPin, Check, FileUp, ClipboardList, GraduationCap, ListChecks,
@@ -82,7 +84,7 @@ import {
   Palette, Trash, DatabaseBackup, Languages, ChevronsRight, ChevronsLeft, Settings, Crown, Lock,
   Phone, Linkedin, Paperclip, TrendingUp, Percent, FileCheck2, CalendarCheck, Rocket, Heart, Gem,
   Laptop, Monitor, Headphones, KeyRound, Mouse, Car, Armchair, Boxes, RotateCcw, PenLine,
-  Moon, Sun, Lightbulb, Bug, Briefcase, BarChart3
+  Moon, Sun, Lightbulb, Bug, Briefcase
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 
@@ -92,16 +94,17 @@ import RichEditor from './components/RichEditor';
 import AdminQuotesPage from './admin/AdminQuotesPage';
 import AdminRecurringMeetingsPage from './admin/AdminRecurringMeetingsPage';
 import EmployeeMyRdvPage from './pages/EmployeeMyRdvPage';
+import HelpCenter from './pages/HelpCenter';
 import TranslatableField, { type Translations } from './components/TranslatableField';
 import { DOC_CATEGORIES, ACTIONS, _MOCK_NOTIFICATIONS_LIST, NOTIF_RESOURCES, TEAM_MEMBERS, ACTION_TYPE_META, PHASE_ICONS, SITES, DEPARTEMENTS, TYPES_CONTRAT, _MOCK_COLLABORATEURS, _MOCK_PARCOURS_TEMPLATES, _MOCK_ACTION_TEMPLATES, _MOCK_ADMIN_DOC_CATEGORIES, _MOCK_WORKFLOW_RULES, _MOCK_EMAIL_TEMPLATES, _MOCK_PHASE_DEFAULTS, _MOCK_GROUPES, EQUIPE_ROLES, TPL_CATEGORIES, guessTplCategory } from './mockData';
 
 // ─── EXTRACTED MODULES ──────────────────────────────────
-import { createAdminRenders } from './admin/AdminRenderFunctions';
-import { createAdminInlinePages } from './admin/AdminInlinePages';
-import { createAdminPanels } from './admin/AdminPanels';
 import { createEmployeeRenders } from './pages/EmployeePages';
 import { createSetupWizard } from './pages/SetupWizard';
 import { createAuthPages } from './pages/AuthPages';
+import { createAdminRenders } from './admin/AdminRenderFunctions';
+import { createAdminInlinePages } from './admin/AdminInlinePages';
+import { createAdminPanels } from './admin/AdminPanels';
 // ─── MAIN COMPONENT ──────────────────────────────────────────
 export default function OnboardingModule() {
   // ═══ POST-REGISTRATION FLAG ═══════════════════════════════
@@ -133,6 +136,7 @@ export default function OnboardingModule() {
   // Subscription & active modules
   const [tenantActiveModules, setTenantActiveModules] = useState<string[]>([]);
   const [tenantSubscriptions, setTenantSubscriptions] = useState<any[]>([]);
+  const [subscriptionLoaded, setSubscriptionLoaded] = useState(false);
   const [selectedPlanIds, setSelectedPlanIds] = useState<number[]>([]);
   const [subTab, setSubTab] = useState<"facturation" | "factures" | "paiement" | "protection" | "consommation">("facturation");
   const [subView, setSubView] = useState<"overview" | "change" | "apps">(_needsPlan ? "change" : "overview");
@@ -164,13 +168,21 @@ export default function OnboardingModule() {
     if (v) pushSuperAdmin();
     else pushAdminPage("admin_dashboard" as AdminPage);
   }, []);
-  const [saTab, setSaTab] = useState<"dashboard" | "tenants" | "plans" | "subscriptions" | "stripe">("dashboard");
+  const [saTab, setSaTab] = useState<"dashboard" | "tenants" | "plans" | "subscriptions" | "stripe" | "coupons" | "reporting" | "ai" | "ai_protection">("dashboard");
   const [saDashData, setSaDashData] = useState<any>(null);
   const [saTenants, setSaTenants] = useState<any[]>([]);
   const [saPlans, setSaPlans] = useState<PlanData[]>([]);
   const [saSubscriptions, setSaSubscriptions] = useState<any[]>([]);
   const [saStripe, setSaStripe] = useState<any>(null);
+  const [saCoupons, setSaCoupons] = useState<any[]>([]);
+  const [saCouponForm, setSaCouponForm] = useState<any>({ name: "", discount_type: "percent", percent_off: 10, amount_off: 1000, currency: "chf", duration: "once", duration_in_months: 3, max_redemptions: undefined, redeem_by: "", promo_code: "", code_max_redemptions: undefined, code_expires_at: "" });
+  const [saReport, setSaReport] = useState<any>(null);
   const [saLoaded, setSaLoaded] = useState(false);
+  const [buddyAiSuggestions, setBuddyAiSuggestions] = useState<any[]>([]);
+  const [npsSentiments, setNpsSentiments] = useState<Record<number, any>>({});
+  const [npsAggregateInsights, setNpsAggregateInsights] = useState<any>(null);
+  const [turnoverRisk, setTurnoverRisk] = useState<any>(null);
+  const [turnoverLoading, setTurnoverLoading] = useState(false);
   const [saPlanPanel, setSaPlanPanel] = useState<"closed" | "create" | "edit">("closed");
   const [saPlanData, setSaPlanData] = useState<any>({ nom: "", slug: "", description: "", prix_eur_mensuel: 0, prix_chf_mensuel: 0, min_mensuel_eur: 0, min_mensuel_chf: 0, max_collaborateurs: null, max_admins: null, max_parcours: null, max_integrations: null, max_workflows: null, populaire: false, actif: true, ordre: 0, stripe_price_id_eur: "", stripe_price_id_chf: "" });
   const [tenantError, setTenantError] = useState("");
@@ -186,10 +198,20 @@ export default function OnboardingModule() {
       return true;
     }
     // 2. URL path starts with /:tenantId (e.g. /acme/calendrier)
+    // Reserved paths must NOT be treated as tenant IDs.
+    const RESERVED_PATHS = ["help", "pricing", "signup", "signin"];
     const parsed = parseCurrentUrl();
-    if (parsed.tenantId) {
+    if (parsed.tenantId && !RESERVED_PATHS.includes(parsed.tenantId.toLowerCase())) {
       localStorage.setItem("illizeo_tenant_id", parsed.tenantId);
       return true;
+    }
+    // Self-heal: if a reserved path was previously stored as tenant_id, clear it
+    if (parsed.tenantId && RESERVED_PATHS.includes(parsed.tenantId.toLowerCase())) {
+      const stored = localStorage.getItem("illizeo_tenant_id");
+      if (stored && RESERVED_PATHS.includes(stored.toLowerCase())) {
+        localStorage.removeItem("illizeo_tenant_id");
+        localStorage.removeItem("illizeo_token");
+      }
     }
     // 3. URL has ?tenant= param
     const qparams = new URLSearchParams(window.location.search);
@@ -207,7 +229,7 @@ export default function OnboardingModule() {
   });
   // Note: tenant resolution is handled in useState initializer above
   const [tenantInput, setTenantInput] = useState("");
-  const [regData, setRegData] = useState({ company_name: "", admin_prenom: "", admin_nom: "", admin_email: "", password: "", password_confirmation: "" });
+  const [regData, setRegData] = useState({ company_name: "", admin_prenom: "", admin_nom: "", admin_email: "", password: "", password_confirmation: "", country: "CH", customer_type: "company" as "company" | "individual", vat_number: "", billing_street: "", billing_postal_code: "", billing_city: "" });
   const [regLoading, setRegLoading] = useState(false);
   const [regTenantSlug, setRegTenantSlug] = useState("");
   const [twoFASetup, setTwoFASetup] = useState<{ secret: string; qr_code_svg: string } | null>(null);
@@ -236,7 +258,7 @@ export default function OnboardingModule() {
   const [feedbackTab, setFeedbackTab] = useState<"surveys" | "mood" | "suggestion" | "buddy">("surveys");
   const [openSurveyId, setOpenSurveyId] = useState<number | null>(null);
   // Admin feedback hub state
-  const [adminFeedbackTab, setAdminFeedbackTab] = useState<"mood" | "suggestion" | "buddy" | "excited">("mood");
+  const [adminFeedbackTab, setAdminFeedbackTab] = useState<"mood" | "suggestion" | "rdv" | "buddy" | "excited">("mood");
   const [adminMoods, setAdminMoods] = useState<{ entries: any[]; stats: any } | null>(null);
   const [adminSuggestions, setAdminSuggestions] = useState<any[] | null>(null);
   const [adminSuggStatusFilter, setAdminSuggStatusFilter] = useState<"" | "open" | "reviewing" | "done" | "dismissed">("");
@@ -264,14 +286,16 @@ export default function OnboardingModule() {
   const [empCooptations, setEmpCooptations] = useState<Cooptation[]>([]);
   const [empCooptForm, setEmpCooptForm] = useState<{ open: boolean; campaign_id: number | null; candidate_name: string; candidate_email: string; candidate_poste: string; telephone: string; linkedin_url: string; message: string; step?: 1 | 2; source?: "linkedin" | "manual" | null; reward?: number | null }>({ open: false, campaign_id: null, candidate_name: "", candidate_email: "", candidate_poste: "", telephone: "", linkedin_url: "", message: "", step: 1, source: null, reward: null });
   const [shareModal, setShareModal] = useState<{ open: boolean; campaign: any | null }>({ open: false, campaign: null });
-  // Notifications config
+  // Notifications config — keyed by the real notification types emitted by the
+  // backend (App\Support\NotificationRegistry). The registry itself is fetched
+  // separately into notifRegistry below.
   const [notifConfig, setNotifConfig] = useState<Record<string, { email: boolean; push: boolean; inapp: boolean }>>(() => {
     const saved = localStorage.getItem("illizeo_notif_config");
     if (saved) try { return JSON.parse(saved); } catch {}
-    const defaults: Record<string, { email: boolean; push: boolean; inapp: boolean }> = {};
-    ["anniversaire","fin_contrat","fin_essai","nouveau_questionnaire","nouvelle_tache","relance_retard","piece_a_valider","piece_completee","piece_refusee","arrivees_semaine","nouvelle_recrue","questionnaire_complete","invitation_utilisateur","delegation"].forEach(k => { defaults[k] = { email: true, push: false, inapp: true }; });
-    return defaults;
+    return {};
   });
+  const [notifRegistry, setNotifRegistry] = useState<any[]>([]);
+  const [permRegistry, setPermRegistry] = useState<{ modules: any[]; sections: Record<string, string>; levels: string[] } | null>(null);
 
   // Equipment Management
   const [equipTypes, setEquipTypes] = useState<EquipmentType[]>([]);
@@ -282,6 +306,7 @@ export default function OnboardingModule() {
   const [equipTab, setEquipTab] = useState<"inventaire" | "packages" | "types">("inventaire");
   const [equipPackages, setEquipPackages] = useState<EquipmentPackage[]>([]);
   const [pkgPanel, setPkgPanel] = useState<{ mode: "closed" | "create" | "edit"; data: any }>({ mode: "closed", data: {} });
+  const [myEquipment, setMyEquipment] = useState<Equipment[]>([]);
   // Signature Documents
   const [signDocs, setSignDocs] = useState<SignatureDoc[]>([]);
   const [signPanel, setSignPanel] = useState<{ mode: "closed" | "create" | "edit"; data: any }>({ mode: "closed", data: {} });
@@ -399,7 +424,7 @@ export default function OnboardingModule() {
   const { data: PARCOURS_TEMPLATES, refetch: refetchParcours } = useApiData(getParcours, isDemo ? _MOCK_PARCOURS_TEMPLATES : [], adminApiEnabled);
   const { data: ACTION_TEMPLATES, refetch: refetchActions } = useApiData(getActions, isDemo ? _MOCK_ACTION_TEMPLATES as any : [], adminApiEnabled);
   const { data: GROUPES, refetch: refetchGroupes } = useApiData(getGroupes, isDemo ? _MOCK_GROUPES as any : [], adminApiEnabled);
-  const { data: PHASE_DEFAULTS, refetch: refetchPhases } = useApiData(getPhases, isDemo ? _MOCK_PHASE_DEFAULTS : [], adminApiEnabled);
+  const { data: PHASE_DEFAULTS, refetch: refetchPhases } = useApiData(getPhases, isDemo ? (_MOCK_PHASE_DEFAULTS as any[]) : [], adminApiEnabled);
   const { data: WORKFLOW_RULES, refetch: refetchWorkflows } = useApiData(getWorkflows, isDemo ? _MOCK_WORKFLOW_RULES : [], adminApiEnabled);
   const { data: EMAIL_TEMPLATES, refetch: refetchEmailTemplates } = useApiData(getEmailTemplates, isDemo ? _MOCK_EMAIL_TEMPLATES : [], adminApiEnabled);
   const { data: ADMIN_DOC_CATEGORIES } = useApiData(getDocumentCategories, isDemo ? _MOCK_ADMIN_DOC_CATEGORIES : [], adminApiEnabled);
@@ -433,6 +458,11 @@ export default function OnboardingModule() {
   }, []);
   // ─── URL SYNC: popstate (back/forward) + initial URL set ────
   useEffect(() => {
+    // Skip URL sync on public utility paths (/help, /pricing, /signup, /signin)
+    // — these are independent pages that must keep their URL untouched.
+    const path = window.location.pathname;
+    if (/^\/(help|pricing|signup|signin)(\/|$)/.test(path)) return;
+
     // Set initial URL if not already matching a page
     const tid = localStorage.getItem("illizeo_tenant_id");
     if (tid && auth.isAuthenticated) {
@@ -903,7 +933,7 @@ export default function OnboardingModule() {
   // ═══ SHARED STATE — Cross-role data flow ═══════════════════
   type DocStatus = "manquant" | "soumis" | "en_attente" | "valide" | "refuse";
   type TimelineEntry = { date: string; heure: string; event: string; type: "system" | "success" | "email" | "warning" | "action"; detail: string };
-  type Toast = { id: number; message: string; type: "success" | "info" | "warning"; role: UserRole };
+  type Toast = { id: number; message: string; type: "success" | "info" | "warning" | "error"; role: UserRole };
 
   const [employeeDocs, setEmployeeDocs] = useState<Record<string, DocStatus>>({
     "IBAN/BIC *": "manquant",
@@ -940,6 +970,22 @@ export default function OnboardingModule() {
     if (adminPage !== "admin_suivi" && adminPage !== "admin_dashboard") return;
     getCompanySettings().then(s => setAllCompanySettings(s || {})).catch(() => {});
   }, [adminPage, auth.isAuthenticated, auth.isAdmin]);
+
+  // Notification registry — fetched once per admin session. Static, tenant-
+  // agnostic list mirroring App\Support\NotificationRegistry.
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.isAdmin) return;
+    if (notifRegistry.length) return;
+    getNotificationsRegistry().then(setNotifRegistry).catch(() => {});
+  }, [auth.isAuthenticated, auth.isAdmin, notifRegistry.length]);
+
+  // Permission registry — fetched once per admin session. Static, tenant-
+  // agnostic structure mirroring App\Support\PermissionRegistry.
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.isAdmin) return;
+    if (permRegistry) return;
+    getPermissionsRegistry().then(setPermRegistry).catch(() => {});
+  }, [auth.isAuthenticated, auth.isAdmin, permRegistry]);
 
   // ─── Hydrate profileForm à l'ouverture du ProfileModal ─────
   // Lit auth.user pour name/email et fetch les prefs notifs depuis le backend.
@@ -1142,6 +1188,27 @@ export default function OnboardingModule() {
     showRegister, setShowRegister,
     tenantActiveModules, setTenantActiveModules,
     tenantSubscriptions, setTenantSubscriptions,
+    subscriptionLoaded, setSubscriptionLoaded,
+    // ── Derived AI plan tier (for feature gating in UI) ──
+    aiPlanTier: (() => {
+      const aiSub = (tenantSubscriptions || []).find((s: any) =>
+        s.plan?.addon_type === 'ai' && (s.status === 'active' || s.status === 'trialing')
+      );
+      if (!aiSub) return 'none' as const;
+      const slug = (aiSub.plan?.slug || '').toLowerCase();
+      if (slug.includes('starter')) return 'starter' as const;
+      if (slug.includes('enterprise')) return 'enterprise' as const;
+      if (slug.includes('business')) return 'business' as const;
+      return 'business' as const; // unknown AI plan → assume Business+
+    })(),
+    aiHasBusinessPlus: (() => {
+      const aiSub = (tenantSubscriptions || []).find((s: any) =>
+        s.plan?.addon_type === 'ai' && (s.status === 'active' || s.status === 'trialing')
+      );
+      if (!aiSub) return false;
+      const slug = (aiSub.plan?.slug || '').toLowerCase();
+      return !slug.includes('starter');
+    })(),
     selectedPlanIds, setSelectedPlanIds,
     subTab, setSubTab,
     subView, setSubView,
@@ -1169,6 +1236,14 @@ export default function OnboardingModule() {
     saPlans, setSaPlans,
     saSubscriptions, setSaSubscriptions,
     saStripe, setSaStripe,
+    saCoupons, setSaCoupons,
+    saCouponForm, setSaCouponForm,
+    saReport, setSaReport,
+    buddyAiSuggestions, setBuddyAiSuggestions,
+    npsSentiments, setNpsSentiments,
+    npsAggregateInsights, setNpsAggregateInsights,
+    turnoverRisk, setTurnoverRisk,
+    turnoverLoading, setTurnoverLoading,
     saLoaded, setSaLoaded,
     saPlanPanel, setSaPlanPanel,
     saPlanData, setSaPlanData,
@@ -1200,6 +1275,8 @@ export default function OnboardingModule() {
     empCooptations, setEmpCooptations,
     empCooptForm, setEmpCooptForm,
     notifConfig, setNotifConfig,
+    notifRegistry, setNotifRegistry,
+    permRegistry, setPermRegistry,
     equipTypes, setEquipTypes,
     equipments, setEquipments,
     equipStats, setEquipStats,
@@ -1513,7 +1590,9 @@ export default function OnboardingModule() {
         if (s.login_gradient_end) { setLoginGradientEnd(s.login_gradient_end); localStorage.setItem("illizeo_login_gradient_end", s.login_gradient_end); }
         if (s.login_bg_image) { setLoginBgImage(s.login_bg_image); localStorage.setItem("illizeo_login_bg_image", s.login_bg_image); }
         if (s.custom_logo) { setCustomLogo(s.custom_logo); localStorage.setItem("illizeo_custom_logo", s.custom_logo); }
+        else { setCustomLogo(""); localStorage.removeItem("illizeo_custom_logo"); }
         if (s.custom_logo_full) { setCustomLogoFull(s.custom_logo_full); localStorage.setItem("illizeo_custom_logo_full", s.custom_logo_full); }
+        else { setCustomLogoFull(""); localStorage.removeItem("illizeo_custom_logo_full"); }
       }).catch(() => {});
     }
   }, [tenantResolved, auth.isAuthenticated]);
@@ -1529,9 +1608,14 @@ export default function OnboardingModule() {
           setThemeColor(themeColor);
           localStorage.setItem("illizeo_theme_color", themeColor);
         }
+        // Sync logos with BDD : si la BDD est vide, on retire le localStorage
+        // (sinon un ancien logo custom restait actif après suppression côté admin)
         if (s.custom_logo) { setCustomLogo(s.custom_logo); localStorage.setItem("illizeo_custom_logo", s.custom_logo); }
+        else { setCustomLogo(""); localStorage.removeItem("illizeo_custom_logo"); }
         if (s.custom_logo_full) { setCustomLogoFull(s.custom_logo_full); localStorage.setItem("illizeo_custom_logo_full", s.custom_logo_full); }
+        else { setCustomLogoFull(""); localStorage.removeItem("illizeo_custom_logo_full"); }
         if (s.custom_favicon) { setCustomFavicon(s.custom_favicon); localStorage.setItem("illizeo_custom_favicon", s.custom_favicon); }
+        else { setCustomFavicon(""); localStorage.removeItem("illizeo_custom_favicon"); }
         if (s.region) { setRegion(s.region); localStorage.setItem("illizeo_region", s.region); }
         if (s.date_format) { setDateFormat(s.date_format); localStorage.setItem("illizeo_date_format", s.date_format); }
         if (s.time_format) { setTimeFormat(s.time_format); localStorage.setItem("illizeo_time_format", s.time_format); }
@@ -1539,10 +1623,11 @@ export default function OnboardingModule() {
         if (s.login_bg_image) { setLoginBgImage(s.login_bg_image); localStorage.setItem("illizeo_login_bg_image", s.login_bg_image); }
         if (s.interface_language && ['fr','en','de','it','es'].includes(s.interface_language)) { setLang(s.interface_language as Lang); setLangState(s.interface_language as Lang); }
         if (s.active_languages) { try { const langs = JSON.parse(s.active_languages); setActiveLanguages(langs); localStorage.setItem("illizeo_active_languages", s.active_languages); } catch {} }
+        if (s.notif_config) { try { const cfg = JSON.parse(s.notif_config); if (cfg && typeof cfg === "object") { setNotifConfig(cfg); localStorage.setItem("illizeo_notif_config", s.notif_config); } } catch {} }
         // Contract types & jurisdictions from company settings
         if (s.contract_types) try { setContractTypes(JSON.parse(s.contract_types)); } catch {}
         if (s.jurisdictions) try { setJurisdictions(JSON.parse(s.jurisdictions)); } catch {}
-        if (s.demo_mode !== undefined) { const dm = s.demo_mode === "true" || s.demo_mode === true; setDemoMode(dm); localStorage.setItem("illizeo_demo_mode", String(dm)); }
+        if (s.demo_mode !== undefined) { const dm = s.demo_mode === "true" || (s.demo_mode as any) === true; setDemoMode(dm); localStorage.setItem("illizeo_demo_mode", String(dm)); }
         if (s.login_gradient_start) { setLoginGradientStart(s.login_gradient_start); localStorage.setItem("illizeo_login_gradient_start", s.login_gradient_start); }
         if (s.login_gradient_end) { setLoginGradientEnd(s.login_gradient_end); localStorage.setItem("illizeo_login_gradient_end", s.login_gradient_end); }
         // Setup wizard: show for new tenants (no setup_completed flag).
@@ -1671,9 +1756,13 @@ export default function OnboardingModule() {
   useEffect(() => {
     if (auth.isAuthenticated && !auth.isAdmin) {
       getMyBadges().then(setMyBadges).catch(() => {});
+      getMyBadgeTemplates().then(setBadgeTemplates).catch(() => {});
     }
     if (auth.isAuthenticated && dashPage === "satisfaction") {
       getMyNpsSurveys().then(setEmpSurveys).catch(() => getNpsSurveys().then(s => setEmpSurveys(s.map(sv => ({ survey: sv, token: null, completed: false, completed_at: null })))).catch(() => {}));
+    }
+    if (auth.isAuthenticated && !auth.isAdmin && dashPage === "mon_materiel") {
+      getMyEquipment().then(setMyEquipment).catch(() => setMyEquipment([]));
     }
   }, [auth.isAuthenticated, dashPage]);
 
@@ -1769,6 +1858,7 @@ export default function OnboardingModule() {
       getMySubscription().then(res => {
         setTenantSubscriptions(res.subscriptions || []);
         setTenantActiveModules(res.active_modules || []);
+        setSubscriptionLoaded(true);
         const tid = localStorage.getItem("illizeo_tenant_id") || "illizeo";
         if (tid === "illizeo") return; // Editor tenant — no restrictions
 
@@ -1788,7 +1878,7 @@ export default function OnboardingModule() {
           setSubView("change");
         }
         // If in trial (< 14 days) with no sub → let them use everything freely
-      }).catch(() => {});
+      }).catch(() => { setSubscriptionLoaded(true); });
     }
   }, [auth.isAuthenticated]);
 
@@ -1877,6 +1967,7 @@ export default function OnboardingModule() {
       { id: "organigramme" as const, label: "Mon équipe", icon: Users },
       { id: "mes_rdv" as const, label: "Mes RDV", icon: Calendar },
       { id: "mes_signatures" as const, label: "Mes signatures", icon: FileSignature, badge: docsBadge },
+      { id: "mon_materiel" as const, label: "Mon matériel", icon: Laptop },
       { id: "badges" as const, label: "Badges", icon: Award },
       ...(hasOfficeTour ? [{ id: "bureaux" as const, label: "Bureaux", icon: MapPin }] : []),
       { id: "satisfaction" as const, label: "Feedback", icon: MessageSquare },
@@ -1899,7 +1990,7 @@ export default function OnboardingModule() {
     renderSidebar, renderEmployeeTopbar, renderActionCard, renderDashboard, renderMesActions, renderMonEquipe,
     renderMessagerie, renderCompanyBlock, renderEntreprise, renderRapports,
     renderWelcomeModal, renderDocPanel, renderActionDetail, renderProfileModal,
-    renderMonProfil, renderAssistantIA, handleBannerFileUpload, handleSendMessage,
+    renderMonProfil, renderAssistantIA, renderBadges, handleBannerFileUpload, handleSendMessage,
   } = empRenders;
 
   ctx.renderActionCard = renderActionCard;
@@ -1917,11 +2008,12 @@ export default function OnboardingModule() {
   const trialStart = localStorage.getItem("illizeo_trial_start");
 
   const authPages = createAuthPages(ctx);
+
   const adminRenders = createAdminRenders(ctx);
   const {
     renderDashboard_admin, renderSuivi, renderCollabProfile, renderParcours,
     renderDocuments, renderWorkflows, renderTemplates, renderEquipes,
-    renderNotifications_admin, renderEntreprise_admin, renderMessagerie_admin,
+    renderNotifications_admin, renderEntreprise_admin, renderAdminBureaux, renderGamificationBlocks, renderMessagerie_admin,
     renderNPS, renderContrats, renderGenerateContratModal, renderCooptation, renderIntegrations,
     renderSidebar_admin: _renderSidebar_admin, renderSuperAdminPanel, renderOcrModal, renderRelanceModal, PARCOURS_CAT_META, hasModule, isPageAccessible,
     isEditorTenant, isInTrial, trialExpired, hasActiveSub, SIDEBAR,
@@ -1934,7 +2026,28 @@ export default function OnboardingModule() {
   // ─── AUTH GUARDS (early returns) ─────────────────────────
   if (resetMode && !auth.isAuthenticated) return authPages.renderResetPassword();
   if (auth.twoFactorPending) return authPages.renderTwoFactorVerify();
+  // Public Pricing page — accessible via /pricing without auth
+  if (typeof window !== "undefined" && /^\/pricing\/?$/.test(window.location.pathname)) {
+    return authPages.renderPricing();
+  }
+  // Public Help Center — accessible via /help (or /help?article=slug) without auth
+  if (typeof window !== "undefined" && /^\/help(\/|$)/.test(window.location.pathname)) {
+    return <HelpCenter onClose={() => { window.location.href = "/"; }} />;
+  }
   if (showPricing) return authPages.renderPricing();
+  // Direct /signup URL — opens the register form for non-authenticated users.
+  // For already-logged-in users, just continue to the dashboard (don't trap them on signup).
+  if (typeof window !== "undefined" && /^\/signup\/?$/.test(window.location.pathname) && !auth.isAuthenticated) {
+    if (!showRegister) setShowRegister(true);
+    return authPages.renderRegister();
+  }
+  // Direct /signin URL — opens the login form. Same UX as the home page once a tenant
+  // is resolved (via ?tenant= query, localStorage, or domain). If no tenant, fall back
+  // to the tenant selector.
+  if (typeof window !== "undefined" && /^\/signin\/?$/.test(window.location.pathname) && !auth.isAuthenticated) {
+    if (tenantResolved) return authPages.renderLogin();
+    return authPages.renderTenantSelection();
+  }
   if (!auth.isAuthenticated && !tenantResolved && !showRegister) return authPages.renderTenantSelection();
   if (!auth.isAuthenticated && showRegister) return authPages.renderRegister();
   if (!auth.isAuthenticated && forgotMode) return authPages.renderForgotPassword();
@@ -2262,6 +2375,10 @@ export default function OnboardingModule() {
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Help center — opens in new tab */}
+            <a href="/help" target="_blank" rel="noopener noreferrer" title="Centre d'aide (nouvel onglet)" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: 6, borderRadius: 8, transition: "all .15s", color: C.textMuted, textDecoration: "none" }}>
+              <HelpCircle size={18} />
+            </a>
             {/* Dark mode toggle */}
             <button onClick={toggleDarkMode} title={darkMode ? "Mode clair" : "Mode sombre"} style={{ background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 8, transition: "all .15s" }}>
               {darkMode ? <Sun size={18} color={C.amber} /> : <Moon size={18} color={C.textMuted} />}
@@ -2438,7 +2555,7 @@ export default function OnboardingModule() {
         })()}
         <div style={{ flex: 1, overflow: "auto" }}>
         {/* ── Trial expired lock: only allow abonnement + RGPD ── */}
-        {!isEditorTenant && trialExpired && !hasActiveSub && adminPage !== "admin_abonnement" && adminPage !== "admin_donnees" && (
+        {!isEditorTenant && subscriptionLoaded && trialExpired && !hasActiveSub && adminPage !== "admin_abonnement" && adminPage !== "admin_donnees" && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: "60px 40px", textAlign: "center" }}>
             <div style={{ width: 64, height: 64, borderRadius: "50%", background: C.redLight, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
               <Lock size={28} color={C.red} />
@@ -2458,7 +2575,7 @@ export default function OnboardingModule() {
 
         {/* ── All other pages: locked when trial expired ──── */}
         {(() => {
-          const _locked = !isEditorTenant && !hasActiveSub && !isInTrial;
+          const _locked = !isEditorTenant && subscriptionLoaded && !hasActiveSub && !isInTrial;
           if (_locked && adminPage !== "admin_abonnement" && adminPage !== "admin_donnees") {
             return (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: "60px 40px", textAlign: "center" }}>
@@ -2488,6 +2605,7 @@ export default function OnboardingModule() {
         {adminPage === "admin_messagerie" && renderMessagerie_admin()}
         {adminPage === "admin_notifications" && renderNotifications_admin()}
         {adminPage === "admin_entreprise" && renderEntreprise_admin()}
+        {adminPage === "admin_bureaux" && renderAdminBureaux()}
         {adminPage === "admin_nps" && renderNPS()}
         {adminPage === "admin_feedback_hub" && (() => {
           // Lazy-load tab data on first view
@@ -2496,7 +2614,7 @@ export default function OnboardingModule() {
             try {
               if (adminFeedbackTab === "mood" && !adminMoods) {
                 const d = await (m as any).adminGetMoods?.(); if (d) setAdminMoods(d);
-              } else if (adminFeedbackTab === "suggestion" && adminSuggestions === null) {
+              } else if ((adminFeedbackTab === "suggestion" || adminFeedbackTab === "rdv") && adminSuggestions === null) {
                 const d = await (m as any).adminGetSuggestions?.(adminSuggStatusFilter || undefined); if (d) setAdminSuggestions(d);
               } else if (adminFeedbackTab === "buddy" && !adminBuddyRatings) {
                 const d = await (m as any).adminGetBuddyRatings?.(); if (d) setAdminBuddyRatings(d);
@@ -2520,6 +2638,7 @@ export default function OnboardingModule() {
             improvement: { label: "Amélioration", icon: Sparkles },
             bug: { label: "Bug", icon: Bug },
             other: { label: "Autre", icon: MessageCircle },
+            rdv_request: { label: "Demande RDV", icon: Calendar },
           };
 
           return (
@@ -2532,6 +2651,7 @@ export default function OnboardingModule() {
                 {([
                   { id: "mood", label: "Mood pulses", icon: Smile },
                   { id: "suggestion", label: "Suggestions / bugs", icon: Lightbulb },
+                  { id: "rdv", label: "Demandes RDV", icon: Calendar },
                   { id: "buddy", label: "Buddy / manager", icon: Star },
                   { id: "excited", label: "J'ai hâte", icon: Heart },
                 ] as const).map(tab => {
@@ -2605,7 +2725,7 @@ export default function OnboardingModule() {
                 </div>
               )}
 
-              {adminFeedbackTab === "suggestion" && (
+              {(adminFeedbackTab === "suggestion" || adminFeedbackTab === "rdv") && (
                 <div>
                   <div style={{ display: "flex", gap: 6, marginBottom: 14, alignItems: "center" }}>
                     <span style={{ fontSize: 11, color: C.textMuted, fontWeight: 600 }}>FILTRE :</span>
@@ -2618,7 +2738,7 @@ export default function OnboardingModule() {
                     ))}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {(adminSuggestions || []).map((s: any) => {
+                    {(adminSuggestions || []).filter((s: any) => adminFeedbackTab === "rdv" ? s.category === "rdv_request" : s.category !== "rdv_request").map((s: any) => {
                       const c = s.collaborateur;
                       const name = s.anonymous ? "Anonyme" : (c ? `${c.prenom} ${c.nom}` : `User #${s.user_id}`);
                       const sb = statusBadge[s.status] || statusBadge.open;
@@ -2652,8 +2772,8 @@ export default function OnboardingModule() {
                         </div>
                       );
                     })}
-                    {adminSuggestions !== null && adminSuggestions.length === 0 && (
-                      <div className="iz-card" style={{ ...sCard, textAlign: "center", color: C.textMuted, fontSize: 12, padding: 32 }}>Aucune suggestion {adminSuggStatusFilter ? `avec le statut "${statusBadge[adminSuggStatusFilter]?.label}"` : ""}.</div>
+                    {adminSuggestions !== null && (adminSuggestions || []).filter((s: any) => adminFeedbackTab === "rdv" ? s.category === "rdv_request" : s.category !== "rdv_request").length === 0 && (
+                      <div className="iz-card" style={{ ...sCard, textAlign: "center", color: C.textMuted, fontSize: 12, padding: 32 }}>{adminFeedbackTab === "rdv" ? "Aucune demande de RDV" : "Aucune suggestion"} {adminSuggStatusFilter ? `avec le statut "${statusBadge[adminSuggStatusFilter]?.label}"` : ""}.</div>
                     )}
                   </div>
                 </div>
@@ -2750,7 +2870,12 @@ export default function OnboardingModule() {
         {adminPage === "admin_contrats" && renderContrats()}
         {adminPage === "admin_integrations" && renderIntegrations()}
         {adminPage === "admin_cooptation" && renderCooptation()}
-        {adminPage === "admin_gamification" && adminInline.renderAdminGamification()}
+        {adminPage === "admin_gamification" && (
+          <>
+            {adminInline.renderAdminGamification()}
+            {renderGamificationBlocks()}
+          </>
+        )}
         {adminPage === "admin_users" && adminInline.renderAdminUsers()}
         {adminPanels.renderGroupePanel()}
         {adminPanels.renderActionPanel()}
@@ -2793,6 +2918,18 @@ export default function OnboardingModule() {
             return parts.includes("manager") || parts.includes("n+1");
           };
 
+          // Compute the longest delay across all parcours_actions to derive
+          // the actual onboarding duration (in days) for each arrivant.
+          const computeParcoursDuration = (actions: any[]): number => {
+            if (!actions || actions.length === 0) return 100;
+            const maxOffset = actions.reduce((max: number, a: any) => {
+              const m = (a.delaiRelatif || a.delai_relatif || "J+0").match(/J([+-]?\d+)/);
+              const offset = m ? parseInt(m[1], 10) : 0;
+              return offset > max ? offset : max;
+            }, 0);
+            return Math.max(maxOffset, 1);
+          };
+
           const realArrivants = COLLABORATEURS
             .filter((c: any) => c.status !== "termine")
             .filter((c: any) => {
@@ -2806,6 +2943,7 @@ export default function OnboardingModule() {
               const j = Math.max(1, Math.floor((now - startDate.getTime()) / 86400000) + 1);
               const buddy = (c.accompagnants || []).find((a: any) => a.role === "buddy")?.name || "—";
               const actions = c.parcours_actions || [];
+              const duration = computeParcoursDuration(actions);
 
               const todo = actions
                 .filter((a: any) => (a.type === "rdv" || a.type === "entretien") && a.assignment_status !== "termine" && isManagerInvolved(a))
@@ -2834,8 +2972,9 @@ export default function OnboardingModule() {
 
               return {
                 id: c.id,
+                user_id: c.user_id,
                 initials: c.initials, color: c.color || PALETTE[i % PALETTE.length],
-                name: `${c.prenom} ${c.nom}`, role: c.poste, j, buddy, pct: c.progression,
+                name: `${c.prenom} ${c.nom}`, role: c.poste, j, duration, buddy, pct: c.progression,
                 todo, done,
               };
             });
@@ -2844,6 +2983,10 @@ export default function OnboardingModule() {
           const totalTodo = ARRIVANTS.reduce((acc: number, a: any) => acc + a.todo.length, 0);
           const totalDoneRecent = ARRIVANTS.reduce((acc: number, a: any) => acc + a.done.length, 0);
           const avgPct = ARRIVANTS.length > 0 ? Math.round(ARRIVANTS.reduce((acc: number, a: any) => acc + a.pct, 0) / ARRIVANTS.length) : 0;
+          // Average parcours duration across all arrivants
+          const avgDuration = ARRIVANTS.length > 0
+            ? Math.round(ARRIVANTS.reduce((acc: number, a: any) => acc + a.duration, 0) / ARRIVANTS.length)
+            : 0;
           if (ARRIVANTS.length === 0) {
             return (
               <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
@@ -2869,14 +3012,14 @@ export default function OnboardingModule() {
                   <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{myName} · {ARRIVANTS.length} personne{ARRIVANTS.length > 1 ? "s" : ""} en intégration</div>
                   <h1 style={{ fontSize: 24, fontWeight: 700, color: C.pink, margin: 0 }}>Mes nouveaux arrivants</h1>
                 </div>
-                <button className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "10px 22px", fontSize: 13 }}>+ Préparer un arrivant</button>
+                <button onClick={() => { setCollabPanelData({ prenom: "", nom: "", email: "", poste: "", site: "", departement: "", dateDebut: "" }); setCollabPanelMode("create"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "10px 22px", fontSize: 13 }}>+ Préparer un arrivant</button>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
                 {[
                   { label: "EN COURS", value: ARRIVANTS.length, color: C.pink },
                   { label: "ACTIONS À FAIRE", value: totalTodo, sub: `${totalDoneRecent} validé${totalDoneRecent > 1 ? "s" : ""} 7j`, color: C.amber },
                   { label: "SCORE MOYEN", value: `${avgPct}%`, color: C.green },
-                  { label: "DÉLAI ONBOARDING", value: "100j", color: "#9C27B0" },
+                  { label: "DÉLAI ONBOARDING", value: avgDuration > 0 ? `${avgDuration}j` : "—", color: "#9C27B0" },
                 ].map(k => (
                   <div key={k.label} className="iz-card" style={{ ...sCard, padding: "16px 18px" }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1 }}>{k.label}</div>
@@ -2891,7 +3034,7 @@ export default function OnboardingModule() {
                     <div style={{ width: 48, height: 48, borderRadius: "50%", background: a.color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700 }}>{a.initials}</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{a.name}</div>
-                      <div style={{ fontSize: 12, color: C.textMuted }}>{a.role} · J+{a.j} sur 100 · Buddy : {a.buddy}</div>
+                      <div style={{ fontSize: 12, color: C.textMuted }}>{a.role} · J+{a.j} sur {a.duration} · Buddy : {a.buddy}</div>
                     </div>
                     <div style={{ minWidth: 220 }}>
                       <div style={{ height: 6, background: C.bg, borderRadius: 3, overflow: "hidden" }}>
@@ -2900,7 +3043,26 @@ export default function OnboardingModule() {
                       <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4, textAlign: "right" }}>{a.pct}% complété</div>
                     </div>
                     <button onClick={() => { setAdminPage("admin_suivi"); if (a.id) setCollabProfileId(a.id); }} style={{ ...sBtn("outline"), padding: "8px 16px", fontSize: 12 }}>Fiche</button>
-                    <button onClick={() => { setAdminPage("admin_messagerie"); }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 16px", fontSize: 12 }}>1:1</button>
+                    <button onClick={async () => {
+                      setAdminPage("admin_messagerie");
+                      if (!a.user_id) { addToast_admin(`${a.name} n'a pas encore de compte utilisateur`); return; }
+                      // Try to find an existing conversation with this collab's user
+                      const existing = msgConversations.find((c: any) => c.other_user?.id === a.user_id);
+                      if (existing) {
+                        setMsgActiveConvId(existing.id);
+                      } else {
+                        // Create the conversation by sending a placeholder, then refresh
+                        try {
+                          const ep = await import('./api/endpoints');
+                          const msg = await ep.sendMessage(a.user_id, "👋");
+                          const list = await ep.getConversations();
+                          setMsgConversations(list);
+                          setMsgActiveConvId(msg.conversation_id);
+                        } catch (e: any) {
+                          addToast_admin(e?.message || "Impossible d'ouvrir la conversation");
+                        }
+                      }
+                    }} className="iz-btn-pink" style={{ ...sBtn("pink"), padding: "8px 16px", fontSize: 12 }}>1:1</button>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "0 22px 18px", gap: 24 }}>
                     <div>
@@ -2934,12 +3096,12 @@ export default function OnboardingModule() {
 
         {/* CITATIONS DU JOUR — référentiel admin */}
         {adminPage === "admin_quotes" && (
-          <AdminQuotesPage C={C} sCard={sCard} sBtn={sBtn} sInput={sInput} font={font} addToast={addToast_admin} />
+          <AdminQuotesPage C={C} sCard={sCard} sBtn={sBtn as (k: string) => any} sInput={sInput} font={font} addToast={addToast_admin} />
         )}
 
         {/* RDV RÉCURRENTS — admin CRUD */}
         {adminPage === "admin_recurring_meetings" && (
-          <AdminRecurringMeetingsPage C={C} sCard={sCard} sBtn={sBtn} sInput={sInput} font={font} addToast={addToast_admin} parcours={PARCOURS_TEMPLATES} collaborateurs={COLLABORATEURS} />
+          <AdminRecurringMeetingsPage C={C} sCard={sCard} sBtn={sBtn as (k: string) => any} sInput={sInput} font={font} addToast={addToast_admin} parcours={PARCOURS_TEMPLATES} collaborateurs={COLLABORATEURS} />
         )}
           </>);
         })()}
@@ -3016,11 +3178,11 @@ export default function OnboardingModule() {
   }
   // ─── EMPLOYEE MAIN RENDER ────────────────────────────────
   // Lock employee pages when no active subscription (trial expired or sub not renewed)
-  if (!isEditorTenant && !hasActiveSub && !isInTrial) {
+  if (!isEditorTenant && subscriptionLoaded && !hasActiveSub && !isInTrial) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: font, background: C.white, color: C.text, padding: "60px 40px", textAlign: "center" }}>
         <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-        <div style={{ marginBottom: 24 }}><IllizeoLogoBrand style={{ height: 32 }} /></div>
+        <div style={{ marginBottom: 24 }}><IllizeoLogoBrand size={32} /></div>
         <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#FFF3E0", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
           <Lock size={28} color="#E65100" />
         </div>
@@ -3043,6 +3205,7 @@ export default function OnboardingModule() {
       {dashPage === "mon_profil" && renderMonProfil()}
       {dashPage === "organigramme" && renderMonEquipe()}
       {dashPage === "assistant_ia" && renderAssistantIA()}
+      {dashPage === "badges" && renderBadges()}
       {dashPage === "entreprise" && renderEntreprise()}
       {dashPage === "cooptation" && (() => {
         const activeCampaigns = empCampaigns.filter(c => c.statut === "active");
@@ -4498,7 +4661,7 @@ export default function OnboardingModule() {
         <EmployeeMyRdvPage
           C={C}
           sCard={sCard}
-          sBtn={sBtn}
+          sBtn={sBtn as (k: string) => any}
           font={font}
           myCollab={myCollabProfile || COLLABORATEURS.find((c: any) => c.email === auth.user?.email)}
           actionTemplates={ACTION_TEMPLATES}
@@ -4739,9 +4902,73 @@ export default function OnboardingModule() {
         );
       })()}
 
+      {/* MON MATÉRIEL PAGE */}
+      {dashPage === "mon_materiel" && (() => {
+        const EQUIP_ICON_MAP: Record<string, any> = { laptop: Laptop, monitor: Monitor, phone: Phone, key: KeyRound, headphones: Headphones, mouse: Mouse, armchair: Armchair, car: Car, package: Package };
+        const ETAT_META: Record<string, { label: string; color: string; bg: string }> = {
+          attribue: { label: "Attribué", color: C.blue, bg: C.blueLight },
+          en_reparation: { label: "En réparation", color: "#7B5EA7", bg: C.purple + "15" },
+          retire: { label: "Retiré", color: C.textMuted, bg: C.bg },
+          disponible: { label: "Disponible", color: C.green, bg: C.greenLight },
+          en_commande: { label: "En commande", color: C.amber, bg: C.amberLight },
+        };
+        const fmtAssignedDate = (d: string | null | undefined) => {
+          if (!d) return "—";
+          try { return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }); } catch { return d; }
+        };
+        return (
+          <div style={{ flex: 1, padding: "32px 40px", overflow: "auto" }}>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{myEquipment.length} équipement{myEquipment.length > 1 ? 's' : ''} attribué{myEquipment.length > 1 ? 's' : ''}</div>
+              <h1 style={{ fontSize: 24, fontWeight: 700, color: C.pink, margin: 0 }}>Mon matériel</h1>
+              <p style={{ fontSize: 13, color: C.textLight, margin: "6px 0 0" }}>Retrouvez ici l'inventaire du matériel qui vous est confié. En cas de problème, contactez votre équipe IT.</p>
+            </div>
+            {myEquipment.length === 0 ? (
+              <div className="iz-card" style={{ ...sCard, padding: "40px 32px", textAlign: "center" }}>
+                <div style={{ width: 64, height: 64, borderRadius: 16, background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <Laptop size={28} color={C.textMuted} />
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 6 }}>Aucun matériel attribué</div>
+                <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>Votre équipement n'a pas encore été enregistré. Contactez votre RH ou votre équipe IT pour plus d'informations.</div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+                {myEquipment.map(eq => {
+                  const TypeIcon = EQUIP_ICON_MAP[eq.type?.icon || "package"] || Package;
+                  const meta = ETAT_META[eq.etat] || ETAT_META.attribue;
+                  return (
+                    <div key={eq.id} className="iz-card" style={{ ...sCard, padding: "18px 20px", display: "flex", gap: 14, alignItems: "flex-start" }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 10, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        <TypeIcon size={22} color={C.pink} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>{eq.nom}</div>
+                          <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700, background: meta.bg, color: meta.color }}>{meta.label}</span>
+                        </div>
+                        {(eq.marque || eq.modele) && <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 6 }}>{[eq.marque, eq.modele].filter(Boolean).join(" ")}</div>}
+                        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", fontSize: 11 }}>
+                          {eq.type?.nom && (<><span style={{ color: C.textMuted }}>Type</span><span style={{ color: C.text }}>{eq.type.nom}</span></>)}
+                          {eq.numero_serie && (<><span style={{ color: C.textMuted }}>N° série</span><span style={{ color: C.text, fontFamily: "monospace" }}>{eq.numero_serie}</span></>)}
+                          {eq.assigned_at && (<><span style={{ color: C.textMuted }}>Attribué le</span><span style={{ color: C.text }}>{fmtAssignedDate(eq.assigned_at)}</span></>)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* BUREAUX PAGE */}
       {dashPage === "bureaux" && (() => {
-        const tourBlock = (companyBlocks || []).find((b: any) => b.type === "office_tour" && b.actif);
+        const allTourBlocks = (companyBlocks || []).filter((b: any) => b.type === "office_tour");
+        const tourBlock = allTourBlocks.find((b: any) => b.actif);
+        const hasDisabledTourBlock = allTourBlocks.length > 0 && !tourBlock;
+        const tenantIdBureaux = localStorage.getItem("illizeo_tenant_id") || "";
+        const isDemoTenantBureaux = tenantIdBureaux === "illizeo" || tenantIdBureaux === "illizeo2";
         const data = tourBlock?.data || {};
         const ROOMS_FALLBACK = [
           { id: "openspace", title: "Open-space RSE", subtitle: "✓ Votre poste · 4.12", span: 1 },
@@ -4753,7 +4980,11 @@ export default function OnboardingModule() {
           { id: "directionrh", title: "Direction & RH", subtitle: "Marie · Hélène", span: 2 },
           { id: "brainstorm", title: "Salle Brainstorm", subtitle: "16 places", span: 1 },
         ];
-        const ROOMS = ((data.rooms && data.rooms.length > 0) ? data.rooms : ROOMS_FALLBACK).map((r: any, i: number) => ({
+        const adminRooms = (data.rooms && data.rooms.length > 0) ? data.rooms : null;
+        const sourceRooms = adminRooms
+          ? adminRooms
+          : (hasDisabledTourBlock ? [] : (isDemoTenantBureaux ? ROOMS_FALLBACK : []));
+        const ROOMS = sourceRooms.map((r: any, i: number) => ({
           id: r.id || `room_${i}`, title: r.title, subtitle: r.subtitle || "", span: r.span || 1,
         }));
         const SITE = data.site || "Siège Paris";
@@ -4791,7 +5022,7 @@ export default function OnboardingModule() {
         if (ROOMS.length === 0) return (
           <div style={{ flex: 1, padding: "32px 40px" }}>
             <h1 style={{ fontSize: 24, fontWeight: 700, color: C.pink, margin: "0 0 12px" }}>Tour des bureaux</h1>
-            <div className="iz-card" style={{ ...sCard, padding: 32, textAlign: "center", color: C.textMuted }}>Aucun lieu configuré. Demandez à votre admin RH d'activer un bloc "Tour des bureaux" depuis la page Entreprise.</div>
+            <div className="iz-card" style={{ ...sCard, padding: 32, textAlign: "center", color: C.textMuted }}>{hasDisabledTourBlock ? "Le tour des bureaux est actuellement désactivé par votre RH." : "Aucun lieu configuré. Demandez à votre admin RH d'activer un bloc \"Tour des bureaux\" depuis la page Bureaux."}</div>
           </div>
         );
         // Hidden mascot location: stable hash of tourBlock id → one of the rooms

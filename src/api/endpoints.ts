@@ -178,6 +178,7 @@ interface ApiAction {
   xp?: number; heure_default?: string | null; accompagnant_role?: string | null;
   pieces_requises: string[] | null; assignation_mode: string;
   assignation_valeurs: string[] | null;
+  options?: any;
   action_type?: { id: number; slug: string; label: string };
   phase?: { id: number; nom: string };
   parcours?: { id: number; nom: string };
@@ -449,6 +450,41 @@ export async function updateNotificationConfig(id: number, data: Record<string, 
   return apiFetch<ApiNotifConfig>(`/notifications-config/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 }
 
+// Single source of truth for the list of notifications the backend can emit.
+// Backed by App\Support\NotificationRegistry on the API side.
+export interface NotificationRegistryEntry {
+  key: string;
+  label: string;
+  description: string;
+  category: string;
+  audience: string;
+  channels: ("inapp" | "email")[];
+  default: { inapp?: boolean; email?: boolean };
+}
+
+export async function getNotificationsRegistry() {
+  return apiFetch<NotificationRegistryEntry[]>('/notifications-registry');
+}
+
+// Canonical permission registry — single source of truth for the Roles & permissions admin page.
+// Backed by App\Support\PermissionRegistry on the API side.
+export interface PermissionRegistryEntry {
+  key: string;
+  area: "admin" | "employe";
+  section: string;
+  label: string;
+}
+
+export interface PermissionRegistryResponse {
+  levels: ("none" | "view" | "edit" | "admin")[];
+  sections: Record<string, string>;
+  modules: PermissionRegistryEntry[];
+}
+
+export async function getPermissionsRegistry() {
+  return apiFetch<PermissionRegistryResponse>('/permissions-registry');
+}
+
 // ─── AD Group Mappings ──────────────────────────────────────
 export async function getADGroupMappings() {
   return apiFetch<any[]>('/ad-group-mappings');
@@ -607,7 +643,7 @@ export async function postMood(mood: number, comment?: string) {
 export async function getMyMoods() {
   return apiFetch<ApiMoodEntry[]>('/me/mood');
 }
-export async function postSuggestion(payload: { category?: 'suggestion' | 'bug' | 'improvement' | 'other'; content: string; anonymous?: boolean }) {
+export async function postSuggestion(payload: { category?: 'suggestion' | 'bug' | 'improvement' | 'other' | 'rdv_request'; content: string; anonymous?: boolean }) {
   return apiFetch<{ ok: boolean }>('/me/feedback/suggestion', { method: 'POST', body: JSON.stringify(payload) });
 }
 export async function postBuddyRating(payload: { target_type: 'buddy' | 'manager'; target_user_id?: number | null; rating: number; comment?: string }) {
@@ -1009,6 +1045,10 @@ export async function getBadgeTemplates() {
   return apiFetch<BadgeTemplate[]>('/badge-templates');
 }
 
+export async function getMyBadgeTemplates() {
+  return apiFetch<BadgeTemplate[]>('/me/badge-templates');
+}
+
 export async function createBadgeTemplate(data: Record<string, any>) {
   return apiFetch<BadgeTemplate>('/badge-templates', { method: 'POST', body: JSON.stringify(data) });
 }
@@ -1275,6 +1315,29 @@ export async function createEquipmentPackage(data: Record<string, any>) { return
 export async function updateEquipmentPackage(id: number, data: Record<string, any>) { return apiFetch<EquipmentPackage>(`/equipment-packages/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
 export async function deleteEquipmentPackage(id: number) { return apiFetch<void>(`/equipment-packages/${id}`, { method: 'DELETE' }); }
 export async function provisionPackage(id: number, collaborateurId: number) { return apiFetch<any>(`/equipment-packages/${id}/provision`, { method: 'POST', body: JSON.stringify({ collaborateur_id: collaborateurId }) }); }
+export async function getMyEquipment() { return apiFetch<Equipment[]>('/me/equipment'); }
+
+// ─── VAT (TVA suisse + reverse charge EU) ──────────────────
+export interface VatValidation { valid: boolean; name: string | null; address: string | null; cached: boolean; error: string | null; }
+export interface VatComputation {
+  rate: number; amount_ht_cents: number; vat_amount_cents: number; amount_ttc_cents: number;
+  treatment: string; mention: string; vat_number_validated?: boolean;
+}
+export async function validateVatNumber(country_code: string, vat_number: string) {
+  return apiFetch<VatValidation>('/vat/validate', { method: 'POST', body: JSON.stringify({ country_code, vat_number }) });
+}
+export async function computeVat(amount_ht_cents: number, country_code: string, customer_type?: string, vat_number?: string, vat_validated?: boolean) {
+  return apiFetch<VatComputation>('/vat/compute', { method: 'POST', body: JSON.stringify({ amount_ht_cents, country_code, customer_type, vat_number, vat_validated }) });
+}
+
+// ─── Exchange rates ─────────────────────────────────────────
+export async function getExchangeRates(currencies?: string[]) {
+  const qs = currencies?.length ? `?currencies=${currencies.join(',')}` : '';
+  return apiFetch<{ base: string; rates: Record<string, number>; updated_at: string }>(`/exchange-rates${qs}`);
+}
+export async function convertExchangeRate(amount: number, currency: string) {
+  return apiFetch<{ amount_chf: number; currency: string; amount_target: number; is_estimate: boolean }>(`/exchange-rates/convert?amount=${amount}&currency=${currency}`);
+}
 
 // ─── Signature Documents ───────────────────────────────────
 export interface SignatureDoc { id: number; titre: string; description: string | null; type: 'lecture' | 'signature'; fichier_path: string | null; fichier_nom: string | null; obligatoire: boolean; actif: boolean; total_envois?: number; total_signes?: number; }
@@ -1395,7 +1458,17 @@ export async function getTenantBranding() {
 }
 
 // ─── Tenant Registration ────────────────────────────────────
-export async function registerTenant(data: { company_name: string; admin_name: string; admin_email: string; password: string; password_confirmation: string }) {
+export async function registerTenant(data: {
+  company_name: string;
+  admin_name: string;
+  admin_email: string;
+  password: string;
+  password_confirmation: string;
+  country: string;
+  customer_type: 'company' | 'individual';
+  vat_number?: string;
+  billing_address?: { street?: string; postal_code?: string; city?: string };
+}) {
   const res = await apiFetch<{ tenant_id: string; user: AuthUser; token: string }>('/register-tenant', { method: 'POST', body: JSON.stringify(data) });
   setToken(res.token);
   // Update tenant ID in localStorage for future requests
@@ -1477,11 +1550,109 @@ export async function superAdminListInvoices() {
   return apiFetch<any[]>('/super-admin/invoices');
 }
 
+// ─── Super-admin: Coupons (Stripe) ─────────────────────────
+export async function superAdminListCoupons() {
+  return apiFetch<any[]>('/super-admin/coupons');
+}
+export async function superAdminCreateCoupon(data: {
+  name: string;
+  discount_type: 'percent' | 'amount';
+  percent_off?: number;
+  amount_off?: number;
+  currency?: string;
+  duration: 'once' | 'repeating' | 'forever';
+  duration_in_months?: number;
+  max_redemptions?: number;
+  redeem_by?: string;
+  promo_code?: string;
+  code_max_redemptions?: number;
+  code_expires_at?: string;
+}) {
+  return apiFetch<{ coupon_id: string; promo_code?: string; promo_code_id?: string }>('/super-admin/coupons', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function superAdminDeleteCoupon(couponId: string) {
+  return apiFetch<{ ok: boolean }>(`/super-admin/coupons/${couponId}`, { method: 'DELETE' });
+}
+export async function superAdminTogglePromoCode(promoCodeId: string, active: boolean) {
+  return apiFetch<{ code: string; active: boolean }>(`/super-admin/promotion-codes/${promoCodeId}`, { method: 'PATCH', body: JSON.stringify({ active }) });
+}
+
+// ─── Super-admin: Reporting ────────────────────────────────
+export interface RevenueReport {
+  mrr: number; arr: number; arpu: number; arpc: number;
+  active_subs: number; total_tenants: number; total_collaborateurs: number;
+  churn_rate_30d: number; churned_last_30d: number; revenue_last_30d: number;
+  by_plan: { slug: string; nom: string; addon_type: string | null; subs_count: number; mrr: number; collaborateurs: number }[];
+  evolution: { month: string; label: string; mrr: number; subs_count: number; new_subs: number; churned: number }[];
+  currency: string;
+}
+export async function superAdminGetRevenueReport() {
+  return apiFetch<RevenueReport>('/super-admin/reporting/revenue');
+}
+
+// ─── AI Insights ───────────────────────────────────────────
+export interface NpsSentimentResult {
+  sentiment: 'positive' | 'neutral' | 'negative';
+  themes: string[];
+  key_insight: string;
+  suggestion: string;
+}
+export async function aiAnalyzeNpsResponse(responseId: number) {
+  return apiFetch<NpsSentimentResult>('/ai/nps-sentiment', { method: 'POST', body: JSON.stringify({ response_id: responseId }) });
+}
+
+export interface NpsAggregateInsights {
+  top_positive_themes: string[];
+  top_negative_themes: string[];
+  key_findings: string[];
+  recommendations: string[];
+  summary: { total: number; promoters: number; passives: number; detractors: number; nps_score: number };
+}
+export async function aiAggregateNpsInsights(surveyId: number) {
+  return apiFetch<NpsAggregateInsights>('/ai/nps-insights', { method: 'POST', body: JSON.stringify({ survey_id: surveyId }) });
+}
+
+export interface BuddySuggestion {
+  collaborateur_id: number;
+  user_id: number;
+  score: number;
+  reasons: string[];
+  nom: string;
+  poste: string;
+  site: string;
+  departement: string;
+}
+export async function aiSuggestBuddy(collaborateurId: number) {
+  return apiFetch<{ target: any; suggestions: BuddySuggestion[] }>('/ai/suggest-buddy', { method: 'POST', body: JSON.stringify({ collaborateur_id: collaborateurId }) });
+}
+
+export interface TurnoverRiskEntry {
+  id: number;
+  nom: string;
+  poste: string;
+  site: string;
+  risk_score: number;
+  reasons: string[];
+  // Level 2/3 enrichment (when enrich=1, default)
+  narrative?: string | null;
+  trend?: 'declining' | 'stable' | 'improving' | 'insufficient_data' | null;
+  trend_label?: string | null;
+  targeted_recommendation?: string | null;
+}
+export interface TurnoverRisk {
+  at_risk: TurnoverRiskEntry[];
+  total_screened: number;
+  enriched: boolean;
+}
+export async function aiTurnoverRisk(enrich: boolean = true) {
+  return apiFetch<TurnoverRisk>(`/ai/turnover-risk${enrich ? '?enrich=1' : '?enrich=0'}`);
+}
+
 export async function superAdminGetStripeConfig() {
   return apiFetch<{ has_key: boolean; has_secret: boolean; has_webhook: boolean }>('/super-admin/stripe-config');
 }
 
-export async function superAdminUpdateStripeConfig(data: { stripe_key?: string; stripe_secret?: string; stripe_webhook_secret?: string }) {
+export async function superAdminUpdateStripeConfig(data: { stripe_key?: string; stripe_secret?: string; stripe_webhook_secret?: string; stripe_mode?: string; stripe_test_key?: string; stripe_test_secret?: string; stripe_test_webhook_secret?: string }) {
   return apiFetch<any>('/super-admin/stripe-config', { method: 'PUT', body: JSON.stringify(data) });
 }
 
@@ -1490,8 +1661,11 @@ export async function getMySubscription() {
   return apiFetch<{ subscriptions: any[]; active_modules: string[]; tenant_id: string }>('/my-subscription');
 }
 
-export async function subscribeToPlan(plan_id: number, billing_cycle: 'monthly' | 'yearly', payment_method: 'stripe' | 'sepa' | 'invoice', nombre_collaborateurs?: number) {
-  return apiFetch<any>('/subscribe', { method: 'POST', body: JSON.stringify({ plan_id, billing_cycle, payment_method, nombre_collaborateurs: nombre_collaborateurs || 25 }) });
+export async function subscribeToPlan(plan_id: number, billing_cycle: 'monthly' | 'yearly', payment_method: 'stripe' | 'sepa' | 'invoice', nombre_collaborateurs?: number, billing?: { currency?: string; country?: string; customer_type?: string; vat_number?: string }) {
+  return apiFetch<any>('/subscribe', { method: 'POST', body: JSON.stringify({
+    plan_id, billing_cycle, payment_method, nombre_collaborateurs: nombre_collaborateurs || 25,
+    currency: billing?.currency, country: billing?.country, customer_type: billing?.customer_type, vat_number: billing?.vat_number,
+  }) });
 }
 
 export async function cancelSubscription(subscriptionId: number) {
@@ -1508,6 +1682,65 @@ export async function getActiveModules() {
 
 export async function getInvoices() {
   return apiFetch<any[]>('/invoices');
+}
+
+export async function createStripeCheckoutSession(data: {
+  plan_id: number;
+  billing_cycle: 'monthly' | 'yearly';
+  currency: string;
+  nombre_collaborateurs?: number;
+  country?: string;
+  customer_type?: 'company' | 'individual';
+  vat_number?: string;
+  success_url?: string;
+  cancel_url?: string;
+}) {
+  return apiFetch<{ url: string; session_id: string; publishable_key: string }>('/stripe/checkout/create-session', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function downloadInvoicePdf(invoiceId: number, invoiceNumber?: string) {
+  const baseUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+  const token = localStorage.getItem('illizeo_token');
+  const tenantId = localStorage.getItem('illizeo_tenant_id') || (import.meta as any).env?.VITE_TENANT_ID || 'illizeo';
+  const res = await fetch(`${baseUrl}/invoices/${invoiceId}/download`, {
+    headers: { 'X-Tenant': tenantId, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error(`Téléchargement échoué (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${invoiceNumber || `facture-${invoiceId}`}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function superAdminRegenerateInvoicePdf(invoiceId: number) {
+  return apiFetch<{ ok: boolean; invoice_number: string; pdf_path: string }>(`/super-admin/invoices/${invoiceId}/regenerate-pdf`, { method: 'POST' });
+}
+
+export async function superAdminDownloadInvoicePdf(invoiceId: number, invoiceNumber?: string) {
+  const baseUrl = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
+  const token = localStorage.getItem('illizeo_token');
+  const tenantId = localStorage.getItem('illizeo_tenant_id') || (import.meta as any).env?.VITE_TENANT_ID || 'illizeo';
+  const res = await fetch(`${baseUrl}/super-admin/invoices/${invoiceId}/download`, {
+    headers: { 'X-Tenant': tenantId, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!res.ok) throw new Error(`Téléchargement échoué (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${invoiceNumber || `facture-${invoiceId}`}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ─── Demo Mode ─────────────────────────────────────────────
@@ -1618,7 +1851,7 @@ export interface OcrIdentityResult {
   avs_number: string | null;
   confidence: 'high' | 'medium' | 'low';
 }
-export async function ocrExtractIdentity(file: File): Promise<{ success: boolean; data: OcrIdentityResult; confidence: string }> {
+export async function ocrExtractIdentity(file: File): Promise<{ success: boolean; data: OcrIdentityResult; confidence: string; usage?: number; warning?: string }> {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
   const tenantId = localStorage.getItem('illizeo_tenant_id') || import.meta.env.VITE_TENANT_ID || 'illizeo';
   const token = localStorage.getItem('illizeo_token');
@@ -1849,12 +2082,6 @@ export async function postAdminAiChat(message: string, history: { role: string; 
 
 export async function relancerCollaborateur(collabId: number, payload: { subject: string; body: string }) {
   return apiFetch<{ success: boolean; message?: string }>(`/collaborateurs/${collabId}/relancer`, { method: 'POST', body: JSON.stringify(payload) });
-}
-
-export async function getExchangeRates() {
-  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
-  const res = await fetch(`${base}/exchange-rates`);
-  return res.json() as Promise<{ rates: Record<string, number> }>;
 }
 
 export async function getCalendarEvents(year: number, month: number) {
