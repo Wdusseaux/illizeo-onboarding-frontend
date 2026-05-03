@@ -32,16 +32,20 @@ const TRIGGER_OPTIONS = [
   { value: 'Fin de parcours offboarding', label: 'Fin offboarding', icon: LogOut, color: '#FF9800' },
   { value: 'Nouveau collaborateur', label: 'Nouveau collaborateur', icon: UserPlus, color: '#7B5EA7' },
   { value: 'J-7 avant date limite', label: 'J-7 date limite', icon: Clock, color: '#F9A825' },
+  { value: "J-3 avant date d'arrivée", label: 'J-3 pré-arrivée', icon: Clock, color: '#FF9800' },
+  { value: "Jour d'arrivée (J+0)", label: "Jour d'arrivée (J+0)", icon: Rocket, color: '#4CAF50' },
+  { value: 'Milestone post-arrivée', label: 'Milestone J+14/J+30', icon: Calendar, color: '#7B5EA7' },
   { value: "Période d'essai terminée", label: 'Fin période essai', icon: Calendar, color: '#FF9800' },
+  { value: "Fin de période d'essai (J-15)", label: "Fin période essai J-15", icon: Clock, color: '#FF9800' },
+  { value: 'Renouvellement CDD (J-60)', label: 'Renouvellement CDD J-60', icon: PenTool, color: '#E91E63' },
   { value: "Anniversaire d'embauche", label: 'Anniversaire embauche', icon: Gift, color: '#E91E63' },
+  { value: 'Anniversaire personnel', label: 'Anniversaire personnel', icon: Gift, color: '#7B5EA7' },
   { value: 'Collaborateur en retard', label: 'Collaborateur en retard', icon: AlertTriangle, color: '#E53935' },
   { value: 'Cooptation validée', label: 'Cooptation validée', icon: Handshake, color: '#4CAF50' },
   { value: 'Contrat prêt', label: 'Contrat prêt', icon: FileText, color: '#1A73E8' },
   { value: 'Contrat signé', label: 'Contrat signé', icon: PenTool, color: '#1A73E8' },
   { value: 'Questionnaire NPS soumis', label: 'NPS soumis', icon: Star, color: '#F9A825' },
   { value: 'Document validé', label: 'Document validé', icon: CheckCircle, color: '#4CAF50' },
-  { value: "J-3 avant date d'arrivée", label: 'J-3 pré-arrivée', icon: Clock, color: '#FF9800' },
-  { value: 'Milestone post-arrivée', label: 'Milestone J+14/J+30', icon: Calendar, color: '#7B5EA7' },
   { value: 'J+3 après envoi signature', label: 'Relance signature J+3', icon: Send, color: '#E91E63' },
   { value: 'Hebdomadaire (lundi)', label: 'Hebdomadaire (lundi)', icon: Calendar, color: '#1A73E8' },
   { value: 'Nouveau message reçu', label: 'Nouveau message', icon: MessageSquare, color: '#1A73E8' },
@@ -54,13 +58,13 @@ const ACTION_OPTIONS = [
   { value: 'Envoyer pour approbation Admin RH', label: 'Approbation RH', icon: UserCheck, color: '#E91E63', hasEmailConfig: true },
   { value: "Notifier l'équipe RH", label: 'Notifier RH', icon: Bell, color: '#F9A825' },
   { value: 'Envoyer un message IllizeoBot', label: 'Message Bot', icon: MessageSquare, color: '#1A73E8', hasBotConfig: true },
-  { value: 'Envoyer via Teams', label: 'Teams', icon: Send, color: '#6264A7' },
-  { value: 'Envoyer pour signature', label: 'Signature', icon: FileText, color: '#E91E63' },
-  { value: 'Assigner action automatiquement', label: 'Assigner action', icon: Zap, color: '#FF9800' },
+  { value: 'Envoyer via Teams', label: 'Teams', icon: Send, color: '#6264A7', requiresIntegration: 'teams' as const },
+  { value: 'Envoyer pour signature', label: 'Signature', icon: FileText, color: '#E91E63', requiresIntegration: 'signature' as const },
+  { value: 'Assigner action automatiquement', label: 'Assigner action', icon: Zap, color: '#FF9800', hasActionConfig: true },
   { value: 'Changer statut du parcours', label: 'Changer statut', icon: Play, color: '#4CAF50' },
   { value: 'Attribuer un badge', label: 'Badge', icon: Award, color: '#F9A825', hasBadgeConfig: true },
   { value: 'Ajouter au groupe', label: 'Ajouter au groupe', icon: Users, color: '#7B5EA7', hasGroupConfig: true },
-  { value: 'Générer un document', label: 'Générer document', icon: FileText, color: '#1A73E8' },
+  { value: 'Générer un document', label: 'Générer document', icon: FileText, color: '#1A73E8', hasDocConfig: true },
 ];
 
 const RECIPIENT_OPTIONS = [
@@ -206,11 +210,19 @@ const nodeTypes = { trigger: TriggerNode, action: ActionNode, condition: Conditi
 
 // ── Config Panel ──
 
-function StepConfigPanel({ step, stepIndex, onChange, onClose, groups, users }: any) {
+function StepConfigPanel({ step, stepIndex, onChange, onClose, groups, users, actions = [], integrations = {} }: any) {
   const action = ACTION_OPTIONS.find(a => a.value === step.action);
   if (!action) return null;
 
   const update = (field: string, val: any) => onChange(stepIndex, { ...step, [field]: val });
+
+  // Surface integration warning at the top if the action requires one and it's not configured.
+  const integrationKey = (action as any).requiresIntegration as string | undefined;
+  const integrationActive = integrationKey
+    ? (integrationKey === 'signature'
+        ? (integrations.docusign?.actif || integrations.ugosign?.actif)
+        : !!integrations[integrationKey]?.actif)
+    : true;
 
   return (
     <div style={{ position: 'absolute', top: 0, right: 0, width: 300, height: '100%', background: '#fff', borderLeft: `1px solid ${C.border}`, zIndex: 20, display: 'flex', flexDirection: 'column', boxShadow: '-2px 0 12px rgba(0,0,0,.05)' }}>
@@ -219,6 +231,14 @@ function StepConfigPanel({ step, stepIndex, onChange, onClose, groups, users }: 
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} color="#999" /></button>
       </div>
       <div style={{ flex: 1, padding: 16, overflow: 'auto', fontSize: 12 }}>
+        {/* Integration warning */}
+        {integrationKey && !integrationActive && (
+          <div style={{ marginBottom: 14, padding: '10px 12px', background: '#FFEBEE', border: '1px solid #E5737333', borderRadius: 8, fontSize: 11, color: '#C62828', lineHeight: 1.5 }}>
+            <strong>Intégration {integrationKey === 'signature' ? 'signature électronique' : integrationKey} requise.</strong><br />
+            Configure-la dans <em>Intégrations</em> avant d'activer ce workflow, sinon l'action échouera silencieusement.
+          </div>
+        )}
+
         {/* Email config */}
         {action.hasEmailConfig && (
           <>
@@ -285,6 +305,48 @@ function StepConfigPanel({ step, stepIndex, onChange, onClose, groups, users }: 
             </select>
           </div>
         )}
+
+        {/* Action assignment config */}
+        {action.hasActionConfig && (
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: 'block', marginBottom: 4 }}>Action à assigner</label>
+            {actions.length === 0 ? (
+              <div style={{ padding: '8px 10px', background: '#FFF8E1', border: '1px solid #FFC107', borderRadius: 8, fontSize: 11, color: '#5D4037' }}>
+                Aucune action disponible. Crée d'abord une action template dans <em>Parcours &amp; Actions</em>.
+              </div>
+            ) : (
+              <select value={step.target_action_id || ''} onChange={e => update('target_action_id', e.target.value ? Number(e.target.value) : null)}
+                style={{ width: '100%', padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }}>
+                <option value="">— Sélectionner une action —</option>
+                {actions.map((a: any) => <option key={a.id} value={a.id}>{a.titre || a.nom}</option>)}
+              </select>
+            )}
+            <div style={{ padding: '8px 10px', background: '#f5f5f5', borderRadius: 6, fontSize: 10, color: '#888', marginTop: 8, lineHeight: 1.5 }}>
+              L'action sera créée automatiquement dans le parcours du collaborateur (statut « à faire »).
+            </div>
+          </div>
+        )}
+
+        {/* Document generation config — reuses email_subject + email_body */}
+        {action.hasDocConfig && (
+          <>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: 'block', marginBottom: 4 }}>Titre du document</label>
+              <input value={step.email_subject || ''} onChange={e => update('email_subject', e.target.value)}
+                placeholder="Ex: Attestation d'embauche {{prenom}} {{nom}}"
+                style={{ width: '100%', padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, outline: 'none' }} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: 'block', marginBottom: 4 }}>Contenu du document (HTML)</label>
+              <textarea value={step.email_body || ''} onChange={e => update('email_body', e.target.value)}
+                placeholder="<p>Bonjour {{prenom}},</p><p>Voici votre attestation...</p>"
+                style={{ width: '100%', padding: '8px 10px', border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12, minHeight: 140, resize: 'vertical', outline: 'none', fontFamily: 'monospace' }} />
+            </div>
+            <div style={{ padding: '8px 10px', background: '#f5f5f5', borderRadius: 6, fontSize: 10, color: '#888', marginBottom: 12, lineHeight: 1.5 }}>
+              Le document sera généré en PDF et ajouté au dossier du collaborateur. Variables : {'{{prenom}}'}, {'{{nom}}'}, {'{{date_debut}}'}, {'{{site}}'}, {'{{poste}}'}, {'{{departement}}'}.
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -297,9 +359,11 @@ interface WorkflowBuilderProps {
   onChange: (workflow: any) => void;
   groups?: any[];
   users?: any[];
+  actions?: any[];
+  integrations?: Record<string, { actif?: boolean }>;
 }
 
-export default function WorkflowBuilder({ workflow, onChange, groups = [], users = [] }: WorkflowBuilderProps) {
+export default function WorkflowBuilder({ workflow, onChange, groups = [], users = [], actions = [], integrations = {} }: WorkflowBuilderProps) {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [selectedStep, setSelectedStep] = useState<number | null>(null);
 
@@ -422,6 +486,8 @@ export default function WorkflowBuilder({ workflow, onChange, groups = [], users
           onClose={() => setSelectedStep(null)}
           groups={groups}
           users={users}
+          actions={actions}
+          integrations={integrations}
         />
       )}
     </div>
