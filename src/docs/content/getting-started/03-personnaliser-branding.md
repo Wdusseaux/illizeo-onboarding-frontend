@@ -1,59 +1,67 @@
 # Personnaliser le branding
 
-Vos collaborateurs vivent leur expérience Illizeo dans un environnement aux couleurs de votre entreprise. Ce branding s'applique à l'interface, aux emails, aux documents générés et aux pages publiques (page de cooptation, signature électronique).
+Vos collaborateurs vivent leur expérience Illizeo dans un environnement aux couleurs de votre entreprise. Ce branding s'applique à l'interface admin, aux emails envoyés à vos employés, et aux pages publiques (cooptation, signature électronique).
 
-## Accéder aux paramètres de branding
+## Accéder aux paramètres
 
-Allez dans **Paramètres → Apparence → Branding**. Cette section est réservée aux rôles `admin` et `super_admin`.
+Allez dans **Admin → Apparence**. Cette section nécessite la permission `apparence:edit`.
 
 Vous y configurez :
 
-- Logo principal (header de l'app)
-- Logo monochrome (filigranes, factures)
-- Favicon (onglet du navigateur)
-- Couleur primaire (CTA, liens, accents)
-- Couleur secondaire (boutons secondaires, badges)
-- Image de fond de l'écran de connexion
+- **Logo entreprise** (utilisé dans les emails envoyés aux collaborateurs)
+- **Mode clair / sombre**
+- **Langues actives**
+- **Thème couleur** (couleur primaire des CTA, liens, accents)
+- **Région & devise**, fuseau horaire
+- **Format de date** et d'heure
 
-## Logos : formats recommandés
+## Logo entreprise — frame 600×150 px
 
-Pour un rendu parfait sur tous les écrans, utilisez :
+C'est le logo affiché dans le bandeau supérieur de tous les emails envoyés depuis votre espace vers vos collaborateurs (notifications, rappels, invitations onboarding, templates email, etc.).
 
-- **Logo principal** : PNG transparent, 512×512 px minimum, ratio carré ou horizontal jusqu'à 4:1
-- **Logo monochrome** : SVG ou PNG noir sur fond transparent, 256×256 px minimum
-- **Favicon** : PNG carré 64×64 px (généré automatiquement en .ico)
+**Format conseillé** : horizontal, fond transparent, ratio 4:1 (ex. votre logo « pleine largeur »).
 
-Illizeo génère ensuite automatiquement les déclinaisons retina (2x, 3x) et les versions claires/sombres si vous fournissez les deux.
+**Comment l'uploader :**
 
-> 💡 Astuce : si vous n'avez qu'un logo couleur, l'IA Illizeo peut générer la version monochrome pour vous. Cliquez sur « Générer la version monochrome » sous le champ d'upload.
+1. **Importer un logo** — PNG, JPG, SVG ou WebP, max 5 Mo.
+2. **Recadrer dans la frame** — un aperçu en taille réelle s'affiche à côté de l'image. Trois sliders :
+   - **Zoom** (50–300 %) pour grossir/réduire
+   - **Position horizontale** pour décaler à gauche/droite
+   - **Position verticale** pour décaler en haut/bas
+3. **Enregistrer** — l'image est rendue en canvas 600×150 px, encodée en base64, et persistée dans `CompanySetting.custom_logo_full`.
 
-## Couleurs : sélecteur et accessibilité
+Si aucun logo n'est défini, le logo Illizeo s'affiche par défaut.
 
-Le sélecteur de couleurs accepte les formats hex (#0054A6), RGB et HSL. Illizeo vérifie automatiquement le **ratio de contraste WCAG AA** : si votre couleur primaire ne passe pas avec le texte blanc, un avertissement s'affiche.
+> 💡 Astuce : avant d'envoyer un vrai email à votre équipe, allez dans **Admin → Templates emails**, ouvrez n'importe quel modèle, cliquez **Aperçu** pour vérifier le rendu de votre logo dans le bandeau, puis **Envoyer un test** sur votre adresse.
 
-Pour respecter votre charte tout en gardant l'accessibilité :
+## Templates email rendus en HTML
 
-- Utilisez votre couleur primaire pour les **gros aplats** (boutons, headers)
-- Évitez de l'utiliser pour des **petits textes** sur fond clair
-- Préférez du blanc ou un noir adouci (#1a1a1a) pour les textes longs
+Vous pouvez utiliser des balises HTML (`<h2>`, `<p>`, `<b>`, `<a>`…) dans les corps de templates. Le RichEditor produit du HTML qui est rendu tel quel dans l'email final. Les variables `{{prenom}}`, `{{nom}}`, `{{date_debut}}`, `{{lien}}`, etc. sont substituées au moment de l'envoi.
 
-## Branding des emails et documents
+L'URL `{FRONTEND_URL}` du bouton CTA en bas de chaque email est automatiquement remplacée par l'URL de votre tenant (ex. `https://onboarding.illizeo.com/votre-espace`).
 
-Le branding s'applique automatiquement à :
+## Thème couleur
 
-- Tous les emails transactionnels (invitation, rappel, notification)
-- Les en-têtes des PDF de factures
-- Les contrats DOCX générés (logo dans l'en-tête)
-- Les pages publiques de cooptation et de signature
+Choisissez parmi 8 presets ou utilisez le sélecteur custom (format hex). La couleur s'applique :
 
-Vous pouvez personnaliser plus finement les emails via **Paramètres → Apparence → Templates email**.
+- Aux boutons CTA et liens dans l'app admin
+- Aux boutons CTA dans les emails
+- Aux badges et accents UI
 
-> ⚠️ Important : modifier le logo n'impacte **pas** les contrats déjà générés ni les factures déjà émises. Seuls les nouveaux documents prennent le nouveau branding. C'est voulu : un PDF signé est immuable.
+> 💡 Astuce : la couleur s'applique en CSS variables, donc le changement est instantané sans rebuild.
 
 ## Mode sombre
 
-Illizeo propose un mode sombre que chaque utilisateur active depuis son profil. Vous pouvez forcer un mode par défaut au niveau de l'espace, mais l'utilisateur garde toujours le choix final.
+Activez/désactivez globalement via le toggle en haut de la page. Chaque utilisateur peut surcharger le choix depuis son profil.
+
+## Couleurs des écrans de login
+
+Le gradient du fond de la page de login est configurable séparément via deux color pickers (début / fin de gradient) — voir **Apparence → Login**.
 
 ## Et après ?
 
-Une fois votre branding configuré, partagez un lien d'invitation avec votre équipe RH pour qu'ils découvrent l'espace à vos couleurs. Suivez le guide [Inviter mon équipe RH](?article=inviter-equipe-rh).
+Une fois votre branding configuré :
+
+1. [Inviter votre équipe RH](?article=inviter-equipe-rh) pour qu'ils découvrent l'espace à vos couleurs
+2. [Configurer vos templates emails](?article=onboarding-templates) avec votre logo dans le bandeau
+3. [Activer les workflows automatiques](?article=onboarding-workflows) qui enverront ces emails

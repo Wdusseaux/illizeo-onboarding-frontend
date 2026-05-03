@@ -1,126 +1,101 @@
 # Permissions et champs
 
-Au-delà des rôles, Illizeo permet une **gestion fine des permissions** par catégorie de données et par champ. Vous décidez exactement qui voit quoi : qui voit le salaire, qui voit le numéro AVS, qui voit les évaluations.
+Illizeo applique deux niveaux de filtrage qui se combinent :
 
-## Le modèle de permissions
+1. **Niveau module** — quelles pages/fonctionnalités un rôle peut voir/éditer/administrer
+2. **Niveau champ** — quels champs spécifiques d'un collaborateur (salaire, AVS, date de naissance…) sont visibles ou éditables par ce rôle
 
-Illizeo applique deux niveaux de filtrage :
+Les deux se configurent depuis la **même page** : **Admin → Rôles & permissions**.
 
-1. **Niveau rôle** — ce que ce rôle peut voir/modifier en général
-2. **Niveau champ** — quels champs spécifiques sont visibles à ce rôle
+## Le système de niveaux
 
-Le résultat final est l'intersection des deux niveaux.
+Chaque permission a 4 niveaux hiérarchiques (du plus restrictif au plus permissif) :
 
-## Les catégories de champs
+| Niveau | Sens |
+|---|---|
+| **none** | Aucun accès — la page n'apparaît pas dans la sidebar |
+| **view** | Lecture seule |
+| **edit** | Lecture + écriture (créer, modifier, supprimer) |
+| **admin** | edit + actions sensibles (purge, export, configuration globale) |
 
-Les champs collaborateur sont regroupés en catégories :
+Les permissions au niveau **champ** n'ont que 3 niveaux : aucun, voir, éditer.
 
-- **Identité publique** — nom, prénom, photo, poste, équipe
-- **Contact** — email, téléphone, adresse
-- **Identité administrative** — date de naissance, nationalité, n° AVS
-- **Contrat** — type, dates, période d'essai, préavis
-- **Rémunération** — salaire, primes, variables, voiture de fonction
-- **Évaluation** — bilans, scores, objectifs
-- **Médical** — visites médicales, RQTH, restrictions
-- **Famille** — enfants à charge, conjoint(e), urgences
+## La matrice des permissions
 
-## Permissions par défaut
+La matrice principale liste **51 modules** regroupés en deux espaces :
 
-Voici la matrice par défaut Illizeo (modifiable via **Paramètres → Permissions**) :
+### Espace admin (35 modules)
 
-| Catégorie | super_admin | admin | admin_rh | manager | employee |
-|---|---|---|---|---|---|
-| Identité publique | RW | RW | RW | R | R (sien) |
-| Contact | RW | RW | RW | R | RW (sien) |
-| Identité admin | RW | RW | RW | - | R (sien) |
-| Contrat | RW | RW | RW | R partiel | R (sien) |
-| Rémunération | RW | RW | RW | - | R (sien) |
-| Évaluation | RW | RW | RW | RW (équipe) | R (sien) |
-| Médical | R | R | R | - | RW (sien) |
-| Famille | RW | RW | RW | - | RW (sien) |
+- **Gestion** — Tableau de bord, Parcours, Collaborateurs, Vue Manager, Documents, Équipes & Groupes, Calendrier, Buddy
+- **Automatisation** — Workflows, Templates emails, Notifications, RDV récurrents
+- **Contenu** — Page entreprise, Bureaux, Citations, Équipements, NPS, Feedback, Contrats, Signatures, Cooptation, Gamification, Projets
+- **Intégrations** — Intégrations, Provisioning SCIM/SSO, Assistant IA
+- **Sécurité & Paramètres** — Audit, Utilisateurs, Rôles, Champs collaborateur, Apparence, Sécurité 2FA, RGPD, Abonnement, Paramètres généraux, Rapports
 
-R = lecture, W = écriture, RW = les deux, "-" = pas d'accès.
+### Espace collaborateur (16 modules)
 
-## Personnaliser les permissions
+- **Mon espace** — Onboarding, Actions, Parcours 100j, Équipe
+- **Mon dossier** — Signatures, Matériel, Profil, RDV
+- **Engagement** — Badges, Bureaux, Feedback, Page entreprise, Citation
+- **Communication** — Messagerie, Assistant IA, Cooptation
 
-Allez dans **Paramètres → Permissions & champs**.
+> 💡 Astuce : la liste est servie par le backend (`PermissionRegistry`). Si un module est ajouté côté serveur, il apparaît automatiquement dans la matrice — pas de mise à jour côté front nécessaire.
 
-Pour chaque catégorie, vous configurez :
+## Permissions par champ — synchronisé avec la page Champs
 
-- **Lecture** : qui voit
-- **Écriture** : qui peut modifier
-- **Export** : qui peut exporter en CSV
-- **Audit** : si les accès sont logés
+Sous la matrice des modules, une zone turquoise **Champs collaborateur** liste un par un tous les champs du profil (Identité, Personnel, Contrat, Poste, Position, Org).
 
-Vous pouvez aussi configurer **champ par champ** dans une catégorie (avancé).
+Pour chaque champ × rôle, un bouton qui cycle :
 
-> 💡 Astuce : pour la catégorie **Rémunération**, certaines entreprises ouvrent l'accès aux managers. Cela facilite les revues annuelles. Évaluez la maturité culturelle avant.
+- **Édit** (rouge) — le rôle voit ET peut modifier
+- **Voir** (bleu) — le rôle voit en lecture seule
+- **Aucun** (gris) — le champ est masqué pour ce rôle
 
-## Permissions sur les parcours
+Cette zone est **dynamiquement synchronisée** avec la page **Admin → Champs collaborateur** :
 
-Pour les parcours, deux niveaux :
+- Ajouter un champ là-bas → apparaît dans la matrice ici
+- Supprimer un champ → disparaît
+- Réordonner les sections → reflété dans la matrice
 
-- **Visibilité globale** : qui voit la liste de tous les parcours
-- **Visibilité d'instance** : qui voit un parcours individuel assigné à un collaborateur
+> ⚠️ Cohérence : si vous retirez « Voir » à un rôle, « Éditer » est automatiquement retiré aussi. Logique : on ne peut pas éditer ce qu'on ne voit pas.
 
-Par exemple, un manager voit la liste des templates de parcours mais ne voit que les instances de son équipe.
+## Cycle de clic
 
-## Permissions sur les documents
+Chaque cellule de la matrice est un bouton cliquable qui cycle entre les niveaux :
 
-Sur la GED, par catégorie de document :
+- **Modules** : Admin → Édit → Voir → Aucun → Admin…
+- **Champs** : Édit → Voir → Aucun → Édit…
 
-- **Identité** : RH only
-- **Contrat** : RH + collaborateur (le sien)
-- **Rémunération (fiches paie)** : RH + collaborateur (le sien)
-- **Évaluation** : RH + manager (équipe) + collaborateur (sien)
-- **Médical** : RH only (et collaborateur sien)
+La modification est **persistée immédiatement** (mise à jour optimiste avec rollback en cas d'erreur API).
 
-Voir [GED](?article=documents-ged).
+## Rôles préconfigurés
 
-## Audit des consultations
+Illizeo livre les rôles standards :
 
-Activez l'**audit des consultations** sur les catégories sensibles :
+- `super_admin` — bypass total, toutes permissions
+- `admin` — toutes permissions admin sauf super-admin
+- `admin_rh` — onboarding, collaborateurs, RH (pas la facturation ni la sécurité)
+- `manager` — sa propre équipe en lecture
+- `collaborateur` — son propre profil
 
-- Rémunération
-- Identité administrative (n° AVS)
-- Évaluation
-- Médical
+Vous pouvez créer des **rôles custom** via le bouton « Nouveau rôle » et leur attribuer la combinaison exacte de permissions souhaitée.
 
-Chaque consultation est logée : qui a vu, quand, depuis quelle IP. Voir [Audit log](?article=admin-audit-log).
+## Scope d'un rôle
 
-> ⚠️ Important : l'audit log des consultations est crucial pour la conformité RGPD. En cas de plainte ou d'audit, vous devez pouvoir prouver qui a accédé à quoi.
+Au-delà des permissions, chaque rôle a un **scope** qui limite *sur quelles données* il s'applique :
 
-## Permissions par site / entité
+- **Global** — tous les collaborateurs
+- **Société / Sous-société / Département / Bureau / Équipe / Poste** — restriction à une sous-population
+- **N-1 du manager** — uniquement les rapports directs
+- **Population RH** — uniquement les fiches gérées par cet admin RH
 
-Si vous avez plusieurs entités juridiques ou sites :
+Voir l'onglet **Scope** dans la fiche d'un rôle.
 
-- L'admin RH du site Genève voit uniquement les collaborateurs Genève
-- L'admin RH du site Zurich voit uniquement Zurich
-- Le DRH groupe voit tout
+## Audit des changements
 
-Configurez via **Paramètres → Entités → Permissions par entité**.
-
-## Anonymisation pour le reporting
-
-Pour les rapports analytiques, certaines données sont **anonymisées** :
-
-- Verbatims dans les analyses sentiment NPS
-- Statistiques agrégées (équipes <5 personnes regroupées)
-- Exit interviews dans les rapports trimestriels
-
-L'anonymisation est appliquée automatiquement par l'IA Illizeo.
-
-## Permissions personnalisées (Enterprise)
-
-Le plan Enterprise permet des **rôles 100 % custom** :
-
-- Combinaisons de permissions hors rôles standards
-- Permissions par projet, par équipe, par geography
-- Workflows d'approbation pour les actions sensibles
+Chaque modification de permission est logée dans `permission_logs` avec : qui, quand, quel rôle, quelle clé. Consultable via **Admin → Journal d'audit** (filtre `permission`).
 
 ## Et après ?
-
-Pour aller plus loin :
 
 1. [Utilisateurs et rôles](?article=admin-utilisateurs-roles)
 2. [Sécurité et 2FA](?article=admin-securite-2fa)

@@ -135,6 +135,7 @@ export const DOCS_SECTIONS: DocSection[] = [
       { slug: 'admin-securite-2fa', title: 'Sécurité et 2FA', file: 'admin/03-securite-2fa.md' },
       { slug: 'admin-rgpd', title: 'RGPD et conservation des données', file: 'admin/04-rgpd.md' },
       { slug: 'admin-audit-log', title: 'Journal d\'audit', file: 'admin/05-audit-log.md' },
+      { slug: 'admin-notifications', title: 'Configuration des notifications', file: 'admin/06-notifications.md', keywords: ['notifications', 'email', 'in-app', 'canaux'] },
     ],
   },
   {
