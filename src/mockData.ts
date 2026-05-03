@@ -130,7 +130,7 @@ export const _MOCK_GROUPES: GroupePersonnes[] = [
   { id: 6, nom: "Équipe IT", description: "Équipe IT/SI en charge du provisioning matériel et des accès", membres: ["Antoine Morel", "Youssef Hadj"], couleur: "#0D47A1", critereAuto: { type: "departement", valeur: "IT" } },
 ];
 
-export const ACTION_TYPE_META: Record<ActionType, { label: string; description: string; Icon: React.FC<{ size?: number; color?: string }>; bg: string; color: string }> = {
+export const ACTION_TYPE_META: Record<ActionType, { label: string; description: string; Icon: any; bg: string; color: string }> = {
   document: { label: "Document", description: "Pièce à téléverser ou document à fournir (IBAN, pièce d'identité, certificats…).", Icon: FileUp, bg: "#E3F2FD", color: "#1A73E8" },
   formulaire: { label: "Formulaire", description: "Formulaire personnalisé à remplir par l'employé (champs configurables).", Icon: ClipboardList, bg: "#FFF0F5", color: "#E41076" },
   formation: { label: "Formation", description: "Module e-learning ou formation présentielle (lien, durée, validation).", Icon: GraduationCap, bg: "#E8F5E9", color: "#4CAF50" },
@@ -146,7 +146,7 @@ export const ACTION_TYPE_META: Record<ActionType, { label: string; description: 
   visite: { label: "Visite", description: "Tour des bureaux, atelier, site industriel — visite physique guidée.", Icon: MapPin, bg: "#E8F5E9", color: "#2E7D32" },
 };
 
-export const PHASE_ICONS: Record<string, React.FC<{ size?: number; color?: string }>> = {
+export const PHASE_ICONS: Record<string, any> = {
   "Avant le premier jour": Hand,
   "Premier jour": PartyPopper,
   "Première semaine": Dumbbell,
@@ -185,7 +185,7 @@ export const _MOCK_WORKFLOW_RULES: WorkflowRule[] = [
   { id: 1, nom: "Validation pièce d'identité", declencheur: "Document soumis", action: "Envoyer pour validation au Manager", destinataire: "Manager direct", actif: true },
   { id: 2, nom: "Relance documents en retard", declencheur: "J-7 avant date limite", action: "Envoyer email de relance", destinataire: "Collaborateur", actif: true },
   { id: 3, nom: "Notification nouveau collaborateur", declencheur: "Parcours créé", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: true },
-  { id: 4, nom: "Validation dossier complet", declencheur: "Tous documents validés", action: "Envoyer confirmation au collaborateur", destinataire: "Collaborateur", actif: false },
+  { id: 4, nom: "Validation dossier complet", declencheur: "Tous documents validés", action: "Envoyer confirmation au collaborateur", destinataire: "Collaborateur", actif: true },
   { id: 5, nom: "Approbation formulaires Suisse", declencheur: "Formulaire soumis", action: "Envoyer pour approbation Admin RH", destinataire: "Admin RH Suisse", actif: true },
   { id: 6, nom: "Alerte collaborateur en retard", declencheur: "Collaborateur en retard", action: "Envoyer email de relance", destinataire: "Manager direct", actif: true },
   { id: 7, nom: "Message bienvenue IllizeoBot", declencheur: "Nouveau collaborateur", action: "Envoyer un message IllizeoBot", destinataire: "Collaborateur", actif: true },
@@ -194,7 +194,7 @@ export const _MOCK_WORKFLOW_RULES: WorkflowRule[] = [
   { id: 10, nom: "Évaluation fin période d'essai", declencheur: "Période d'essai terminée", action: "Envoyer pour validation au Manager", destinataire: "Manager direct", actif: true },
   { id: 11, nom: "Relance document refusé", declencheur: "Document refusé", action: "Envoyer email de relance", destinataire: "Collaborateur", actif: true },
   { id: 12, nom: "Alerte NPS négatif", declencheur: "Questionnaire NPS soumis", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: true },
-  { id: 13, nom: "Récompense cooptation", declencheur: "Cooptation validée", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: false },
+  { id: 13, nom: "Récompense cooptation", declencheur: "Cooptation validée", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: true },
   { id: 14, nom: "Félicitations anniversaire", declencheur: "Anniversaire d'embauche", action: "Envoyer un message IllizeoBot", destinataire: "Collaborateur", actif: true },
   { id: 15, nom: "Désactivation accès offboarding", declencheur: "Fin de parcours offboarding", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: true },
   { id: 16, nom: "Rappel pré-arrivée J-3", declencheur: "J-3 avant date d'arrivée", action: "Envoyer email pré-arrivée", destinataire: "Collaborateur", actif: true },
@@ -210,6 +210,46 @@ export const _MOCK_WORKFLOW_RULES: WorkflowRule[] = [
   { id: 26, nom: "Envoi formulaire fin de période d'essai", declencheur: "Période d'essai terminée", action: "Envoyer formulaire évaluation", destinataire: "Manager direct", actif: true },
   { id: 27, nom: "Envoi entretien de sortie", declencheur: "Parcours offboarding créé", action: "Envoyer questionnaire exit interview", destinataire: "Collaborateur", actif: true },
   { id: 28, nom: "Envoi rapport d'étonnement J+30", declencheur: "J+30 après arrivée", action: "Envoyer questionnaire rapport d'étonnement", destinataire: "Collaborateur", actif: true },
+  // ── Feedback Hub ─────────────────────────────────────────
+  { id: 29, nom: "Alerte feedback collaborateur reçu", declencheur: "Feedback soumis", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: true },
+  { id: 30, nom: "Accusé réception feedback", declencheur: "Feedback soumis", action: "Envoyer email confirmation", destinataire: "Collaborateur", actif: true },
+  // ── Buddy / Parrain ──────────────────────────────────────
+  { id: 31, nom: "Confirmation assignation buddy", declencheur: "Buddy assigné", action: "Envoyer email confirmation", destinataire: "Buddy / Parrain", actif: true },
+  { id: 32, nom: "Présentation buddy au collaborateur", declencheur: "Buddy assigné", action: "Envoyer email présentation", destinataire: "Collaborateur", actif: true },
+  { id: 33, nom: "Check-in buddy J+30", declencheur: "J+30 après arrivée", action: "Envoyer demande feedback", destinataire: "Buddy / Parrain", actif: true },
+  // ── Équipement & Provisioning ────────────────────────────
+  { id: 34, nom: "Checklist équipement assignée", declencheur: "Équipement attribué", action: "Envoyer checklist équipement", destinataire: "Collaborateur", actif: true },
+  { id: 35, nom: "Notification IT — Provisioning", declencheur: "Nouveau collaborateur", action: "Notifier équipe IT", destinataire: "IT", actif: true },
+  { id: 36, nom: "Restitution équipement offboarding", declencheur: "Parcours offboarding créé", action: "Envoyer checklist restitution", destinataire: "Collaborateur", actif: true },
+  // ── RDV / Calendar ───────────────────────────────────────
+  { id: 37, nom: "Rappel RDV J-1", declencheur: "J-1 avant RDV", action: "Envoyer rappel RDV", destinataire: "Collaborateur", actif: true },
+  { id: 38, nom: "Confirmation RDV planifié", declencheur: "RDV créé", action: "Envoyer email confirmation", destinataire: "Collaborateur", actif: true },
+  { id: 39, nom: "Rappel RDV récurrent", declencheur: "J-1 avant RDV récurrent", action: "Envoyer rappel RDV récurrent", destinataire: "Collaborateur", actif: true },
+  // ── Contrats / Signatures ────────────────────────────────
+  { id: 40, nom: "Alerte contrat refusé", declencheur: "Contrat refusé", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: true },
+  { id: 41, nom: "Toutes signatures complètes", declencheur: "Toutes signatures collectées", action: "Envoyer email confirmation", destinataire: "Collaborateur", actif: true },
+  // ── Citations du jour ────────────────────────────────────
+  { id: 42, nom: "Citation hebdomadaire", declencheur: "Hebdomadaire (lundi)", action: "Envoyer citation du jour", destinataire: "Collaborateur", actif: true },
+  // ── Formations ───────────────────────────────────────────
+  { id: 43, nom: "Certificat formation complétée", declencheur: "Formation complétée", action: "Envoyer certificat formation", destinataire: "Collaborateur", actif: true },
+  { id: 44, nom: "Notification manager — Formation terminée", declencheur: "Formation complétée", action: "Notifier le manager", destinataire: "Manager direct", actif: true },
+  // ── Audit / Sécurité ─────────────────────────────────────
+  { id: 45, nom: "Alerte action sensible (audit)", declencheur: "Action sensible détectée", action: "Notifier admin", destinataire: "Admin RH", actif: true },
+  // ── Organigramme ─────────────────────────────────────────
+  { id: 46, nom: "Notification changement organigramme", declencheur: "Organigramme mis à jour", action: "Notifier l'équipe RH", destinataire: "Équipe RH", actif: false },
+  // ── Badges milestones (auto-attribués) ───────────────────
+  { id: 47, nom: "Badge Première semaine (J+7)", declencheur: "J+7 onboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 48, nom: "Badge Premier mois (J+30)", declencheur: "J+30 onboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 49, nom: "Badge Cap des 100j (J+100)", declencheur: "J+100 onboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 50, nom: "Badge De retour (reboarding J+1)", declencheur: "J+1 reboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 51, nom: "Badge Réadaptation (reboarding J+7)", declencheur: "J+7 reboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 52, nom: "Badge Réintégré (reboarding J+30)", declencheur: "J+30 reboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 53, nom: "Badge Transparence (offboarding J+1)", declencheur: "J+1 offboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 54, nom: "Badge Transmission (offboarding J+14)", declencheur: "J+14 offboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 55, nom: "Badge Bonne route (offboarding J+30)", declencheur: "J+30 offboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 56, nom: "Badge Mobilité (crossboarding J+1)", declencheur: "J+1 crossboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 57, nom: "Badge Polyvalent (crossboarding J+14)", declencheur: "J+14 crossboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
+  { id: 58, nom: "Badge Évolution (crossboarding J+60)", declencheur: "J+60 crossboarding", action: "Attribuer un badge", destinataire: "Collaborateur", actif: true },
 ];
 
 export const _MOCK_EMAIL_TEMPLATES: EmailTemplate[] = [
@@ -250,6 +290,13 @@ export const _MOCK_EMAIL_TEMPLATES: EmailTemplate[] = [
   { id: 28, nom: "Évaluation fin de période d'essai", sujet: "Évaluation de fin de période d'essai — {{collab_nom}}", declencheur: "Parcours complété à 100%", variables: ["{{manager}}", "{{collab_nom}}", "{{date_fin_essai}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{manager}},</h2><p>La période d'essai de <strong>{{collab_nom}}</strong> arrive à son terme le <strong>{{date_fin_essai}}</strong>.</p><p>Merci de compléter le formulaire d'évaluation afin de confirmer ou non la poursuite du contrat.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#E41076;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Compléter l'évaluation</a></p>" },
   { id: 29, nom: "Entretien de sortie (Exit Interview)", sujet: "Votre avis compte — Entretien de sortie", declencheur: "Création du parcours", variables: ["{{prenom}}", "{{date_depart}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Votre départ est prévu le <strong>{{date_depart}}</strong>. Nous aimerions recueillir votre retour d'expérience afin d'améliorer continuellement notre environnement de travail.</p><p>Ce questionnaire est confidentiel et prend environ 5 minutes.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#E41076;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Répondre au questionnaire</a></p>" },
   { id: 30, nom: "Rapport d'étonnement (1 mois)", sujet: "Votre regard compte — Rapport d'étonnement", declencheur: "J+30", variables: ["{{prenom}}", "{{parcours_nom}}", "{{lien}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Cela fait maintenant 1 mois que vous avez rejoint l'équipe. Nous aimerions recueillir votre regard neuf sur notre entreprise.</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#E41076;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Partager mon retour</a></p>" },
+  // ── Nouvelles features ────────────────────────────────────
+  { id: 31, nom: "Demande RDV soumise", sujet: "📅 Nouvelle demande de RDV — {{collab_nom}}", declencheur: "Feedback soumis avec rdv_request", variables: ["{{prenom}}", "{{collab_nom}}", "{{role_cible}}", "{{date_souhaitee}}", "{{motif}}", "{{lien}}"], actif: true, contenu: "<h2>Nouvelle demande de RDV</h2><p><strong>{{collab_nom}}</strong> a demandé un RDV avec son <strong>{{role_cible}}</strong>.</p><p><strong>Date souhaitée :</strong> {{date_souhaitee}}</p><p><strong>Motif :</strong><br>{{motif}}</p><p><a href='{{lien}}' style='display:inline-block;padding:10px 28px;background:#E41076;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Traiter la demande</a></p>" },
+  { id: 32, nom: "Équipement assigné", sujet: "💻 Votre matériel professionnel est prêt", declencheur: "Équipement attribué", variables: ["{{prenom}}", "{{equipement_nom}}", "{{numero_serie}}", "{{date_attribution}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Votre équipement <strong>{{equipement_nom}}</strong> (n° de série : {{numero_serie}}) vous a été attribué le {{date_attribution}}.</p><p>Vous pouvez consulter la liste de votre matériel depuis la rubrique <strong>Mon matériel</strong> de votre espace.</p>" },
+  { id: 33, nom: "Restitution équipement (offboarding)", sujet: "📦 Checklist de restitution matériel — {{prenom}}", declencheur: "Parcours offboarding créé", variables: ["{{prenom}}", "{{date_depart}}", "{{equipement_liste}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Votre départ est prévu le <strong>{{date_depart}}</strong>. Voici la liste du matériel à restituer avant cette date :</p>{{equipement_liste}}<p>Merci de prendre rendez-vous avec votre IT ou RH pour la restitution.</p>" },
+  { id: 34, nom: "Citation hebdomadaire", sujet: "✨ Votre citation de la semaine", declencheur: "Hebdomadaire (lundi)", variables: ["{{prenom}}", "{{citation_text}}", "{{citation_author}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><blockquote style='border-left:4px solid #E41076;padding:12px 20px;margin:20px 0;background:#fff5fb;font-style:italic;font-size:16px;'>« {{citation_text}} »<br><br>— <strong>{{citation_author}}</strong></blockquote><p>Bonne semaine !</p>" },
+  { id: 35, nom: "Rappel RDV récurrent J-1", sujet: "⏰ Rappel : {{rdv_titre}} demain à {{heure}}", declencheur: "J-1 avant RDV récurrent", variables: ["{{prenom}}", "{{rdv_titre}}", "{{date}}", "{{heure}}", "{{participants}}"], actif: true, contenu: "<h2>Bonjour {{prenom}},</h2><p>Petit rappel : votre RDV récurrent <strong>{{rdv_titre}}</strong> a lieu demain ({{date}}) à <strong>{{heure}}</strong>.</p><p>Avec : {{participants}}</p>" },
+  { id: 36, nom: "Badge milestone obtenu", sujet: "🏆 Nouveau badge : {{badge_nom}} !", declencheur: "Badge milestone attribué", variables: ["{{prenom}}", "{{badge_nom}}", "{{badge_description}}", "{{badge_color}}", "{{lien_badges}}"], actif: true, contenu: "<h2>Félicitations {{prenom}} !</h2><p>Vous venez de débloquer le badge <strong style='color:{{badge_color}}'>{{badge_nom}}</strong>.</p><p>{{badge_description}}</p><p><a href='{{lien_badges}}' style='display:inline-block;padding:10px 28px;background:#E41076;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;'>Voir mes badges</a></p>" },
 ];
 export const TPL_CATEGORIES: Record<string, { label: string; color: string; bg: string }> = {
   onboarding: { label: "Onboarding", color: "#4CAF50", bg: "#E8F5E9" },

@@ -155,7 +155,7 @@ export default function RichEditor({ value, onChange, placeholder }: RichEditorP
           onChange={e => setHtmlSource(e.target.value)}
           style={{
             width: "100%", minHeight: 250, padding: "12px", border: "none", outline: "none",
-            fontFamily: "monospace", fontSize: 12, lineHeight: 1.6, color: C.text, resize: "vertical",
+            fontFamily: "monospace", fontSize: 12, lineHeight: 1.6, resize: "vertical",
             background: "#1a1a2e", color: "#e0e0e0",
           }}
         />

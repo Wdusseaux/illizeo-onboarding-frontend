@@ -7,8 +7,61 @@ import {
 } from 'lucide-react';
 import {
   subscribeToPlan, cancelSubscription, getMySubscription, getAvailablePlans,
+  validateVatNumber, computeVat, convertExchangeRate,
   type PlanData,
 } from '../../api/endpoints';
+
+// Module-level billing state — survit aux re-renders du factory
+let _billingCountry = "CH";
+let _billingDisplayCurrency = "CHF"; // ce que voit le client (CHF/EUR/USD/GBP/...)
+let _billingCustomerType: "company" | "individual" | "freelance" = "company";
+let _billingVatNumber = "";
+let _billingVatValidation: { valid: boolean; name: string | null; error: string | null } | null = null;
+let _billingComputedVat: { rate: number; amount_ht_cents: number; vat_amount_cents: number; amount_ttc_cents: number; treatment: string; mention: string } | null = null;
+let _billingVatChecking = false;
+let _billingFxRate: number | null = null; // 1 CHF = X display_currency
+
+// Liste des pays courants — auto-charge_currency
+// charge_currency = CHF par défaut (sauf EU = EUR), display_currency = devise locale
+const COUNTRIES_BILLING: { code: string; name: string; charge: "CHF" | "EUR"; display: string }[] = [
+  // CHF (encaissement direct, affichage CHF)
+  { code: "CH", name: "Suisse",         charge: "CHF", display: "CHF" },
+  { code: "LI", name: "Liechtenstein",  charge: "CHF", display: "CHF" },
+  // EU (encaissement EUR, affichage EUR)
+  { code: "FR", name: "France",         charge: "EUR", display: "EUR" },
+  { code: "BE", name: "Belgique",       charge: "EUR", display: "EUR" },
+  { code: "DE", name: "Allemagne",      charge: "EUR", display: "EUR" },
+  { code: "LU", name: "Luxembourg",     charge: "EUR", display: "EUR" },
+  { code: "IT", name: "Italie",         charge: "EUR", display: "EUR" },
+  { code: "ES", name: "Espagne",        charge: "EUR", display: "EUR" },
+  { code: "PT", name: "Portugal",       charge: "EUR", display: "EUR" },
+  { code: "NL", name: "Pays-Bas",       charge: "EUR", display: "EUR" },
+  { code: "AT", name: "Autriche",       charge: "EUR", display: "EUR" },
+  { code: "IE", name: "Irlande",        charge: "EUR", display: "EUR" },
+  { code: "FI", name: "Finlande",       charge: "EUR", display: "EUR" },
+  { code: "GR", name: "Grèce",          charge: "EUR", display: "EUR" },
+  { code: "PL", name: "Pologne",        charge: "EUR", display: "PLN" },
+  { code: "SE", name: "Suède",          charge: "EUR", display: "SEK" },
+  { code: "DK", name: "Danemark",       charge: "EUR", display: "DKK" },
+  { code: "CZ", name: "Tchéquie",       charge: "EUR", display: "CZK" },
+  // Autres (encaissement CHF, affichage devise locale en estimation)
+  { code: "GB", name: "Royaume-Uni",    charge: "CHF", display: "GBP" },
+  { code: "US", name: "États-Unis",     charge: "CHF", display: "USD" },
+  { code: "CA", name: "Canada",         charge: "CHF", display: "CAD" },
+  { code: "AU", name: "Australie",      charge: "CHF", display: "AUD" },
+  { code: "JP", name: "Japon",          charge: "CHF", display: "JPY" },
+  { code: "SG", name: "Singapour",      charge: "CHF", display: "SGD" },
+  { code: "AE", name: "Émirats arabes",  charge: "CHF", display: "AED" },
+  { code: "IL", name: "Israël",         charge: "CHF", display: "ILS" },
+  { code: "NO", name: "Norvège",        charge: "CHF", display: "NOK" },
+  { code: "BR", name: "Brésil",         charge: "CHF", display: "BRL" },
+];
+const EU_COUNTRY_CODES = ["AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR","HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"];
+
+// Trouve l'entrée pays + détermine charge currency
+const findCountry = (code: string) => COUNTRIES_BILLING.find(c => c.code === code) || { code, name: code, charge: "CHF" as const, display: "CHF" };
+// Pour la facturation Stripe : si charge="CHF" → utilise stripe_price_id_chf, si "EUR" → stripe_price_id_eur
+const getChargeCurrency = (countryCode: string): "CHF" | "EUR" => findCountry(countryCode).charge;
 
 // ─── Plan features mapping (matches illizeo.com design) ────────
 const PLAN_FEATURES: Record<string, string[]> = {
@@ -85,22 +138,88 @@ export function createAdminSubscription(ctx: any) {
       if (plans.length === 0) getAvailablePlans().then(setPlans).catch(() => {});
     };
 
-    // ── Price calculation ──
+    // ── Currency selection ──
+    // Pour les pays "estimation" (US/GB/CA/AU/JP/...), on a maintenant des Stripe Prices
+    // natifs dans leur devise. On utilise donc directement la display currency comme charge.
+    const NATIVE_STRIPE_CURRENCIES = ["CHF", "EUR", "USD", "GBP", "CAD", "AUD", "JPY"];
+    const countryEntry = findCountry(_billingCountry);
+    const chargeCurrency = NATIVE_STRIPE_CURRENCIES.includes(countryEntry.display)
+      ? countryEntry.display // On charge directement dans la devise locale du client
+      : countryEntry.charge; // Fallback : EUR pour PL/SE/CZ/etc., CHF sinon
+    const priceField = ({
+      "CHF": "prix_chf_mensuel", "EUR": "prix_eur_mensuel",
+      "USD": "prix_usd_mensuel", "GBP": "prix_gbp_mensuel",
+      "CAD": "prix_cad_mensuel", "AUD": "prix_aud_mensuel",
+      "JPY": "prix_jpy_mensuel",
+    } as Record<string, string>)[chargeCurrency] || "prix_chf_mensuel";
     const calcTotal = () => {
       return selectedPlanIds.reduce((sum: number, id: number) => {
         const p = availablePlans.find(pl => pl.id === id) as any;
         if (!p) return sum;
-        const price = Number(p.prix_chf_mensuel || 0);
+        const price = Number(p[priceField] || 0);
         const isAddon = p.is_addon || p.slug === "cooptation";
-        if (p.addon_type === "ai") return sum + price; // AI = fixed, no per-employee
-        if (isAddon) return sum + price * subEmployeeCount; // Cooptation = per employee
+        if (p.addon_type === "ai") return sum + price;
+        if (isAddon) return sum + price * subEmployeeCount;
         return sum + (pricingBilling === "yearly" ? price * 0.9 : price) * subEmployeeCount;
       }, 0);
     };
 
     const total = calcTotal();
-    const tax = Math.round(total * 0.081 * 100) / 100;
-    const perEmployee = selectedMainPlan ? (pricingBilling === "yearly" ? Number(selectedMainPlan.prix_chf_mensuel) * 0.9 : Number(selectedMainPlan.prix_chf_mensuel)) : 0;
+    const perEmployee = selectedMainPlan ? (pricingBilling === "yearly" ? Number((selectedMainPlan as any)[priceField]) * 0.9 : Number((selectedMainPlan as any)[priceField])) : 0;
+
+    // ── Recalcul TVA quand pays/n° TVA/total change ──
+    const recomputeVat = async () => {
+      if (total <= 0) { _billingComputedVat = null; setSubEmployeeCount(subEmployeeCount); return; }
+      try {
+        const r = await computeVat(
+          Math.round(total * 100),
+          _billingCountry,
+          _billingCustomerType,
+          _billingVatNumber || undefined,
+          _billingVatValidation?.valid || false,
+        );
+        _billingComputedVat = r;
+        setSubEmployeeCount(subEmployeeCount); // force re-render
+      } catch {}
+    };
+
+    const handleValidateVat = async () => {
+      if (!_billingVatNumber || !EU_COUNTRY_CODES.includes(_billingCountry)) return;
+      _billingVatChecking = true;
+      setSubEmployeeCount(subEmployeeCount);
+      try {
+        const v = await validateVatNumber(_billingCountry, _billingVatNumber);
+        _billingVatValidation = { valid: v.valid, name: v.name, error: v.error };
+      } catch (e) {
+        _billingVatValidation = { valid: false, name: null, error: "Erreur de vérification" };
+      }
+      _billingVatChecking = false;
+      await recomputeVat();
+    };
+
+    const handleCountryChange = async (code: string) => {
+      _billingCountry = code;
+      _billingDisplayCurrency = findCountry(code).display;
+      _billingVatValidation = null; // reset
+      // Récupère le taux de change si la display currency n'est ni CHF ni la charge currency
+      if (_billingDisplayCurrency !== "CHF" && _billingDisplayCurrency !== "EUR") {
+        try {
+          const r = await convertExchangeRate(1, _billingDisplayCurrency);
+          _billingFxRate = r.amount_target;
+        } catch { _billingFxRate = null; }
+      } else {
+        _billingFxRate = null;
+      }
+      await recomputeVat();
+    };
+
+    // Helpers d'affichage
+    const fmt = (amount: number, currency: string) => `${(Math.round(amount * 100) / 100).toFixed(2)} ${currency}`;
+    const displayCurrency = _billingDisplayCurrency || chargeCurrency;
+    const totalChargeCurrency = total;
+    const totalDisplayCurrency = (displayCurrency === chargeCurrency || _billingFxRate === null)
+      ? totalChargeCurrency
+      : (chargeCurrency === "CHF" ? totalChargeCurrency * (_billingFxRate || 1) : totalChargeCurrency); // EUR→display via FX seulement si display différent
 
     // ══════════════════════════════════════════════════════
     // STEP 1: Plan selection (3 cards like illizeo.com)
@@ -114,7 +233,7 @@ export function createAdminSubscription(ctx: any) {
             const isEnterprise = plan.slug === "enterprise";
             const display = PLAN_DISPLAY[plan.slug] || { title: plan.nom, subtitle: plan.description || "" };
             const features = PLAN_FEATURES[plan.slug] || [];
-            const monthlyPrice = Number(plan.prix_chf_mensuel);
+            const monthlyPrice = Number((plan as any)[priceField] || plan.prix_chf_mensuel);
             const displayPrice = pricingBilling === "yearly" ? Math.round(monthlyPrice * 0.9 * 100) / 100 : monthlyPrice;
             const minMonthly = Math.round(displayPrice * 100) / 100;
 
@@ -149,10 +268,10 @@ export function createAdminSubscription(ctx: any) {
                 <p style={{ fontSize: 13, color: C.textLight, marginBottom: 20, lineHeight: 1.5 }}>{display.subtitle}</p>
 
                 <div style={{ marginBottom: 4 }}>
-                  <span style={{ fontSize: 28, fontWeight: 800 }}>CHF {displayPrice}</span>
-                  <span style={{ fontSize: 12, color: C.textMuted, marginLeft: 6 }}>/ Month / User</span>
+                  <span style={{ fontSize: 28, fontWeight: 800 }}>{chargeCurrency} {displayPrice}</span>
+                  <span style={{ fontSize: 12, color: C.textMuted, marginLeft: 6 }}>/ mois / employé</span>
                 </div>
-                <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 20 }}>≈ {minMonthly} CHF / Month</div>
+                <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 20 }}>≈ {minMonthly} {chargeCurrency} / mois</div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24, flex: 1 }}>
                   {features.map(f => (
@@ -190,9 +309,9 @@ export function createAdminSubscription(ctx: any) {
             const isSelected = selectedPlanIds.includes(plan.id);
             const display = APP_DISPLAY[plan.slug] || { name: plan.nom, desc: plan.description || "", icon: Package, color: C.textMuted };
             const IconComp = display.icon;
-            const price = Number(plan.prix_chf_mensuel);
+            const price = Number((plan as any)[priceField] || plan.prix_chf_mensuel);
             const isAi = (plan as any).addon_type === "ai";
-            const priceLabel = isAi ? `CHF ${price} / mois` : `Starts at CHF ${price} / Per Active Employee`;
+            const priceLabel = isAi ? `${chargeCurrency} ${price} / mois` : `À partir de ${chargeCurrency} ${price} / employé actif`;
 
             return (
               <div key={plan.id} onClick={() => setSelectedPlanIds((prev: number[]) => prev.includes(plan.id) ? prev.filter((id: number) => id !== plan.id) : [...prev, plan.id])}
@@ -258,7 +377,7 @@ export function createAdminSubscription(ctx: any) {
               {selectedMainPlan ? (
                 <>
                   {PLAN_DISPLAY[selectedMainPlan.slug]?.title || selectedMainPlan.nom}
-                  <div style={{ fontSize: 11, color: C.textLight }}>( {perEmployee} CHF Per Active Employee)</div>
+                  <div style={{ fontSize: 11, color: C.textLight }}>( {perEmployee} {chargeCurrency} / employé actif)</div>
                 </>
               ) : "Aucun plan sélectionné"}
             </div>
@@ -288,30 +407,142 @@ export function createAdminSubscription(ctx: any) {
             <>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>3. Choose your apps</div>
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Select the necessary applications to get started.</div>
+
+              {/* ── Récap pré-confirmation ── */}
+              {(() => {
+                const countryName = COUNTRIES_BILLING.find(c => c.code === _billingCountry)?.name || _billingCountry;
+                const customerTypeLabel = ({ company: "Société", freelance: "Indépendant", individual: "Particulier" } as any)[_billingCustomerType];
+                const vatLine = _billingComputedVat ? (
+                  _billingComputedVat.rate > 0
+                    ? `+ TVA ${_billingComputedVat.rate}% : ${fmt(_billingComputedVat.vat_amount_cents / 100, chargeCurrency)}`
+                    : (_billingComputedVat.treatment === "eu_reverse_charge"
+                      ? "0% TVA — autoliquidation (reverse charge)"
+                      : _billingComputedVat.treatment === "export"
+                        ? "0% TVA — export de services hors-EU"
+                        : "0% TVA")
+                ) : null;
+                const totalHt = total;
+                const totalTtc = _billingComputedVat ? _billingComputedVat.amount_ttc_cents / 100 : totalHt;
+                const periodLabel = pricingBilling === "yearly" ? "/ an" : "/ mois";
+                return (
+                  <div style={{ background: "linear-gradient(135deg, #FFF5FB 0%, #FFF 100%)", border: `1.5px solid ${C.pink}30`, borderRadius: 10, padding: "14px 16px", marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: .8, marginBottom: 8, textTransform: "uppercase" }}>
+                      📋 Récapitulatif avant paiement
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", fontSize: 12, marginBottom: 10 }}>
+                      <span style={{ color: C.textMuted }}>Pays :</span><span style={{ fontWeight: 600 }}>{countryName}</span>
+                      <span style={{ color: C.textMuted }}>Profil :</span><span style={{ fontWeight: 600 }}>{customerTypeLabel}</span>
+                      {_billingVatNumber && <><span style={{ color: C.textMuted }}>N° TVA :</span><span style={{ fontFamily: "monospace", fontSize: 11 }}>{_billingVatNumber} {_billingVatValidation?.valid ? "✓" : ""}</span></>}
+                      <span style={{ color: C.textMuted }}>Cycle :</span><span style={{ fontWeight: 600 }}>{pricingBilling === "yearly" ? "Annuel (-10%)" : "Mensuel"}</span>
+                    </div>
+                    <div style={{ borderTop: `1px dashed ${C.pink}30`, paddingTop: 10 }}>
+                      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Vous serez facturé :</div>
+                      <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>{fmt(totalTtc, chargeCurrency)} <span style={{ fontSize: 13, fontWeight: 400, color: C.textMuted }}>{periodLabel}</span></div>
+                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Total HT : {fmt(totalHt, chargeCurrency)}{vatLine && ` · ${vatLine}`}</div>
+                      {chargeCurrency !== "CHF" && chargeCurrency !== "EUR" && (
+                        <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6, fontStyle: "italic" }}>
+                          ℹ️ Stripe convertira votre paiement en CHF lors de la réception (taux Stripe ~1%).
+                        </div>
+                      )}
+                      {_billingComputedVat?.treatment === "eu_reverse_charge" && (
+                        <div style={{ fontSize: 10, color: C.green, marginTop: 6 }}>
+                          ✓ TVA due par votre entreprise via autoliquidation (art. 196 directive 2006/112/CE)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                <button onClick={() => setStep("plan")} style={{ ...sBtn("outline"), fontSize: 12, padding: "8px 16px" }}>Back</button>
+                <button onClick={() => setStep("plan")} style={{ ...sBtn("outline"), fontSize: 12, padding: "8px 16px" }}>Retour</button>
                 <button onClick={async () => {
+                  const billing = {
+                    currency: chargeCurrency,
+                    country: _billingCountry,
+                    customer_type: _billingCustomerType,
+                    vat_number: _billingVatValidation?.valid ? _billingVatNumber : undefined,
+                  };
                   for (const pid of selectedPlanIds) {
-                    try { await subscribeToPlan(pid, pricingBilling, paymentMethod, subEmployeeCount); } catch {}
+                    try { await subscribeToPlan(pid, pricingBilling, paymentMethod, subEmployeeCount, billing); } catch {}
                   }
                   reloadSub(); setSubView("overview"); setSelectedPlanIds([]);
                   addToast_admin(paymentMethod === "invoice" ? "Abonnement activé — facture envoyée" : "Abonnement activé — 14 jours d'essai gratuit");
                 }} style={{
                   flex: 1, padding: "10px 0", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
-                  border: "none", background: "#1565C0", color: "#fff", fontFamily: font,
+                  border: "none", background: C.pink, color: "#fff", fontFamily: font,
                 }}>
-                  Access Summary
+                  ✓ Confirmer la souscription
                 </button>
               </div>
             </>
           )}
 
-          {/* Total */}
-          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>Estimated Total Price</div>
-            <div style={{ fontSize: 28, fontWeight: 800 }}>{Math.round(total * 100) / 100} CHF</div>
-            <div style={{ fontSize: 12, color: C.textMuted }}>( {pricingBilling === "yearly" ? "Yearly" : "Monthly"} )</div>
-            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>Inclusive Tax rate of 8.10% : {Math.round((total + tax) * 100) / 100} CHF</div>
+          {/* ── Informations de facturation ── */}
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, marginTop: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>📍 Informations de facturation</div>
+
+            {/* Pays */}
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: C.textLight, display: "block", marginBottom: 4 }}>Pays</label>
+              <select value={_billingCountry} onChange={(e: any) => { handleCountryChange(e.target.value); }} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                {COUNTRIES_BILLING.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+              </select>
+            </div>
+
+            {/* Type de client */}
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: C.textLight, display: "block", marginBottom: 4 }}>Type de client</label>
+              <select value={_billingCustomerType} onChange={(e: any) => { _billingCustomerType = e.target.value; recomputeVat(); }} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                <option value="company">Société</option>
+                <option value="freelance">Indépendant</option>
+                <option value="individual">Particulier</option>
+              </select>
+            </div>
+
+            {/* N° TVA — uniquement EU + société/freelance */}
+            {EU_COUNTRY_CODES.includes(_billingCountry) && _billingCustomerType !== "individual" && (
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ fontSize: 11, fontWeight: 600, color: C.textLight, display: "block", marginBottom: 4 }}>
+                  N° TVA <span style={{ fontWeight: 400 }}>(pour autoliquidation)</span>
+                </label>
+                <input value={_billingVatNumber} onChange={(e: any) => { _billingVatNumber = e.target.value.toUpperCase().replace(/\s/g, ""); _billingVatValidation = null; setSubEmployeeCount(subEmployeeCount); }}
+                  onBlur={handleValidateVat}
+                  placeholder={`Ex: ${_billingCountry}12345678901`}
+                  style={{ ...sInput, fontSize: 12, fontFamily: "monospace" }} />
+                {_billingVatChecking && <div style={{ fontSize: 10, color: C.textMuted, marginTop: 4 }}>⏳ Vérification VIES...</div>}
+                {_billingVatValidation && _billingVatValidation.valid && (
+                  <div style={{ fontSize: 10, color: C.green, marginTop: 4, fontWeight: 600 }}>✓ Validé via VIES{_billingVatValidation.name ? ` — ${_billingVatValidation.name}` : ""}</div>
+                )}
+                {_billingVatValidation && !_billingVatValidation.valid && _billingVatNumber && (
+                  <div style={{ fontSize: 10, color: C.red, marginTop: 4 }}>✗ {_billingVatValidation.error || "N° TVA invalide"}</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Total ── */}
+          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16, marginTop: 16 }}>
+            <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 4 }}>Total HT ({pricingBilling === "yearly" ? "annuel" : "mensuel"})</div>
+            <div style={{ fontSize: 24, fontWeight: 800 }}>{fmt(total, chargeCurrency)}</div>
+            {_billingFxRate && _billingDisplayCurrency !== chargeCurrency && (
+              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+                ≈ {fmt(total * _billingFxRate / (chargeCurrency === "CHF" ? 1 : 1), _billingDisplayCurrency)} <span style={{ fontStyle: "italic" }}>(estimation, facturé en {chargeCurrency})</span>
+              </div>
+            )}
+            {_billingComputedVat && _billingComputedVat.rate > 0 && (
+              <>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>+ TVA {_billingComputedVat.rate}% : {fmt(_billingComputedVat.vat_amount_cents / 100, chargeCurrency)}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4, paddingTop: 6, borderTop: `1px dashed ${C.border}` }}>
+                  Total TTC : {fmt(_billingComputedVat.amount_ttc_cents / 100, chargeCurrency)}
+                </div>
+              </>
+            )}
+            {_billingComputedVat && _billingComputedVat.rate === 0 && _billingComputedVat.mention && (
+              <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6, padding: "6px 8px", background: C.bg, borderRadius: 6, lineHeight: 1.4, fontStyle: "italic" }}>
+                {_billingComputedVat.mention}
+              </div>
+            )}
           </div>
         </div>
       </div>

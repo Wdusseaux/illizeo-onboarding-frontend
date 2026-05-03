@@ -2,10 +2,10 @@
 
 // ─── TYPES ───────────────────────────────────────────────────
 export type OnboardingStep = "email" | "welcome_banner" | "create_account" | "photo_profile" | "collect_info" | "welcome_modal" | "dashboard";
-export type DashboardPage = "tableau_de_bord" | "mes_actions" | "messagerie" | "notifications" | "entreprise" | "rapports" | "suivi" | "mon_profil" | "cooptation" | "satisfaction" | "assistant_ia" | "organigramme" | "mes_rdv" | "documents" | "mes_signatures" | "formations" | "bureaux" | "badges";
+export type DashboardPage = "tableau_de_bord" | "mes_actions" | "messagerie" | "notifications" | "entreprise" | "rapports" | "suivi" | "mon_profil" | "cooptation" | "satisfaction" | "assistant_ia" | "organigramme" | "mes_rdv" | "documents" | "mes_signatures" | "formations" | "bureaux" | "badges" | "mon_materiel";
 export type DashboardTab = "toutes" | "onboarding";
 export type UserRole = "employee" | "rh";
-export type AdminPage = "admin_dashboard" | "admin_parcours" | "admin_suivi" | "admin_documents" | "admin_actions" | "admin_workflows" | "admin_templates" | "admin_phases" | "admin_equipes" | "admin_messagerie" | "admin_notifications" | "admin_entreprise" | "admin_profil" | "admin_gamification" | "admin_nps" | "admin_feedback_hub" | "admin_livret" | "admin_contrats" | "admin_integrations" | "admin_users" | "admin_fields" | "admin_provisioning" | "admin_cooptation" | "admin_apparence" | "admin_donnees" | "admin_2fa" | "admin_abonnement" | "admin_equipements" | "admin_signatures" | "admin_roles" | "admin_calendar" | "admin_orgchart" | "admin_buddy" | "admin_audit" | "admin_password_policy" | "admin_assistant_ia" | "admin_manager_view" | "admin_cohorte_rh" | "admin_templates_profil" | "admin_quotes" | "admin_recurring_meetings";
+export type AdminPage = "admin_dashboard" | "admin_parcours" | "admin_suivi" | "admin_documents" | "admin_actions" | "admin_workflows" | "admin_templates" | "admin_phases" | "admin_equipes" | "admin_messagerie" | "admin_notifications" | "admin_entreprise" | "admin_profil" | "admin_gamification" | "admin_nps" | "admin_feedback_hub" | "admin_livret" | "admin_contrats" | "admin_integrations" | "admin_users" | "admin_fields" | "admin_provisioning" | "admin_cooptation" | "admin_apparence" | "admin_donnees" | "admin_2fa" | "admin_abonnement" | "admin_equipements" | "admin_signatures" | "admin_roles" | "admin_calendar" | "admin_orgchart" | "admin_buddy" | "admin_audit" | "admin_password_policy" | "admin_assistant_ia" | "admin_manager_view" | "admin_cohorte_rh" | "admin_templates_profil" | "admin_quotes" | "admin_recurring_meetings" | "admin_bureaux";
 export type AdminModal = null | "create_parcours" | "edit_parcours" | "view_parcours" | "create_action" | "edit_action" | "create_doc_category" | "edit_doc" | "create_template" | "edit_template" | "create_workflow" | "assign_member" | "collaborateur_detail" | "create_groupe" | "edit_groupe" | "action_detail" | "send_message" | "create_phase" | "edit_phase" | "create_contrat" | "edit_contrat";
 
 export interface Collaborateur {
@@ -54,6 +54,7 @@ export interface WorkflowRule {
 
 export interface EmailTemplate {
   id: number; nom: string; sujet: string; declencheur: string; variables: string[]; actif: boolean;
+  contenu?: string;
 }
 
 export interface TeamMember {

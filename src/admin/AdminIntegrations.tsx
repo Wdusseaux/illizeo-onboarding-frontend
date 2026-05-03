@@ -288,7 +288,7 @@ export function createAdminIntegrations(ctx: any) {
     };
 
     const renderIntegrations = () => {
-      const categories = [...new Set((integrations || []).map((i: any) => i.categorie))];
+      const categories = [...new Set((integrations || []).map((i: any) => i.categorie))] as string[];
       const selectedIntegration = integrations?.find((i: any) => i.id === integrationPanelId);
       const selectedMeta = selectedIntegration ? INTEGRATION_META[selectedIntegration.provider] : null;
 

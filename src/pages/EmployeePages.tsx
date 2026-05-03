@@ -433,6 +433,14 @@ export function createEmployeeRenders(ctx: any) {
                         } catch {}
                       }
                       ctx.setShowNotifDropdown?.(false);
+                      // Route the user to the relevant page based on the
+                      // notification type. Badge notifications open the
+                      // badges gallery.
+                      const type = n.type || "";
+                      const titleLower = (n.titre || n.title || "").toLowerCase();
+                      if (type === "badge_earned" || titleLower.includes("badge")) {
+                        ctx.setDashPage?.("badges");
+                      }
                     }}
                       style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", background: n.read_at ? "transparent" : C.pinkBg + "30", transition: "background .15s" }}
                       className="iz-sidebar-item">
@@ -994,11 +1002,15 @@ export function createEmployeeRenders(ctx: any) {
               { name: "Autonome", min: 900, max: 1400, color: "#F9A825", icon: Award },
               { name: "Pionnier(ère)", min: 1400, max: 9999, color: "#E91E8C", icon: Trophy },
             ];
-            const lvl = LEVELS.findLast(l => totalXP >= l.min) || LEVELS[0];
+            const lvl = [...LEVELS].reverse().find(l => totalXP >= l.min) || LEVELS[0];
             const lvlIdx = LEVELS.indexOf(lvl);
             const lvlPct = lvl.max < 9999 ? Math.min(100, ((totalXP - lvl.min) / (lvl.max - lvl.min)) * 100) : 100;
             const LvlIcon = lvl.icon;
-            const questsBlock = (companyBlocks || []).find((b: any) => b.type === "gamification_quests" && b.actif);
+            const allQuestsBlocks = (companyBlocks || []).filter((b: any) => b.type === "gamification_quests");
+            const questsBlock = allQuestsBlocks.find((b: any) => b.actif);
+            const hasDisabledQuestsBlock = allQuestsBlocks.length > 0 && !questsBlock;
+            const tenantId = localStorage.getItem("illizeo_tenant_id") || "";
+            const isDemoTenantQuests = tenantId === "illizeo" || tenantId === "illizeo2";
             const inferIcon = (title: string) => {
               const t = (title || "").toLowerCase();
               if (t.includes("action") || t.includes("checklist") || t.includes("tâche")) return ListChecks;
@@ -1030,15 +1042,16 @@ export function createEmployeeRenders(ctx: any) {
               { id: "q4", icon: Users, title: "Rencontrer 3 collègues hors équipe", reward: 50, done: false },
               { id: "q5", icon: MapPin, title: "Découvrir 5 lieux du bureau", reward: 40, done: ((ctx as any)._officeTour?.visited || []).length >= 5 },
             ];
-            const QUESTS = (questsBlock?.data?.quests && questsBlock.data.quests.length > 0)
-              ? questsBlock.data.quests.map((q: any, i: number) => ({
+            const adminQuests = questsBlock?.data?.quests || [];
+            const QUESTS = adminQuests.length > 0
+              ? adminQuests.map((q: any, i: number) => ({
                   id: `cfg_${i}`,
                   icon: inferIcon(q.title),
                   title: q.title,
                   reward: q.reward ?? 50,
                   done: inferDone(q.title),
                 }))
-              : QUESTS_FALLBACK;
+              : (hasDisabledQuestsBlock ? [] : (isDemoTenantQuests ? QUESTS_FALLBACK : []));
             // Real cohort = peers in the same parcours, fetched from /me/leaderboard.
             // While the request is in flight, fall back to a single-row "Vous" so the
             // card still renders without flashing fake names.
@@ -1072,8 +1085,9 @@ export function createEmployeeRenders(ctx: any) {
                   <div style={{ height: "100%", width: `${lvlPct}%`, background: `linear-gradient(90deg, ${lvl.color}, ${lvl.color}CC)`, transition: "width .6s ease" }} />
                 </div>
                 {/* Body */}
-                <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 24 }}>
+                <div style={{ padding: "20px 24px", display: "grid", gridTemplateColumns: QUESTS.length === 0 ? "1fr" : "1.4fr 1fr", gap: 24 }}>
                   {/* Quests */}
+                  {QUESTS.length > 0 && (
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 1, marginBottom: 12 }}>QUÊTES DU MOMENT</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1091,6 +1105,7 @@ export function createEmployeeRenders(ctx: any) {
                       })}
                     </div>
                   </div>
+                  )}
                   {/* Leaderboard */}
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: 1, marginBottom: 12 }}>CLASSEMENT COHORTE</div>
@@ -1631,34 +1646,6 @@ export function createEmployeeRenders(ctx: any) {
         </div>
       </div>
 
-      {/* My badges */}
-      {myBadges.length > 0 && (() => {
-        const BADGE_ICON_MAP_EMP: Record<string, any> = {
-          "trophy": Trophy, "file-check": FileCheck2, "message-circle": MessageCircle, "calendar-check": CalendarCheck,
-          "star": Star, "handshake": Handshake, "smile": Smile, "party-popper": PartyPopper,
-          "award": Award, "heart": Heart, "rocket": Rocket, "gem": Gem, "crown": Crown, "target": Target, "zap": Zap, "gift": Gift,
-        };
-        return (
-        <div style={{ marginTop: 24 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}><Trophy size={18} color={C.amber} /> {t('emp.my_badges')}</h3>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {myBadges.map(b => {
-              const BadgeIcon = BADGE_ICON_MAP_EMP[b.icon] || Trophy;
-              return (
-              <div key={b.id} className="iz-card" style={{ ...sCard, padding: "14px 18px", textAlign: "center", width: 130 }}>
-                <div style={{ width: 48, height: 48, borderRadius: "50%", background: b.color + "20", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", border: `2px solid ${b.color}30` }}>
-                  <BadgeIcon size={22} color={b.color} />
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{b.nom}</div>
-                <div style={{ fontSize: 10, color: C.textMuted }}>{fmtDateShort(b.earned_at)}</div>
-                {b.description && <div style={{ fontSize: 9, color: C.textLight, marginTop: 2, lineHeight: 1.4 }}>{b.description}</div>}
-              </div>
-              );
-            })}
-          </div>
-        </div>
-        );
-      })()}
     </div>
     );
   };
@@ -4387,6 +4374,679 @@ export function createEmployeeRenders(ctx: any) {
     );
   };
 
+  // ─── BADGES — Mes badges (Galerie) ────────────────────────
+  const renderBadges = () => {
+    // 9 prod Illizeo badges, mirroring BackofficeController seeds.
+    // Curated metadata for the 9 reference Illizeo badges (cat/rarity/xp/day/hint).
+    // Other badges loaded from the DB get sensible defaults inferred from name/critere.
+    const STATIC_META: Record<string, { cat: string; rarity: string; xp: number; day: number; hint: string; trigger: string }> = {
+      "explorateur":      { cat: "Démarrage",   rarity: "common",    xp: 50,   day: 1,   hint: "Envoyer son premier message",    trigger: "premier_message" },
+      "première semaine": { cat: "Démarrage",   rarity: "common",    xp: 75,   day: 7,   hint: "Disponible à J+7",               trigger: "j_plus_7" },
+      "intégré":          { cat: "Conformité",  rarity: "uncommon",  xp: 100,  day: 14,  hint: "Valider tous les documents",     trigger: "docs_complete" },
+      "apprenant":        { cat: "Formation",   rarity: "uncommon",  xp: 120,  day: 30,  hint: "Compléter une formation",        trigger: "formation_complete" },
+      "voix entendue":    { cat: "Engagement",  rarity: "rare",      xp: 150,  day: 45,  hint: "Compléter le sondage NPS",       trigger: "nps_complete" },
+      "mentor":           { cat: "Cooptation",  rarity: "rare",      xp: 200,  day: 90,  hint: "Soumettre une cooptation",       trigger: "cooptation" },
+      "ambassadeur":      { cat: "Cooptation",  rarity: "epic",      xp: 500,  day: 180, hint: "0 / 3 cooptations validées",     trigger: "cooptation_3" },
+      "cap des 100j":     { cat: "Démarrage",   rarity: "epic",      xp: 750,  day: 100, hint: "Disponible à J+100",             trigger: "j_plus_100" },
+      "champion":         { cat: "Performance", rarity: "legendary", xp: 1500, day: 365, hint: "Compléter tous les modules",     trigger: "parcours_termine" },
+    };
+
+    // Infer category from a critere/trigger string when no static metadata exists.
+    const inferCat = (critere: string | null | undefined, nom: string): string => {
+      const c = (critere || "").toLowerCase();
+      const n = nom.toLowerCase();
+      if (c.includes("reboarding") || n.includes("retour") || n.includes("réadapt") || n.includes("réintégr")) return "Reboarding";
+      if (c.includes("offboarding") || n.includes("transparence") || n.includes("transmission") || n.includes("bonne route")) return "Offboarding";
+      if (c.includes("crossboarding") || n.includes("mobilité") || n.includes("polyvalent") || n.includes("évolution")) return "Crossboarding";
+      if (c.includes("cooptation")) return "Cooptation";
+      if (c.includes("nps") || c.includes("feedback")) return "Engagement";
+      if (c.includes("formation") || c.includes("apprenant")) return "Formation";
+      if (c.includes("docs") || c.includes("document")) return "Conformité";
+      if (c.includes("parcours") || c.includes("first_") || c.includes("j_plus")) return "Démarrage";
+      return "Parcours";
+    };
+
+    // Infer relative day & rarity from category for ordering / progress display.
+    const inferDay = (cat: string, critere: string | null | undefined): number => {
+      const c = (critere || "").toLowerCase();
+      if (c.includes("_j1")) return 1;
+      if (c.includes("_j7") || c.includes("first_week")) return 7;
+      if (c.includes("_j14")) return 14;
+      if (c.includes("_j30") || c.includes("first_month")) return 30;
+      if (c.includes("_j60")) return 60;
+      if (c.includes("_j100") || c.includes("j_plus_100")) return 100;
+      if (cat === "Reboarding" || cat === "Offboarding" || cat === "Crossboarding") return 30;
+      return 45;
+    };
+
+    // Build the badges list dynamically from DB templates, falling back to the
+    // static 9 if the DB is empty (initial load / non-seeded tenant).
+    const dbTemplates = (badgeTemplates || []).filter((t: any) => t.actif !== false);
+    const ILLIZEO_BADGES = (dbTemplates.length > 0 ? dbTemplates : [
+      // Fallback when DB hasn't loaded yet — keeps the gallery non-empty
+      { id: -1, nom: "Explorateur", description: "Premier message envoyé. La conversation est lancée !", icon: "rocket", color: "#9C27B0", critere: "premier_message" },
+      { id: -2, nom: "Première semaine", description: "Sept jours dans l'aventure. Le pli est pris.", icon: "calendar-check", color: "#26A69A", critere: "j_plus_7" },
+      { id: -3, nom: "Intégré", description: "Tous les documents administratifs sont validés.", icon: "check-circle", color: "#4CAF50", critere: "docs_complete" },
+      { id: -4, nom: "Apprenant", description: "Première formation terminée avec succès.", icon: "book-open", color: "#7B5EA7", critere: "formation_complete" },
+      { id: -5, nom: "Voix entendue", description: "Vos retours comptent. Le NPS a été soumis.", icon: "message-circle", color: "#1A73E8", critere: "nps_complete" },
+      { id: -6, nom: "Mentor", description: "Une cooptation soumise. Faire grandir l'équipe.", icon: "users", color: "#FF9800", critere: "cooptation" },
+      { id: -7, nom: "Ambassadeur", description: "Trois cooptations validées. La culture en marche.", icon: "award", color: "#D81B60", critere: "cooptation_3" },
+      { id: -8, nom: "Cap des 100j", description: "100 jours d'aventure. Le sprint devient marathon.", icon: "target", color: "#EF6C00", critere: "j_plus_100" },
+      { id: -9, nom: "Champion", description: "Parcours d'onboarding complété à 100%. Bravo !", icon: "trophy", color: "#F9A825", critere: "parcours_termine" },
+    ]).map((t: any) => {
+      const key = (t.nom || "").toLowerCase().trim();
+      const meta = STATIC_META[key];
+      const cat = meta?.cat || inferCat(t.critere, t.nom);
+      return {
+        slug: `t${t.id}`,
+        nom: t.nom,
+        cat,
+        trigger: meta?.trigger || t.critere || "",
+        icon: t.icon || "rocket",
+        color: t.color || "#9C27B0",
+        rarity: meta?.rarity || "uncommon",
+        xp: meta?.xp || 100,
+        day: meta?.day ?? inferDay(cat, t.critere),
+        desc: t.description || "",
+        hint: meta?.hint || (t.critere ? `Déclencheur : ${t.critere}` : ""),
+      };
+    });
+
+    const BADGE_ICON_MAP: Record<string, any> = {
+      "trophy": Trophy, "file-check": FileCheck2, "message-circle": MessageCircle, "calendar-check": CalendarCheck,
+      "star": Star, "handshake": Handshake, "smile": Smile, "party-popper": PartyPopper,
+      "award": Award, "heart": Heart, "rocket": Rocket, "gem": Gem, "crown": Crown, "target": Target, "zap": Zap, "gift": Gift,
+      "check-circle": CheckCircle, "book-open": BookOpen, "users": Users,
+    };
+
+    const RARITY_META: Record<string, { label: string; color: string; rank: number }> = {
+      common:    { label: "Commun",     color: "#9CA3AF", rank: 1 },
+      uncommon:  { label: "Peu commun", color: "#10B981", rank: 2 },
+      rare:      { label: "Rare",       color: "#3B82F6", rank: 3 },
+      epic:      { label: "Épique",     color: "#A855F7", rank: 4 },
+      legendary: { label: "Légendaire", color: "#FFB300", rank: 5 },
+    };
+
+    // Resolve start date of the journey — used to position locked/in-progress
+    // badges along the axis. Falls back to "today − 30d" so the canvas is never empty.
+    const dateDebutStr = (myCollab as any)?.dateDebut || (myCollab as any)?.date_debut || "";
+    const startDate = dateDebutStr ? (() => {
+      const parts = dateDebutStr.includes("/") ? dateDebutStr.split("/") : dateDebutStr.split("-");
+      if (parts.length === 3) {
+        const [a, b, c] = parts.map((p: string) => parseInt(p, 10));
+        return dateDebutStr.includes("/") ? new Date(c, b - 1, a) : new Date(a, b - 1, c);
+      }
+      return new Date(Date.now() - 30 * 86400000);
+    })() : new Date(Date.now() - 30 * 86400000);
+
+    const today = new Date();
+    const daysSinceStart = Math.max(1, Math.floor((today.getTime() - startDate.getTime()) / 86400000));
+
+    // Match each illizeo template against earned myBadges by name
+    const earnedByName: Record<string, any> = {};
+    (myBadges || []).forEach((b: any) => {
+      const key = (b.nom || "").toLowerCase().trim();
+      earnedByName[key] = b;
+    });
+
+    // Build enriched badges (chronological by tpl.day)
+    const ordered = ILLIZEO_BADGES.slice().sort((a, b) => a.day - b.day).map(tpl => {
+      const earned = earnedByName[tpl.nom.toLowerCase().trim()];
+      let state: "earned-recent" | "earned" | "in-progress" | "locked";
+      let progress = 0;
+      let next = "";
+      if (earned) {
+        const earnedDate = new Date(earned.earned_at);
+        const ageDays = (today.getTime() - earnedDate.getTime()) / 86400000;
+        state = ageDays < 7 ? "earned-recent" : "earned";
+        progress = 100;
+      } else if (tpl.day <= daysSinceStart + 30) {
+        state = "in-progress";
+        progress = Math.max(5, Math.min(95, Math.round((daysSinceStart / Math.max(1, tpl.day)) * 100)));
+        next = tpl.hint;
+      } else {
+        state = "locked";
+      }
+      return { ...tpl, earned, state, progress, next };
+    });
+
+    // Inject earned badges that don't match any static template (e.g. reboarding,
+    // offboarding, crossboarding milestones — "De retour", "Bonne route", etc.).
+    // Without this, badges awarded by journey milestones never appear in the gallery.
+    const knownNames = new Set(ILLIZEO_BADGES.map(b => b.nom.toLowerCase().trim()));
+    (myBadges || []).forEach((b: any, idx: number) => {
+      const nameKey = (b.nom || "").toLowerCase().trim();
+      if (!nameKey || knownNames.has(nameKey)) return;
+      const earnedDate = b.earned_at ? new Date(b.earned_at) : today;
+      const ageDays = (today.getTime() - earnedDate.getTime()) / 86400000;
+      ordered.push({
+        slug: `extra_${b.id || idx}`,
+        nom: b.nom,
+        cat: b.categorie || "Parcours",
+        trigger: b.trigger || "",
+        icon: b.icon || "rocket",
+        color: b.color || "#9C27B0",
+        rarity: "uncommon",
+        xp: b.xp || 100,
+        day: 1,
+        desc: b.description || "Badge attribué via votre parcours.",
+        hint: "",
+        earned: b,
+        state: ageDays < 7 ? "earned-recent" : "earned",
+        progress: 100,
+        next: "",
+      } as any);
+    });
+
+    // Stats
+    const earnedCount = ordered.filter(b => b.earned).length;
+    const inProgressCount = ordered.filter(b => b.state === "in-progress").length;
+    const lockedCount = ordered.filter(b => b.state === "locked").length;
+    const totalXp = ordered.filter(b => b.earned).reduce((sum, b) => sum + b.xp, 0);
+
+    // Filter state — ctx-backed so it survives renders
+    if (!ctx.badgeFilter) ctx.badgeFilter = "all";
+    const activeFilter = ctx.badgeFilter;
+    const setFilter = (f: string) => { ctx.badgeFilter = f; setMyBadges([...(myBadges || [])]); };
+    const matchesFilter = (b: any) => {
+      if (activeFilter === "all") return true;
+      if (activeFilter === "earned") return b.state === "earned" || b.state === "earned-recent";
+      if (activeFilter === "in-progress") return b.state === "in-progress";
+      if (activeFilter === "locked") return b.state === "locked";
+      return b.cat === activeFilter; // category match
+    };
+    const visibleBadges = ordered.filter(matchesFilter);
+    const cats = Array.from(new Set(ILLIZEO_BADGES.map(b => b.cat)));
+
+    // Modal state — local React refs aren't possible in a render function.
+    // We piggy-back on a controlled state stored on ctx (lazy init).
+    if (!ctx.badgeModalState) ctx.badgeModalState = { open: null };
+    const openBadge: any = ctx.badgeModalState.open;
+    const setOpenBadge = (b: any) => {
+      ctx.badgeModalState.open = b;
+      // Force a re-render of the parent by bumping the myBadges array identity.
+      setMyBadges([...(myBadges || [])]);
+    };
+
+    // ── Hover-triggered confetti for earned badges ────────
+    // ctx-backed so the state survives renders. We reset the timer on each
+    // hover (no early-return) so a stuck `active=true` from a previous
+    // navigation never blocks future triggers, and rapid hovers restart the
+    // animation cleanly via a fresh `seed` (used as the layer key).
+    if (!ctx.badgeConfettiState) ctx.badgeConfettiState = { active: false, slug: null, color: null, seed: 0 };
+    const confettiState = ctx.badgeConfettiState;
+    const triggerHoverConfetti = (slug: string, color: string) => {
+      if (ctx.badgeConfettiTimer) clearTimeout(ctx.badgeConfettiTimer);
+      confettiState.active = true;
+      confettiState.slug = slug;
+      confettiState.color = color;
+      confettiState.seed = Date.now();
+      setMyBadges([...(myBadges || [])]);
+      ctx.badgeConfettiTimer = setTimeout(() => {
+        confettiState.active = false;
+        confettiState.slug = null;
+        ctx.badgeConfettiTimer = null;
+        setMyBadges([...(myBadges || [])]);
+      }, 3500);
+    };
+
+    // ── Tokens & helpers ────────
+    const INK_900 = "#0d0a14";
+    const INK_600 = "#4a4356";
+    const INK_500 = "#6b6376";
+    const INK_400 = "#948c9e";
+    const INK_300 = "#c9c3d0";
+    const INK_200 = "#e6e3ea";
+    const MAGENTA = "#e6007e";
+    const MAGENTA_600 = "#c80070";
+    const MAGENTA_50 = "#fde8f1";
+    const SERIF = `'Instrument Serif', Georgia, 'Times New Roman', serif`;
+
+    // hex → soft pastel rgba for badge color tints
+    const softPastel = (hex: string, alpha = 0.16) => {
+      const h = hex.replace("#", "");
+      const r = parseInt(h.slice(0, 2), 16);
+      const g = parseInt(h.slice(2, 4), 16);
+      const bl = parseInt(h.slice(4, 6), 16);
+      return `rgba(${r},${g},${bl},${alpha})`;
+    };
+
+    const fmtBadgeDate = (b: any) => {
+      if (b.earned?.earned_at) {
+        return new Date(b.earned.earned_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+      }
+      return "—";
+    };
+
+    const STATE_LABEL: Record<string, string> = {
+      "earned-recent": "Récemment acquis",
+      "earned":        "Acquis",
+      "in-progress":   "En cours",
+      "locked":        "À débloquer",
+    };
+
+    // ── Single gallery card (vertical, ~220×340) ────────
+    // Returns plain JSX so React reuses DOM nodes across re-renders.
+    const renderBadgeCard = (b: any, idx: number) => {
+      const isLocked = b.state === "locked";
+      const isInProgress = b.state === "in-progress";
+      const isEarned = b.state === "earned" || b.state === "earned-recent";
+      const isRecent = b.state === "earned-recent";
+      const Icon = BADGE_ICON_MAP[b.icon] || Trophy;
+
+      const stateLabel = STATE_LABEL[b.state];
+      const chipBg = isRecent ? INK_900 : "#fff";
+      const chipText = isRecent ? "#fff" : isEarned || isInProgress ? b.color : INK_500;
+      const chipBorder = isRecent ? "transparent" : softPastel(b.color, 0.3);
+
+      return (
+        <div
+          key={b.slug}
+          className="iz-bg-card"
+          role="button"
+          tabIndex={0}
+          onClick={() => setOpenBadge(b)}
+          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenBadge(b); } }}
+          onMouseEnter={isEarned ? () => triggerHoverConfetti(b.slug, b.color) : undefined}
+          onFocus={isEarned ? () => triggerHoverConfetti(b.slug, b.color) : undefined}
+          aria-label={`${b.nom} — ${stateLabel} — ${b.cat}`}
+          style={{
+            position: "relative",
+            aspectRatio: "0.62",
+            borderRadius: 14,
+            overflow: "hidden",
+            background: "#fff",
+            border: `1px solid ${INK_200}`,
+            display: "flex",
+            flexDirection: "column",
+            cursor: "pointer",
+            isolation: "isolate",
+            ["--iz-card-shadow" as any]: `0 14px 36px ${softPastel(b.color, 0.22)}`,
+            animationDelay: `${idx * 50}ms`,
+          } as React.CSSProperties}
+        >
+          {/* Pastel hero gradient */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 0,
+            background: isLocked
+              ? "linear-gradient(180deg, #f5f3f7 0%, #ffffff 60%)"
+              : `linear-gradient(180deg, ${softPastel(b.color, 0.22)} 0%, ${softPastel(b.color, 0.12)} 45%, #ffffff 80%)`,
+          }} />
+          {/* Halo top-right */}
+          <div style={{
+            position: "absolute", top: "-22%", right: "-28%",
+            width: "78%", aspectRatio: 1, borderRadius: "50%",
+            background: isLocked
+              ? "radial-gradient(circle, rgba(13,10,20,0.06) 0%, transparent 70%)"
+              : `radial-gradient(circle, ${softPastel(b.color, 0.45)} 0%, ${softPastel(b.color, 0.18)} 50%, transparent 75%)`,
+            zIndex: 0, filter: "blur(2px)", pointerEvents: "none",
+          }} />
+          {/* Halo bottom-left */}
+          <div style={{
+            position: "absolute", bottom: "-25%", left: "-30%",
+            width: "70%", aspectRatio: 1, borderRadius: "50%",
+            background: isLocked ? "transparent" : `radial-gradient(circle, ${softPastel(b.color, 0.18)} 0%, transparent 70%)`,
+            zIndex: 0, filter: "blur(4px)", pointerEvents: "none",
+          }} />
+
+          {/* Chips row */}
+          <div style={{ position: "relative", zIndex: 2, display: "flex", alignItems: "center", gap: 6, padding: "12px 14px 0" }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 5,
+              padding: "4px 9px", borderRadius: 999,
+              background: chipBg, color: chipText,
+              fontSize: 9, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase",
+              border: `1px solid ${chipBorder}`,
+            }}>
+              {isRecent && <span style={{ width: 5, height: 5, borderRadius: "50%", background: b.color }} />}
+              {stateLabel}
+            </div>
+            <div style={{
+              padding: "4px 9px",
+              fontSize: 9, fontWeight: 700, color: INK_600,
+              letterSpacing: 0.8, textTransform: "uppercase",
+            }}>{b.cat}</div>
+          </div>
+
+          {/* Icon disc */}
+          <div style={{
+            position: "relative", zIndex: 2,
+            margin: "14px 14px 0",
+            width: 56, height: 56, borderRadius: "50%",
+            background: "#fff",
+            border: isLocked ? `2px solid ${INK_300}` : `2px solid ${b.color}`,
+            display: "grid", placeItems: "center",
+            boxShadow: isLocked ? "none" : `0 4px 14px ${softPastel(b.color, 0.3)}`,
+            animation: isRecent ? "izBgGlow 2.6s ease-in-out infinite" : "none",
+          }}>
+            {isLocked
+              ? <Lock size={26} color={INK_400} strokeWidth={1.8} />
+              : <Icon size={26} color={b.color} strokeWidth={1.8} />}
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Title + desc */}
+          <div style={{ position: "relative", zIndex: 2, padding: "0 16px 12px" }}>
+            <h3 style={{
+              margin: 0,
+              fontFamily: SERIF,
+              fontSize: 26, lineHeight: 1.05, fontWeight: 400,
+              color: INK_900, letterSpacing: -0.3,
+            }}>{b.nom}</h3>
+            <p style={{
+              margin: "6px 0 0",
+              fontSize: 11.5, lineHeight: 1.45,
+              color: INK_600,
+              display: "-webkit-box",
+              WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}>{b.desc}</p>
+            {isInProgress && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ height: 4, borderRadius: 999, background: "rgba(13,10,20,0.07)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${b.progress}%`, background: b.color, borderRadius: 999 }} />
+                </div>
+                <div style={{
+                  marginTop: 5, fontSize: 10, fontWeight: 600, color: b.color,
+                  fontVariantNumeric: "tabular-nums",
+                }}>{b.progress}%{b.next ? ` · ${b.next}` : ""}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{
+            position: "relative", zIndex: 2,
+            padding: "10px 14px",
+            borderTop: `1px solid ${softPastel(b.color, 0.18)}`,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
+            background: "rgba(255,255,255,0.55)",
+            backdropFilter: "blur(2px)",
+          }}>
+            <span style={{ fontSize: 9.5, fontWeight: 500, color: INK_500, letterSpacing: 0.2 }}>
+              {isEarned ? `Acquis le ${fmtBadgeDate(b)}`
+                : isInProgress ? "En cours"
+                : b.hint || "À débloquer"}
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <span style={{
+                fontFamily: `'JetBrains Mono', ui-monospace, SFMono-Regular, monospace`,
+                fontSize: 8.5, fontWeight: 500, color: INK_400, letterSpacing: 0.4,
+              }}>{b.trigger}</span>
+              <span style={{
+                fontSize: 9.5, fontWeight: 700, color: b.color,
+                fontVariantNumeric: "tabular-nums", letterSpacing: 0.4,
+              }}>+{b.xp} XP</span>
+            </span>
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div style={{ flex: 1, padding: "32px 40px", background: C.white }}>
+        {/* Animation keyframes & classes for the gallery */}
+        <style>{`
+          @keyframes izBgFadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes izBgGlow {
+            0%, 100% { box-shadow: 0 4px 14px rgba(230,0,126,0.25); }
+            50%      { box-shadow: 0 6px 22px rgba(230,0,126,0.5); }
+          }
+          .iz-bg-card {
+            opacity: 0;
+            animation: izBgFadeUp .45s cubic-bezier(.2,.8,.2,1) both;
+            transition: transform .18s ease, box-shadow .18s ease;
+          }
+          .iz-bg-card:hover, .iz-bg-card:focus-visible {
+            transform: translateY(-3px);
+            box-shadow: var(--iz-card-shadow, 0 14px 36px rgba(0,0,0,.08)), 0 2px 6px rgba(13,10,20,.05);
+            outline: none;
+          }
+          @keyframes izConfettiFall {
+            0%   { transform: translate3d(0, -10vh, 0) rotate(0deg);   opacity: 1; }
+            70%  { opacity: 1; }
+            100% { transform: translate3d(var(--iz-cfx, 0), 110vh, 0) rotate(var(--iz-cfr, 720deg)); opacity: 0; }
+          }
+          .iz-confetti-layer {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1300;
+            overflow: hidden;
+          }
+          .iz-confetti-piece {
+            position: absolute;
+            top: 0;
+            will-change: transform, opacity;
+            animation-name: izConfettiFall;
+            animation-timing-function: cubic-bezier(.2,.6,.4,1);
+            animation-fill-mode: forwards;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .iz-bg-card, .iz-confetti-piece {
+              animation: none !important; opacity: 1 !important; transform: none !important;
+            }
+            .iz-confetti-layer { display: none; }
+          }
+        `}</style>
+
+        {/* Gallery header — magenta tag, big serif title, intro + quick stats */}
+        <div style={{
+          display: "flex", alignItems: "flex-end", justifyContent: "space-between",
+          gap: 32, marginBottom: 8, paddingBottom: 20,
+          borderBottom: `1px solid ${INK_200}`,
+          flexWrap: "wrap",
+        }}>
+          <div>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              padding: "5px 11px", borderRadius: 999,
+              background: MAGENTA_50, color: MAGENTA_600,
+              fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase",
+              marginBottom: 14,
+            }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: MAGENTA }} />
+              Mon parcours · Galerie
+            </div>
+            <h1 style={{
+              margin: 0,
+              fontFamily: SERIF,
+              fontSize: 56, lineHeight: 1, fontWeight: 400,
+              letterSpacing: -1.2, color: INK_900,
+            }}>Mes badges</h1>
+            <p style={{ margin: "12px 0 0", fontSize: 15, lineHeight: 1.55, color: INK_600, whiteSpace: "nowrap" }}>
+              Chaque badge marque une étape de ton parcours. Garde-les comme souvenirs, partage-les comme fierté.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 32 }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: INK_400, marginBottom: 4 }}>
+                Acquis
+              </div>
+              <div style={{ fontFamily: SERIF, fontSize: 38, lineHeight: 1, fontWeight: 400, color: INK_900, fontVariantNumeric: "tabular-nums" }}>
+                {earnedCount}<span style={{ color: INK_300, fontSize: 22 }}> / {ILLIZEO_BADGES.length}</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: INK_400, marginBottom: 4 }}>
+                XP
+              </div>
+              <div style={{ fontFamily: SERIF, fontSize: 38, lineHeight: 1, fontWeight: 400, color: MAGENTA, fontVariantNumeric: "tabular-nums" }}>
+                {totalXp}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filter chips */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "24px 0 32px" }}>
+          {[
+            { id: "all",         label: `Tous · ${ILLIZEO_BADGES.length}` },
+            { id: "earned",      label: `Acquis · ${earnedCount}` },
+            { id: "in-progress", label: `En cours · ${inProgressCount}` },
+            { id: "locked",      label: `À débloquer · ${lockedCount}` },
+            ...cats.map(c => ({ id: c, label: c })),
+          ].map(f => {
+            const active = activeFilter === f.id;
+            return (
+              <button key={String(f.id)} onClick={() => setFilter(String(f.id))} style={{
+                padding: "7px 13px", borderRadius: 999,
+                background: active ? INK_900 : "#fff",
+                color: active ? "#fff" : INK_600,
+                border: `1px solid ${active ? INK_900 : INK_200}`,
+                fontFamily: font, fontSize: 12, fontWeight: 600, letterSpacing: 0.2,
+                cursor: "pointer",
+                transition: "background .15s, color .15s, border-color .15s",
+              }}>{f.label as any}</button>
+            );
+          })}
+        </div>
+
+        {/* Cards grid */}
+        {visibleBadges.length === 0 ? (
+          <div style={{ padding: "48px 24px", textAlign: "center", color: INK_500, fontSize: 13 }}>
+            Aucun badge ne correspond à ce filtre.
+          </div>
+        ) : (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            gap: 18,
+          }}>
+            {visibleBadges.map((b, i) => renderBadgeCard(b, i))}
+          </div>
+        )}
+
+        {/* Footer hint */}
+        <div style={{
+          marginTop: 48,
+          paddingTop: 24,
+          borderTop: `1px solid ${INK_200}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 24, flexWrap: "wrap",
+        }}>
+          <div style={{ fontSize: 12, color: INK_500 }}>
+            Les badges restent acquis à vie. Tu peux les afficher sur ton profil ou les partager.
+          </div>
+        </div>
+
+        {/* Confetti burst — fires when:
+            - the modal opens for a recently earned badge
+            - the user hovers any earned badge (ctx.badgeConfettiState.active) */}
+        {(openBadge?.state === "earned-recent" || confettiState.active) && (() => {
+          const accent = openBadge?.state === "earned-recent" ? openBadge.color : (confettiState.color || C.pink);
+          const palette = ["#FF6B9D", "#E41076", "#FFC93C", "#10B981", "#3B82F6", "#A855F7", "#FB923C", accent];
+          const N = 60;
+          // Bump key on each fresh burst so the layer remounts and the
+          // animation restarts from frame 0.
+          const burstKey = openBadge?.state === "earned-recent"
+            ? `modal-${openBadge.slug}`
+            : `hover-${confettiState.slug}-${confettiState.seed}`;
+          return (
+            <div key={burstKey} className="iz-confetti-layer" aria-hidden="true">
+              {Array.from({ length: N }, (_, i) => {
+                const left = Math.random() * 100;
+                const dur = 2.4 + Math.random() * 2.2;          // 2.4–4.6s
+                const delay = Math.random() * 0.6;              // 0–600ms
+                const w = 6 + Math.random() * 6;                // 6–12px
+                const isRect = Math.random() < 0.55;
+                const h = isRect ? w * (1.6 + Math.random()) : w;
+                const isCircle = !isRect && Math.random() < 0.4;
+                const startRot = Math.random() * 360;
+                const endRot = 480 + Math.random() * 540;       // 480–1020deg
+                const drift = (Math.random() - 0.5) * 20;       // ±10vw drift
+                const color = palette[i % palette.length];
+                return (
+                  <span
+                    key={i}
+                    className="iz-confetti-piece"
+                    style={{
+                      left: `${left}%`,
+                      width: w,
+                      height: h,
+                      background: color,
+                      borderRadius: isCircle ? "50%" : 2,
+                      transform: `rotate(${startRot}deg)`,
+                      animationDuration: `${dur}s`,
+                      animationDelay: `${delay}s`,
+                      ["--iz-cfx" as any]: `${drift}vw`,
+                      ["--iz-cfr" as any]: `${endRot}deg`,
+                    } as React.CSSProperties}
+                  />
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* Badge modal */}
+        {openBadge && (() => {
+          const b = openBadge;
+          const meta = RARITY_META[b.rarity];
+          const Icon = BADGE_ICON_MAP[b.icon] || Trophy;
+          const isEarned = !!b.earned;
+          const isLocked = b.state === "locked";
+          return (
+            <div onClick={() => setOpenBadge(null)} style={{
+              position: "fixed", inset: 0, background: "rgba(15,15,30,.55)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 1200, padding: 20, animation: "izFadeIn .2s ease",
+            }}>
+              <div onClick={e => e.stopPropagation()} style={{
+                background: C.white, borderRadius: 18, maxWidth: 440, width: "100%",
+                padding: 32, position: "relative", animation: "izScaleIn .25s ease",
+                border: `1px solid ${C.border}`,
+                boxShadow: "0 20px 60px rgba(0,0,0,.25)",
+              }}>
+                <button onClick={() => setOpenBadge(null)} aria-label="Fermer" style={{
+                  position: "absolute", top: 12, right: 12,
+                  width: 32, height: 32, borderRadius: 8, border: "none",
+                  background: C.bg, cursor: "pointer", display: "flex",
+                  alignItems: "center", justifyContent: "center",
+                }}>
+                  <X size={16} color={C.textMuted} />
+                </button>
+                <div style={{
+                  width: 96, height: 96, borderRadius: "50%", margin: "0 auto 16px",
+                  background: isLocked ? C.bgSubtle : `${b.color}20`,
+                  border: `3px solid ${isLocked ? C.borderStrong : b.color}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  filter: isLocked ? "grayscale(.6)" : "none",
+                }}>
+                  {isLocked ? <Lock size={36} color={C.textMuted} /> : <Icon size={42} color={b.color} />}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: C.text, textAlign: "center", fontFamily: fontDisplay, marginBottom: 6 }}>{b.nom}</div>
+                <div style={{ textAlign: "center", marginBottom: 14 }}>
+                  <span style={{
+                    display: "inline-block", padding: "4px 12px", borderRadius: 999,
+                    background: `${meta.color}1A`, color: meta.color,
+                    fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em",
+                  }}>{meta.label} · {b.xp} XP</span>
+                </div>
+                <p style={{ fontSize: 14, color: C.textLight, textAlign: "center", lineHeight: 1.5, margin: "0 0 16px" }}>{b.desc}</p>
+                <div style={{
+                  padding: "12px 14px", borderRadius: 10, background: C.bg,
+                  fontSize: 12, color: C.textLight, textAlign: "center",
+                }}>
+                  {isEarned && b.earned?.earned_at
+                    ? <>Acquis le <strong style={{ color: C.text }}>{fmtDate(b.earned.earned_at)}</strong></>
+                    : isLocked
+                      ? <>{b.hint || "À débloquer plus tard"}</>
+                      : <>En cours — {b.next || "proche de l'objectif !"}</>
+                  }
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    );
+  };
+
   return {
     renderSidebar,
     renderEmployeeTopbar,
@@ -4404,6 +5064,7 @@ export function createEmployeeRenders(ctx: any) {
     renderMonProfil,
     renderMonEquipe,
     renderAssistantIA,
+    renderBadges,
     handleBannerFileUpload,
     handleSendMessage,
   };

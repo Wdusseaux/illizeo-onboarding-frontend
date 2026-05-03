@@ -495,20 +495,109 @@ export function createAdminNPSContrats(ctx: any) {
         {npsTab === "responses" && npsSelectedSurvey && (
           <div>
             <button onClick={() => setNpsSelectedSurvey(null)} style={{ background: "none", border: "none", cursor: "pointer", color: C.pink, fontSize: 13, fontFamily: font, marginBottom: 12, display: "flex", alignItems: "center", gap: 4 }}><ChevronLeft size={14} /> {t('nps.back_surveys')}</button>
-            <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>{npsSelectedSurvey.titre} — {npsSelectedSurvey.responses?.length || 0} {t('nps.responses').toLowerCase()}</h3>
-            <div className="iz-card" style={{ ...sCard, overflow: "hidden", padding: 0 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1.5fr 0.6fr 0.6fr 2fr 1fr", gap: 0, padding: "10px 16px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
-                <span>{t('nps.collaborator')}</span><span>{t('nps.score')}</span><span>{t('nps.rating')}</span><span>{t('nps.comment')}</span><span>{t('nps.date')}</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>{npsSelectedSurvey.titre} — {npsSelectedSurvey.responses?.length || 0} {t('nps.responses').toLowerCase()}</h3>
+              {ctx.aiHasBusinessPlus && (npsSelectedSurvey.responses || []).filter((r: any) => r.completed_at && r.comment).length > 0 && (
+                <button onClick={async () => {
+                  try {
+                    const ep = await import('../api/endpoints');
+                    addToast_admin?.("Analyse IA en cours…");
+                    const res = await ep.aiAggregateNpsInsights(npsSelectedSurvey.id);
+                    ctx.setNpsAggregateInsights?.(res);
+                  } catch (e: any) {
+                    let msg = "Erreur IA"; try { const p = JSON.parse(e?.message || ""); msg = p?.error || p?.reply || msg; } catch {}
+                    addToast_admin?.(msg);
+                  }
+                }} style={{ background: C.pink, color: "#fff", border: "none", padding: "8px 16px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  ✨ Analyse IA des verbatims
+                </button>
+              )}
+              {ctx.aiPlanTier === 'starter' && (npsSelectedSurvey.responses || []).filter((r: any) => r.completed_at && r.comment).length > 0 && (
+                <button onClick={() => setAdminPage("admin_abonnement" as any)} title="Disponible sur IA Business" style={{ background: "none", border: `1px dashed ${C.pink}`, color: C.pink, padding: "8px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  🔒 Analyse IA verbatims · IA Business
+                </button>
+              )}
+            </div>
+
+            {/* Aggregated AI insights panel */}
+            {ctx.npsAggregateInsights && (
+              <div className="iz-card" style={{ ...sCard, padding: 18, marginBottom: 16, borderLeft: `4px solid ${C.pink}` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: C.pink, textTransform: "uppercase", letterSpacing: 1 }}>✨ Synthèse IA</div>
+                  <button onClick={() => ctx.setNpsAggregateInsights?.(null)} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted }}><X size={14} /></button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 14 }}>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.green, textTransform: "uppercase", marginBottom: 6 }}>👍 Points forts</div>
+                    {(ctx.npsAggregateInsights.top_positive_themes || []).map((t: string, i: number) => (
+                      <div key={i} style={{ fontSize: 12, color: C.text, marginBottom: 4, padding: "4px 10px", background: C.greenLight, borderRadius: 4 }}>{t}</div>
+                    ))}
+                    {(ctx.npsAggregateInsights.top_positive_themes || []).length === 0 && <div style={{ fontSize: 11, color: C.textMuted, fontStyle: "italic" }}>—</div>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.red, textTransform: "uppercase", marginBottom: 6 }}>👎 Points d'attention</div>
+                    {(ctx.npsAggregateInsights.top_negative_themes || []).map((t: string, i: number) => (
+                      <div key={i} style={{ fontSize: 12, color: C.text, marginBottom: 4, padding: "4px 10px", background: C.redLight, borderRadius: 4 }}>{t}</div>
+                    ))}
+                    {(ctx.npsAggregateInsights.top_negative_themes || []).length === 0 && <div style={{ fontSize: 11, color: C.textMuted, fontStyle: "italic" }}>—</div>}
+                  </div>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.text, textTransform: "uppercase", marginBottom: 6 }}>Constats clés</div>
+                  <ul style={{ fontSize: 12, color: C.textLight, margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+                    {(ctx.npsAggregateInsights.key_findings || []).map((f: string, i: number) => <li key={i}>{f}</li>)}
+                  </ul>
+                </div>
+                <div style={{ padding: 12, background: C.pinkBg, borderRadius: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, textTransform: "uppercase", marginBottom: 6 }}>💡 Recommandations actionnables</div>
+                  <ul style={{ fontSize: 12, color: C.text, margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+                    {(ctx.npsAggregateInsights.recommendations || []).map((r: string, i: number) => <li key={i}>{r}</li>)}
+                  </ul>
+                </div>
               </div>
-              {(npsSelectedSurvey.responses || []).filter(r => r.completed_at).map(r => (
-                <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 0.6fr 0.6fr 2fr 1fr", gap: 0, padding: "12px 16px", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13 }}>
+            )}
+
+            <div className="iz-card" style={{ ...sCard, overflow: "hidden", padding: 0 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.5fr 0.5fr 1.6fr 0.9fr 0.7fr", gap: 0, padding: "10px 16px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
+                <span>{t('nps.collaborator')}</span><span>{t('nps.score')}</span><span>{t('nps.rating')}</span><span>{t('nps.comment')}</span><span>{t('nps.date')}</span><span>IA</span>
+              </div>
+              {(npsSelectedSurvey.responses || []).filter(r => r.completed_at).map(r => {
+                const sentiment = (ctx.npsSentiments || {})[r.id];
+                return (
+                <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1.3fr 0.5fr 0.5fr 1.6fr 0.9fr 0.7fr", gap: 0, padding: "12px 16px", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13 }}>
                   <div style={{ fontWeight: 500 }}>{r.collaborateur ? `${r.collaborateur.prenom} ${r.collaborateur.nom}` : `#${r.collaborateur_id}`}</div>
                   <div>{r.score !== null ? <span style={{ fontWeight: 700, color: r.score >= 9 ? C.green : r.score >= 7 ? C.amber : C.red }}>{r.score}/10</span> : "—"}</div>
                   <div>{r.rating !== null ? <span style={{ fontWeight: 600, color: C.amber }}>{r.rating}/5</span> : "—"}</div>
                   <div style={{ fontSize: 12, color: C.textLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.comment || "—"}</div>
                   <div style={{ fontSize: 11, color: C.textMuted }}>{fmtDate(r.completed_at)}</div>
+                  <div>
+                    {sentiment ? (
+                      <span title={`${sentiment.key_insight}\n${sentiment.suggestion}`} style={{
+                        fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 4,
+                        background: sentiment.sentiment === "positive" ? C.greenLight : sentiment.sentiment === "negative" ? C.redLight : C.amberLight,
+                        color: sentiment.sentiment === "positive" ? C.green : sentiment.sentiment === "negative" ? C.red : C.amber,
+                        cursor: "help",
+                      }}>
+                        {sentiment.sentiment === "positive" ? "😊 Positif" : sentiment.sentiment === "negative" ? "😟 Négatif" : "😐 Neutre"}
+                      </span>
+                    ) : r.comment ? (
+                      <button onClick={async () => {
+                        try {
+                          const ep = await import('../api/endpoints');
+                          const res = await ep.aiAnalyzeNpsResponse(r.id);
+                          ctx.setNpsSentiments?.((prev: any) => ({ ...(prev || {}), [r.id]: res }));
+                        } catch (e: any) {
+                          let msg = "Erreur"; try { const p = JSON.parse(e?.message || ""); msg = p?.error || p?.reply || msg; } catch {}
+                          addToast_admin?.(msg);
+                        }
+                      }} style={{ background: "none", border: `1px dashed ${C.pink}`, color: C.pink, padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                        ✨ Analyser
+                      </button>
+                    ) : <span style={{ fontSize: 10, color: C.textMuted }}>—</span>}
+                  </div>
                 </div>
-              ))}
+                );
+              })}
               {(npsSelectedSurvey.responses || []).filter(r => r.completed_at).length === 0 && <div style={{ padding: "30px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>{t('nps.no_responses')}</div>}
             </div>
           </div>

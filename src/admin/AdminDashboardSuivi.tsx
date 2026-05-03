@@ -276,10 +276,14 @@ export function createAdminDashboardSuivi(ctx: any) {
     const isEditorTenant = ["illizeo", "illizeo2"].includes(localStorage.getItem("illizeo_tenant_id") || "illizeo");
     const trialStart = localStorage.getItem("illizeo_trial_start");
     const isInTrial = trialStart && (new Date().getTime() - new Date(trialStart).getTime()) <= 14 * 24 * 60 * 60 * 1000;
-    const trialExpired = trialStart && !isInTrial;
+    // While the subscription API hasn't returned yet, assume the user is in trial
+    // to avoid flashing the "trial expired" screen on every login.
+    const subscriptionLoaded = ctx.subscriptionLoaded;
+    const trialExpired = subscriptionLoaded && trialStart && !isInTrial;
     const hasActiveSub = tenantSubscriptions.some((s: any) => s.status === "active" || s.status === "trialing");
     const hasModule = (mod: string) => {
       if (isEditorTenant) return true; // Editor tenant — all access
+      if (!subscriptionLoaded) return true; // Subscription state not loaded yet — let UI render
       if (isInTrial && !hasActiveSub) return true; // In trial, no sub yet — all access
       if (trialExpired && !hasActiveSub) return false; // Trial expired, no sub — blocked
       if (tenantActiveModules.length === 0 && hasActiveSub) return true; // Sub but modules not loaded yet
@@ -584,6 +588,144 @@ export function createAdminDashboardSuivi(ctx: any) {
             ))}
           </div>
 
+          {/* ── Upsell Business+ pour Starter ── */}
+          {ctx.aiPlanTier === 'starter' && (
+            <div onClick={() => setAdminPage("admin_abonnement" as any)} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 20px", marginBottom: 28, background: `linear-gradient(135deg, ${C.pinkBg}, #FFF8FC)`, border: `1px dashed ${C.pink}`, borderRadius: 12, cursor: "pointer", transition: "transform .15s" }}
+              onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-1px)")}
+              onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: C.pink, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Sparkles size={20} color="#fff" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{lang === "fr" ? "🔒 Analyses IA avancées disponibles sur Business" : "🔒 Advanced AI insights available on Business"}</div>
+                <div style={{ fontSize: 12, color: C.textLight, marginTop: 2 }}>{lang === "fr" ? "Détection turnover · Synthèse NPS · Résumé hebdo IA. Passez à IA Business pour débloquer." : "Turnover detection · NPS synthesis · Weekly AI digest. Upgrade to AI Business to unlock."}</div>
+              </div>
+              <ArrowRight size={16} color={C.pink} />
+            </div>
+          )}
+
+          {/* ── Turnover Risk (IA) — Business+ only ── */}
+          {ctx.aiHasBusinessPlus && (() => {
+            const risk = ctx.turnoverRisk;
+            const setRisk = (v: any) => ctx.setTurnoverRisk?.(v);
+            const loading = ctx.turnoverLoading;
+            const setLoading = (v: any) => ctx.setTurnoverLoading?.(v);
+            const loadRisk = async () => {
+              setLoading(true);
+              try {
+                const ep = await import('../api/endpoints');
+                const res = await ep.aiTurnoverRisk();
+                setRisk(res);
+              } catch (e: any) {
+                let msg = "Erreur IA"; try { const p = JSON.parse(e?.message || ""); msg = p?.error || p?.reply || msg; } catch {}
+                addToast_admin?.(msg);
+              } finally {
+                setLoading(false);
+              }
+            };
+            const trendIcon = (trend: string | null | undefined) => {
+              if (trend === "declining") return { icon: "↘", color: C.red, label: "En baisse" };
+              if (trend === "improving") return { icon: "↗", color: C.green, label: "En hausse" };
+              if (trend === "stable") return { icon: "→", color: C.amber, label: "Stable" };
+              return { icon: "○", color: C.textMuted, label: "Données insuffisantes" };
+            };
+            return (
+            <div style={{ background: C.white, borderRadius: 14, border: `1px solid ${C.border}`, padding: "22px 24px", marginBottom: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>
+                    <AlertTriangle size={16} color={C.red} /> {lang === "fr" ? "Collaborateurs à risque" : "At-risk employees"}
+                    <span style={{ fontSize: 9, padding: "2px 6px", background: C.pinkBg, color: C.pink, borderRadius: 4, fontWeight: 700, letterSpacing: 1 }}>IA</span>
+                    {risk?.enriched && <span title="Analyse Claude active : verbatims + tendances 4 semaines" style={{ fontSize: 9, padding: "2px 6px", background: C.greenLight, color: C.green, borderRadius: 4, fontWeight: 700, letterSpacing: 1 }}>+ Claude</span>}
+                  </h3>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{lang === "fr" ? "NPS + humeur + retard parcours, enrichi par lecture des verbatims et détection de tendances 4 semaines" : "NPS + mood + journey delay, enriched by Claude verbatim reading + 4-week trend detection"}</div>
+                </div>
+                <button onClick={loadRisk} disabled={loading} style={{ background: "none", border: `1px solid ${C.border}`, fontSize: 11, padding: "5px 14px", borderRadius: 999, cursor: loading ? "wait" : "pointer", fontFamily: font, color: C.text, fontWeight: 500, display: "flex", alignItems: "center", gap: 4, opacity: loading ? 0.6 : 1 }}>
+                  ✨ {loading ? (lang === "fr" ? "Analyse IA..." : "Analyzing...") : (risk ? (lang === "fr" ? "Rafraîchir" : "Refresh") : (lang === "fr" ? "Analyser" : "Analyze"))}
+                </button>
+              </div>
+              {!risk && !loading && (
+                <div style={{ fontSize: 12, color: C.textMuted, padding: "30px 0", textAlign: "center", fontStyle: "italic" }}>
+                  {lang === "fr" ? "Cliquez sur Analyser pour calculer le risque de turnover. Claude lit les verbatims NPS + humeur et détecte les tendances. (Plan IA Business requis)" : "Click Analyze. Claude reads NPS + mood verbatims and detects trends. (AI Business plan required)"}
+                </div>
+              )}
+              {loading && (
+                <div style={{ fontSize: 12, color: C.textMuted, padding: "30px 0", textAlign: "center", fontStyle: "italic" }}>
+                  {lang === "fr" ? "🤖 Claude analyse les verbatims et tendances..." : "🤖 Claude analyzing verbatims and trends..."}
+                </div>
+              )}
+              {risk && risk.at_risk?.length === 0 && (
+                <div style={{ fontSize: 12, color: C.green, padding: "30px 0", textAlign: "center", fontWeight: 600 }}>
+                  ✓ {lang === "fr" ? `Aucun collaborateur à risque sur ${risk.total_screened} analysés.` : `No at-risk employee out of ${risk.total_screened} screened.`}
+                </div>
+              )}
+              {risk && risk.at_risk?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>
+                    {risk.at_risk.length} / {risk.total_screened} {lang === "fr" ? "collaborateurs nécessitent une attention" : "employees need attention"}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {risk.at_risk.slice(0, 8).map((c: any) => {
+                      const collab = COLLABORATEURS.find((x: any) => x.id === c.id);
+                      const sev = c.risk_score >= 60 ? "high" : c.risk_score >= 40 ? "medium" : "low";
+                      const sevColors: any = { high: { bg: C.redLight, color: C.red, label: "ÉLEVÉ" }, medium: { bg: C.amberLight, color: C.amber, label: "MOYEN" }, low: { bg: C.bg, color: C.textMuted, label: "FAIBLE" } };
+                      const s = sevColors[sev];
+                      const tr = trendIcon(c.trend);
+                      return (
+                        <div key={c.id} style={{ padding: "12px 16px", background: "#FAFAFB", borderRadius: 10, border: `1px solid ${C.border}` }}>
+                          {/* Top row: identity + score + trend + actions */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: c.narrative ? 8 : 0 }}>
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: "3px 8px", background: s.bg, color: s.color, borderRadius: 4, letterSpacing: 1, minWidth: 60, textAlign: "center" }}>{s.label}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{c.nom} <span style={{ fontSize: 10, color: C.textMuted, fontWeight: 400 }}>· {c.poste} · {c.site}</span></div>
+                              <div style={{ fontSize: 11, color: C.textLight, marginTop: 2 }}>{(c.reasons || []).join(" · ")}</div>
+                            </div>
+                            {c.trend && (
+                              <div title={c.trend_label || tr.label} style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 8px", borderLeft: `1px solid ${C.border}` }}>
+                                <span style={{ fontSize: 18, color: tr.color, fontWeight: 700, lineHeight: 1 }}>{tr.icon}</span>
+                                <span style={{ fontSize: 8, color: C.textMuted, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>4 sem.</span>
+                              </div>
+                            )}
+                            <div style={{ textAlign: "right", paddingLeft: 4 }}>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: s.color, lineHeight: 1 }}>{c.risk_score}</div>
+                              <div style={{ fontSize: 9, color: C.textMuted, letterSpacing: 1, textTransform: "uppercase", marginTop: 2 }}>Score</div>
+                            </div>
+                            <button onClick={() => { setAdminPage("admin_suivi"); if (collab) ctx.setCollabProfileId?.(c.id); }} style={{ background: C.pink, color: "#fff", border: "none", padding: "6px 12px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                              {lang === "fr" ? "Fiche" : "Profile"}
+                            </button>
+                          </div>
+
+                          {/* Narrative + trend label + recommendation (Claude enrichment) */}
+                          {(c.narrative || c.trend_label || c.targeted_recommendation) && (
+                            <div style={{ marginLeft: 72, paddingTop: 8, borderTop: `1px dashed ${C.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
+                              {c.narrative && (
+                                <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5, fontStyle: "italic" }}>
+                                  💬 {c.narrative}
+                                </div>
+                              )}
+                              {c.trend_label && (
+                                <div style={{ fontSize: 11, color: tr.color, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{ fontSize: 14 }}>{tr.icon}</span> Tendance : {c.trend_label}
+                                </div>
+                              )}
+                              {c.targeted_recommendation && (
+                                <div style={{ fontSize: 12, padding: "6px 10px", background: C.pinkBg, color: C.pink, borderRadius: 6, display: "flex", alignItems: "flex-start", gap: 6, lineHeight: 1.4 }}>
+                                  <span style={{ fontSize: 14, lineHeight: 1 }}>💡</span>
+                                  <span><strong>Action recommandée :</strong> {c.targeted_recommendation}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            );
+          })()}
+
           {/* ── Grid: Collaborateurs + Aujourd'hui/Actions ── */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16, marginBottom: 28 }}>
             {/* Collaborateurs en parcours */}
@@ -862,13 +1004,13 @@ export function createAdminDashboardSuivi(ctx: any) {
           <SearchableSelect
             value={siteFilter}
             onChange={v => setSuiviSiteFilter(v)}
-            options={uniqueSites.map(s => ({ value: s, label: s }))}
+            options={uniqueSites.map((s: any) => ({ value: String(s), label: String(s) }))}
             allLabel="Tous les sites"
           />
           <SearchableSelect
             value={deptFilter}
             onChange={v => setSuiviDeptFilter(v)}
-            options={uniqueDepts.map(d => ({ value: d, label: d }))}
+            options={uniqueDepts.map((d: any) => ({ value: String(d), label: String(d) }))}
             allLabel="Tous les départements"
           />
           <SearchableSelect

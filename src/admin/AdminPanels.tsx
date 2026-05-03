@@ -1150,6 +1150,43 @@ export function createAdminPanels(ctx: any) {
                           </button>
                         </div>
                       )}
+                      {/* AI buddy suggestions — only when role is buddy */}
+                      {accompagnantDraft.role === "buddy" && collabPanelData.id && (
+                        <div style={{ marginTop: 10 }}>
+                          <button onClick={async () => {
+                            try {
+                              const ep = await import('../api/endpoints');
+                              addToast_admin("Analyse IA en cours…");
+                              const res = await ep.aiSuggestBuddy(collabPanelData.id);
+                              ctx.setBuddyAiSuggestions?.(res.suggestions || []);
+                              if (!res.suggestions || res.suggestions.length === 0) {
+                                addToast_admin("Aucune suggestion trouvée par l'IA");
+                              }
+                            } catch (e: any) {
+                              let msg = "Erreur IA"; try { const p = JSON.parse(e?.message || ""); msg = p?.error || p?.reply || msg; } catch {}
+                              addToast_admin(msg);
+                            }
+                          }} style={{ background: "none", border: `1px dashed ${C.pink}`, color: C.pink, padding: "6px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            ✨ Suggérer un buddy avec l'IA
+                          </button>
+                          {(ctx.buddyAiSuggestions || []).length > 0 && (
+                            <div style={{ marginTop: 10, padding: 12, background: C.pinkBg, borderRadius: 8, border: `1px solid ${C.pink}30` }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: C.pink, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>✨ Top 3 suggestions IA</div>
+                              {(ctx.buddyAiSuggestions || []).slice(0, 3).map((s: any) => (
+                                <div key={s.collaborateur_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: C.white, borderRadius: 6, marginBottom: 6 }}>
+                                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#4CAF50", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{(s.nom || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}</div>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "flex", alignItems: "center", gap: 8 }}>{s.nom} <span style={{ fontSize: 10, padding: "1px 6px", background: C.greenLight, color: C.green, borderRadius: 3 }}>Score {s.score}</span></div>
+                                    <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 2 }}>{s.poste} · {s.site}</div>
+                                    <div style={{ fontSize: 10, color: C.textLight, fontStyle: "italic" }}>{(s.reasons || []).join(" · ")}</div>
+                                  </div>
+                                  <button onClick={() => { setAccompagnantDraft((d: any) => ({ ...d, user_id: s.user_id })); ctx.setBuddyAiSuggestions?.([]); }} style={{ background: C.pink, color: "#fff", border: "none", padding: "5px 10px", borderRadius: 4, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>Choisir</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {availableRoles.length === 0 && (
                         <div style={{ fontSize: 11, color: C.textMuted, fontStyle: "italic", marginTop: 6 }}>
                           Tous les rôles sont assignés. Retirez un accompagnant pour libérer un rôle.

@@ -758,7 +758,7 @@ export function createAdminParcoursDocs(ctx: any) {
             {gedTab === "validation" && selectedDocsForValidation.size > 0 && (
               <button onClick={async () => {
                 const ids = Array.from(selectedDocsForValidation);
-                if (hasRealDocs) { for (const id of ids) { try { await apiValidateDoc(id); } catch {} } reloadDocs(); }
+                if (hasRealDocs) { for (const id of ids) { try { await apiValidateDoc(Number(id)); } catch {} } reloadDocs(); }
                 addToast_admin(`${ids.length} document(s) validé(s)`); setSelectedDocsForValidation(new Set());
               }} className="iz-btn-pink" style={{ ...sBtn("pink"), display: "flex", alignItems: "center", gap: 6 }}><CheckCircle size={14} /> Valider la sélection ({selectedDocsForValidation.size})</button>
             )}
@@ -992,7 +992,7 @@ export function createAdminParcoursDocs(ctx: any) {
             <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, justifyContent: "flex-end" }}>
               {tplPanelOpen === "edit" && (
                 <button onClick={() => { showConfirm("Supprimer ce modèle de document ?", async () => {
-                  try { const { default: ep } = await import('../api/endpoints'); /* delete via standard endpoint */ await apiFetch(`/documents/${tplPanelDoc.id}`, { method: 'DELETE' }); setTplPanelOpen("closed"); addToast_admin("Modèle supprimé"); refetchGroupes(); } catch { addToast_admin(t('toast.error')); }
+                  try { /* delete via standard endpoint */ await apiFetch(`/documents/${tplPanelDoc.id}`, { method: 'DELETE' }); setTplPanelOpen("closed"); addToast_admin("Modèle supprimé"); refetchGroupes(); } catch { addToast_admin(t('toast.error')); }
                 }); }} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, marginRight: "auto" }}>{t('common.delete')}</button>
               )}
               <button onClick={() => setTplPanelOpen("closed")} className="iz-btn-outline" style={sBtn("outline")}>{t('common.cancel')}</button>

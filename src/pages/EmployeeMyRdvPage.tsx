@@ -409,7 +409,7 @@ export default function EmployeeMyRdvPage({ C, sCard, sBtn, font, myCollab, acti
                   try {
                     const m = await import('../api/endpoints');
                     await (m as any).postSuggestion?.({
-                      category: "other",
+                      category: "rdv_request",
                       content: `📅 Demande de RDV avec ${ROLE_LABELS_LOCAL[requestDraft.recipient_role] || requestDraft.recipient_role}\nDate souhaitée : ${requestDraft.preferred_date}${requestDraft.preferred_time ? ` à ${requestDraft.preferred_time}` : ""}\n\nMotif :\n${requestDraft.reason}`,
                       anonymous: false,
                     });

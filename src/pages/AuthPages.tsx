@@ -417,7 +417,11 @@ export function createAuthPages(ctx: any) {
                 </button>
               ))}
             </div>
-            <button onClick={() => setShowPricing(false)} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13, padding: "8px 20px" }}>{t('misc.return')}</button>
+            <button onClick={() => {
+              const isPricingUrl = typeof window !== "undefined" && /^\/pricing\/?$/.test(window.location.pathname);
+              if (isPricingUrl) { window.location.href = "/"; return; }
+              setShowPricing(false);
+            }} className="iz-btn-outline" style={{ ...sBtn("outline"), fontSize: 13, padding: "8px 20px" }}>{t('misc.return')}</button>
           </div>
         </div>
         {/* Hero */}
@@ -773,7 +777,21 @@ export function createAuthPages(ctx: any) {
       e.preventDefault();
       setRegLoading(true);
       try {
-        const res = await registerTenant({ ...regData, admin_name: `${regData.admin_prenom} ${regData.admin_nom}`.trim() });
+        const res = await registerTenant({
+          company_name: regData.company_name,
+          admin_email: regData.admin_email,
+          password: regData.password,
+          password_confirmation: regData.password_confirmation,
+          admin_name: `${regData.admin_prenom} ${regData.admin_nom}`.trim(),
+          country: regData.country || "CH",
+          customer_type: regData.customer_type || "company",
+          vat_number: regData.vat_number || undefined,
+          billing_address: (regData.billing_street || regData.billing_postal_code || regData.billing_city) ? {
+            street: regData.billing_street || undefined,
+            postal_code: regData.billing_postal_code || undefined,
+            city: regData.billing_city || undefined,
+          } : undefined,
+        });
         localStorage.setItem("illizeo_tenant_id", res.tenant_id);
         localStorage.setItem("illizeo_trial_start", new Date().toISOString());
         localStorage.setItem("illizeo_needs_plan", "true");
@@ -831,7 +849,57 @@ export function createAuthPages(ctx: any) {
           )}
         </div>
       )}
-      <button type="submit" disabled={regLoading || !regData.company_name || !regData.admin_prenom || !regData.admin_nom || !regData.admin_email || !allPwdRulesMet(regData.password, defaultPolicy) || regData.password !== regData.password_confirmation}
+      <div style={{ marginTop: 6, marginBottom: 12, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,.18)" }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: "rgba(255,255,255,.85)", marginBottom: 12 }}>Informations de facturation</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+          <div>
+            <label style={sShellLabel}>Pays *</label>
+            <select value={regData.country} onChange={e => setRegData((p: any) => ({ ...p, country: e.target.value }))} required style={sShellInput as any}>
+              <option value="CH" style={{ color: "#000" }}>Suisse</option>
+              <option value="FR" style={{ color: "#000" }}>France</option>
+              <option value="DE" style={{ color: "#000" }}>Allemagne</option>
+              <option value="IT" style={{ color: "#000" }}>Italie</option>
+              <option value="BE" style={{ color: "#000" }}>Belgique</option>
+              <option value="LU" style={{ color: "#000" }}>Luxembourg</option>
+              <option value="NL" style={{ color: "#000" }}>Pays-Bas</option>
+              <option value="AT" style={{ color: "#000" }}>Autriche</option>
+              <option value="ES" style={{ color: "#000" }}>Espagne</option>
+              <option value="PT" style={{ color: "#000" }}>Portugal</option>
+              <option value="GB" style={{ color: "#000" }}>Royaume-Uni</option>
+              <option value="US" style={{ color: "#000" }}>États-Unis</option>
+              <option value="CA" style={{ color: "#000" }}>Canada</option>
+              <option value="OTHER" style={{ color: "#000" }}>Autre (export)</option>
+            </select>
+          </div>
+          <div>
+            <label style={sShellLabel}>Type de client *</label>
+            <select value={regData.customer_type} onChange={e => setRegData((p: any) => ({ ...p, customer_type: e.target.value as any }))} required style={sShellInput as any}>
+              <option value="company" style={{ color: "#000" }}>Société (B2B)</option>
+              <option value="individual" style={{ color: "#000" }}>Particulier (B2C)</option>
+            </select>
+          </div>
+        </div>
+        {regData.customer_type === "company" && (
+          <div style={{ marginBottom: 14 }}>
+            <label style={sShellLabel}>N° TVA / IDE {regData.country !== "CH" && regData.country !== "OTHER" ? "(EU : vérification VIES automatique)" : "(facultatif pour les non-assujettis)"}</label>
+            <input value={regData.vat_number} onChange={e => setRegData((p: any) => ({ ...p, vat_number: e.target.value }))} placeholder={regData.country === "CH" ? "CHE-XXX.XXX.XXX TVA" : regData.country === "FR" ? "FR12345678901" : "Numéro de TVA"} style={sShellInput} />
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,.6)", marginTop: 4 }}>
+              {regData.country === "CH" && "Format : CHE-XXX.XXX.XXX TVA — laisser vide si non-assujetti (CA &lt; 100'000 CHF)"}
+              {["FR","DE","IT","BE","LU","NL","AT","ES","PT"].includes(regData.country) && "Format EU : code pays + numéro (ex. FR12345678901). Permet l'autoliquidation TVA (art. 196)."}
+              {(regData.country === "GB" || regData.country === "US" || regData.country === "CA" || regData.country === "OTHER") && "Export hors-EU — facturation hors champ TVA suisse."}
+            </div>
+          </div>
+        )}
+        <div style={{ marginBottom: 14 }}>
+          <label style={sShellLabel}>Adresse de facturation</label>
+          <input value={regData.billing_street} onChange={e => setRegData((p: any) => ({ ...p, billing_street: e.target.value }))} placeholder="Rue & numéro" style={{ ...sShellInput, marginBottom: 8 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 8 }}>
+            <input value={regData.billing_postal_code} onChange={e => setRegData((p: any) => ({ ...p, billing_postal_code: e.target.value }))} placeholder="Code postal" style={sShellInput} />
+            <input value={regData.billing_city} onChange={e => setRegData((p: any) => ({ ...p, billing_city: e.target.value }))} placeholder="Ville" style={sShellInput} />
+          </div>
+        </div>
+      </div>
+      <button type="submit" disabled={regLoading || !regData.company_name || !regData.admin_prenom || !regData.admin_nom || !regData.admin_email || !regData.country || !regData.customer_type || !allPwdRulesMet(regData.password, defaultPolicy) || regData.password !== regData.password_confirmation}
         style={sShellPrimaryBtn(regLoading || !regData.company_name || !regData.admin_prenom || !regData.admin_nom || !regData.admin_email || !allPwdRulesMet(regData.password, defaultPolicy) || regData.password !== regData.password_confirmation)}>
         {regLoading ? "Création en cours…" : "Créer mon espace Illizeo"} <ArrowRight size={18} />
       </button>
