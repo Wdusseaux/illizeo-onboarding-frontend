@@ -22,7 +22,13 @@ import { ANIM_STYLES, C, hexToRgb, colorWithAlpha, lighten, REGION_LOCALE, REGIO
 import type { OnboardingStep, DashboardPage, DashboardTab, UserRole, AdminPage, AdminModal, Collaborateur, ParcoursCategorie, ParcourTemplate, ActionTemplate, ActionType, AssignTarget, GroupePersonnes, DocCategory, WorkflowRule, EmailTemplate, TeamMember } from '../types';
 import RichEditor from '../components/RichEditor';
 import TranslatableField, { type Translations } from '../components/TranslatableField';
+import LogoUploadCard from './LogoUploadCard';
 import { DOC_CATEGORIES, ACTIONS, _MOCK_NOTIFICATIONS_LIST, NOTIF_RESOURCES, TEAM_MEMBERS, ACTION_TYPE_META, PHASE_ICONS, SITES, DEPARTEMENTS, TYPES_CONTRAT, _MOCK_COLLABORATEURS, _MOCK_PARCOURS_TEMPLATES, _MOCK_ACTION_TEMPLATES, _MOCK_ADMIN_DOC_CATEGORIES, _MOCK_WORKFLOW_RULES, _MOCK_EMAIL_TEMPLATES, _MOCK_PHASE_DEFAULTS, _MOCK_GROUPES, EQUIPE_ROLES, TPL_CATEGORIES, guessTplCategory } from '../mockData';
+
+// Module-level state — survives across renders since ctx is recreated each time.
+// Used for transient UI state that must persist between re-renders without
+// triggering React state updates (we manually force re-render via setFieldConfig).
+let _expandedFieldRoleId: number | null = null;
 
 import {
   getCollaborateurs, getParcours, getActions, getGroupes, getPhases,
@@ -63,7 +69,7 @@ import {
   superAdminListPlans, superAdminCreatePlan, superAdminUpdatePlan, superAdminDeletePlan,
   superAdminUpdateModules, superAdminListSubscriptions, superAdminListInvoices,
   superAdminGetStripeConfig, superAdminUpdateStripeConfig,
-  getMySubscription, subscribeToPlan, cancelSubscription, getAvailablePlans, getActiveModules, getStorageUsage, getSignatureUsage, getMonthlyConsumption, getInvoices, getSupportAccesses, grantSupportAccess, revokeSupportAccess, getIpWhitelist, addIpWhitelist, toggleIpWhitelist, removeIpWhitelist, getSecuritySessions, revokeSession as apiRevokeSession, revokeAllOtherSessions, getLoginHistory, getAllLoginHistory, getSecuritySettings, updateSecuritySettings, createAccessSchedule, deleteAccessSchedule, seedDemoData, type ConsumptionUser,
+  getMySubscription, subscribeToPlan, cancelSubscription, getAvailablePlans, getActiveModules, getStorageUsage, getSignatureUsage, getMonthlyConsumption, getInvoices, downloadInvoicePdf, createStripeCheckoutSession, getSupportAccesses, grantSupportAccess, revokeSupportAccess, getIpWhitelist, addIpWhitelist, toggleIpWhitelist, removeIpWhitelist, getSecuritySessions, revokeSession as apiRevokeSession, revokeAllOtherSessions, getLoginHistory, getAllLoginHistory, getSecuritySettings, updateSecuritySettings, createAccessSchedule, deleteAccessSchedule, seedDemoData, type ConsumptionUser,
   createStripeSetupIntent, getStripePaymentMethods, setDefaultPaymentMethod, deleteStripePaymentMethod, saveInvoiceConfig as apiSaveInvoiceConfig, saveBillingContact, saveBillingInfo as apiSaveBillingInfo, getPaymentConfig,
   getDocuments, uploadDocument, validateDocument as apiValidateDoc, refuseDocument as apiRefuseDoc,
   type UploadedDocument,
@@ -734,7 +740,7 @@ export function createAdminInlinePages(ctx: any) {
                         try {
                           if (userPanelMode === "create") {
                             const roles = Array.isArray(userPanelData.roles) ? userPanelData.roles : [userPanelData.role || "collaborateur"];
-                            await apiCreateUser({ name: userPanelData.name, email: userPanelData.email, password: userPanelData.password, role: roles[0], roles });
+                            await apiCreateUser({ name: userPanelData.name, email: userPanelData.email, password: userPanelData.password, role: roles[0] } as any);
                             addToast_admin(t('users.created'));
                           } else {
                             const roles = Array.isArray(userPanelData.roles) ? userPanelData.roles : [userPanelData.role || "collaborateur"];
@@ -862,6 +868,9 @@ export function createAdminInlinePages(ctx: any) {
                   <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{currentPlan?.nom || "Aucun plan"}</h1>
                   {currentOnboardingSub && <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: C.greenLight, color: C.green }}>Plan {currentOnboardingSub.billing_cycle === "yearly" ? "Annuel" : "Mensuel"}</span>}
                   {!currentOnboardingSub && <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: C.amberLight, color: C.amber }}>Aucun abonnement</span>}
+                  {currentOnboardingSub?.status === "past_due" && <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 700, background: C.redLight, color: C.red }}>⚠ Paiement en retard</span>}
+                  {currentOnboardingSub?.status === "trialing" && <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: C.blueLight, color: C.blue }}>Période d'essai</span>}
+                  {currentOnboardingSub?.cancel_at_period_end && <span style={{ padding: "3px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: C.amberLight, color: C.amber }}>Annulation programmée</span>}
                 </div>
                 <div style={{ fontSize: 13, color: C.textLight }}>{currentPlan?.description || (currentOnboardingSub ? "Votre abonnement est actif" : "Choisissez un plan pour activer votre espace")}</div>
                 {currentOnboardingSub && (() => { const appCount = activeSubs.filter((s: any) => s.plan?.is_addon || s.plan?.addon_type === "ai" || s.plan?.slug === "cooptation").length; return <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>{currentPlan?.prix_chf_mensuel} CHF/emp/mois · 1 plan{appCount > 0 ? ` + ${appCount} app${appCount > 1 ? "s" : ""}` : ""}</div>; })()}
@@ -886,6 +895,40 @@ export function createAdminInlinePages(ctx: any) {
                 <button onClick={() => { if (subView === "change") { setSubView("overview"); } else { setSubStep("plan"); setSubView("change"); } }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12 }}>{subView === "change" ? "Retour" : (currentOnboardingSub ? "Changer le plan" : "Souscrire maintenant")}</button>
               </div>
             </div>
+
+            {/* ═══ Prochaine échéance + montant ═══ */}
+            {currentOnboardingSub && subView === "overview" && (() => {
+              const periodEnd = currentOnboardingSub.current_period_end;
+              const willRenew = periodEnd && !currentOnboardingSub.cancel_at_period_end && !currentOnboardingSub.canceled_at;
+              const willCancel = currentOnboardingSub.cancel_at_period_end;
+              const nextAmountCents = currentOnboardingSub.next_payment_amount_cents;
+              const currency = (currentOnboardingSub.currency || "CHF").toUpperCase();
+              const daysLeft = periodEnd ? Math.max(0, Math.ceil((new Date(periodEnd).getTime() - new Date().getTime()) / (24 * 60 * 60 * 1000))) : null;
+              if (!periodEnd && !nextAmountCents) return null;
+              return (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+                <div style={{ padding: "16px 20px", background: C.white, borderRadius: 10, border: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1 }}>{willCancel ? "FIN D'ABONNEMENT" : "PROCHAINE ÉCHÉANCE"}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: C.text, marginTop: 4 }}>{periodEnd ? fmtDate(periodEnd) : "—"}</div>
+                  {daysLeft !== null && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>Dans {daysLeft} jour{daysLeft > 1 ? "s" : ""}</div>}
+                </div>
+                <div style={{ padding: "16px 20px", background: C.white, borderRadius: 10, border: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1 }}>MONTANT PRÉVU</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: C.text, marginTop: 4 }}>{nextAmountCents ? `${(nextAmountCents / 100).toFixed(2)} ${currency}` : "—"}</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{currentOnboardingSub.billing_cycle === "yearly" ? "Annuel" : "Mensuel"} · TTC</div>
+                </div>
+                <div style={{ padding: "16px 20px", background: C.white, borderRadius: 10, border: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: 1 }}>STATUT</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4, color: willCancel ? C.amber : (currentOnboardingSub.status === "past_due" ? C.red : (currentOnboardingSub.status === "trialing" ? C.blue : C.green)) }}>
+                    {willCancel ? "Annulation à la fin de période" : currentOnboardingSub.status === "past_due" ? "Paiement en retard" : currentOnboardingSub.status === "trialing" ? "Période d'essai" : willRenew ? "Renouvellement automatique" : "Actif"}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+                    {willCancel ? "Aucun renouvellement prévu" : willRenew ? `Sera prélevé le ${fmtDate(periodEnd)}` : "—"}
+                  </div>
+                </div>
+              </div>
+              );
+            })()}
 
             {/* ═══ VIEW: Change plan ═══ */}
             {subView === "change" && (() => {
@@ -1231,9 +1274,63 @@ export function createAdminInlinePages(ctx: any) {
                     setStripeMethods(methods.methods || []);
                   }
                 }
-                // 4. Subscribe
+                // 4. Subscribe — déduit currency/country/customer_type/vat depuis billingInfo
+                const paysName = (billingInfo.pays || "").toLowerCase();
+                const PAYS_TO_CODE: Record<string, { code: string; charge: "CHF" | "EUR" | "USD" | "GBP" | "CAD" | "AUD" | "JPY" }> = {
+                  "suisse": { code: "CH", charge: "CHF" }, "switzerland": { code: "CH", charge: "CHF" }, "ch": { code: "CH", charge: "CHF" },
+                  "liechtenstein": { code: "LI", charge: "CHF" }, "li": { code: "LI", charge: "CHF" },
+                  "france": { code: "FR", charge: "EUR" }, "fr": { code: "FR", charge: "EUR" },
+                  "belgique": { code: "BE", charge: "EUR" }, "belgium": { code: "BE", charge: "EUR" }, "be": { code: "BE", charge: "EUR" },
+                  "allemagne": { code: "DE", charge: "EUR" }, "germany": { code: "DE", charge: "EUR" }, "de": { code: "DE", charge: "EUR" },
+                  "luxembourg": { code: "LU", charge: "EUR" }, "lu": { code: "LU", charge: "EUR" },
+                  "italie": { code: "IT", charge: "EUR" }, "italy": { code: "IT", charge: "EUR" }, "it": { code: "IT", charge: "EUR" },
+                  "espagne": { code: "ES", charge: "EUR" }, "spain": { code: "ES", charge: "EUR" }, "es": { code: "ES", charge: "EUR" },
+                  "portugal": { code: "PT", charge: "EUR" }, "pt": { code: "PT", charge: "EUR" },
+                  "pays-bas": { code: "NL", charge: "EUR" }, "netherlands": { code: "NL", charge: "EUR" }, "nl": { code: "NL", charge: "EUR" },
+                  "autriche": { code: "AT", charge: "EUR" }, "austria": { code: "AT", charge: "EUR" }, "at": { code: "AT", charge: "EUR" },
+                  "irlande": { code: "IE", charge: "EUR" }, "ireland": { code: "IE", charge: "EUR" }, "ie": { code: "IE", charge: "EUR" },
+                  "royaume-uni": { code: "GB", charge: "GBP" }, "united kingdom": { code: "GB", charge: "GBP" }, "uk": { code: "GB", charge: "GBP" }, "gb": { code: "GB", charge: "GBP" },
+                  "états-unis": { code: "US", charge: "USD" }, "united states": { code: "US", charge: "USD" }, "us": { code: "US", charge: "USD" }, "usa": { code: "US", charge: "USD" },
+                  "canada": { code: "CA", charge: "CAD" }, "ca": { code: "CA", charge: "CAD" },
+                  "australie": { code: "AU", charge: "AUD" }, "australia": { code: "AU", charge: "AUD" }, "au": { code: "AU", charge: "AUD" },
+                  "japon": { code: "JP", charge: "JPY" }, "japan": { code: "JP", charge: "JPY" }, "jp": { code: "JP", charge: "JPY" },
+                };
+                const matched = Object.keys(PAYS_TO_CODE).find(k => paysName.includes(k));
+                const billing = matched ? {
+                  currency: PAYS_TO_CODE[matched].charge,
+                  country: PAYS_TO_CODE[matched].code,
+                  customer_type: (billingInfo.vat ? "company" : "individual") as "company" | "individual",
+                  vat_number: billingInfo.vat || undefined,
+                } : undefined;
+
+                // ── Self-service Stripe Checkout (Feature 3) ──
+                if (paymentMethod === "stripe" && selectedPlanIds.length > 0) {
+                  try {
+                    const firstPlanId = selectedPlanIds[0];
+                    const session = await createStripeCheckoutSession({
+                      plan_id: firstPlanId,
+                      billing_cycle: pricingBilling,
+                      currency: (billing?.currency || "CHF").toLowerCase(),
+                      nombre_collaborateurs: subEmployeeCount,
+                      country: billing?.country,
+                      customer_type: billing?.customer_type,
+                      vat_number: billing?.vat_number,
+                    });
+                    if (session?.url) {
+                      window.location.href = session.url;
+                      return;
+                    }
+                    addToast_admin("Stripe Checkout indisponible — fallback création locale");
+                  } catch (e: any) {
+                    let msg = "Stripe Checkout indisponible";
+                    try { const parsed = JSON.parse(e?.message || ""); msg = parsed?.message || msg; } catch {}
+                    addToast_admin(msg);
+                    return;
+                  }
+                }
+
                 for (const pid of selectedPlanIds) {
-                  try { await subscribeToPlan(pid, pricingBilling, paymentMethod, subEmployeeCount); } catch {}
+                  try { await subscribeToPlan(pid, pricingBilling, paymentMethod, subEmployeeCount, billing); } catch {}
                 }
                 setBillingModalOpen(false);
                 reloadSub(); setSubView("overview"); setSelectedPlanIds([]); setSubStep("plan");
@@ -1305,11 +1402,70 @@ export function createAdminInlinePages(ctx: any) {
                     )}
                   </div>
 
+                  {/* ── Récap pré-confirmation ── */}
+                  {(() => {
+                    const paysName = (billingInfo.pays || "").toLowerCase();
+                    const isSwissClient = paysName.includes("suisse") || paysName.includes("switzerland") || paysName === "ch" || paysName.includes("liechtenstein");
+                    const PAYS_TO_CHARGE: Record<string, "CHF" | "EUR" | "USD" | "GBP" | "CAD" | "AUD" | "JPY"> = {
+                      "suisse": "CHF", "switzerland": "CHF", "ch": "CHF", "liechtenstein": "CHF",
+                      "france": "EUR", "fr": "EUR", "belgique": "EUR", "belgium": "EUR", "be": "EUR",
+                      "allemagne": "EUR", "germany": "EUR", "luxembourg": "EUR", "italie": "EUR", "italy": "EUR",
+                      "espagne": "EUR", "spain": "EUR", "portugal": "EUR", "pays-bas": "EUR", "netherlands": "EUR",
+                      "autriche": "EUR", "austria": "EUR", "irlande": "EUR", "ireland": "EUR",
+                      "royaume-uni": "GBP", "united kingdom": "GBP", "uk": "GBP",
+                      "états-unis": "USD", "united states": "USD", "us": "USD", "usa": "USD",
+                      "canada": "CAD", "ca": "CAD", "australie": "AUD", "australia": "AUD", "japon": "JPY", "japan": "JPY",
+                    };
+                    const matched = Object.keys(PAYS_TO_CHARGE).find(k => paysName.includes(k));
+                    const chargeCurr = matched ? PAYS_TO_CHARGE[matched] : "CHF";
+                    const priceField = `prix_${chargeCurr.toLowerCase()}_mensuel`;
+                    const totalInCurr = selectedPlanIds.reduce((sum: number, id: number) => {
+                      const p: any = availablePlans.find(pl => pl.id === id);
+                      if (!p) return sum;
+                      const price = Number(p[priceField] || p.prix_chf_mensuel || 0);
+                      const isAi = p.addon_type === "ai";
+                      if (isAi) return sum + price;
+                      const isAddon = p.is_addon || p.slug === "cooptation";
+                      if (isAddon) return sum + price * subEmployeeCount;
+                      return sum + (pricingBilling === "yearly" ? price * 0.9 : price) * subEmployeeCount;
+                    }, 0);
+                    const tvaRate = isSwissClient ? 8.10 : 0;
+                    const tvaAmount = totalInCurr * tvaRate / 100;
+                    const totalTtc = totalInCurr + tvaAmount;
+                    const fmt = (n: number) => `${(Math.round(n * 100) / 100).toFixed(chargeCurr === "JPY" ? 0 : 2)} ${chargeCurr}`;
+                    const isEU = ["FR","BE","DE","LU","IT","ES","PT","NL","AT","IE","FI"].some(c => matched && PAYS_TO_CHARGE[matched] === "EUR" && (paysName.includes(c.toLowerCase())));
+                    const hasVat = !!billingInfo.vat;
+                    const periodLbl = pricingBilling === "yearly" ? "/ an" : "/ mois";
+                    return (
+                      <div style={{ background: "linear-gradient(135deg, #FFF5FB 0%, #FFFEFE 100%)", border: `1.5px solid ${C.pink}30`, borderRadius: 10, padding: "16px 18px", marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: C.pink, letterSpacing: .8, marginBottom: 10, textTransform: "uppercase" }}>📋 Récapitulatif avant paiement</div>
+                        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px", fontSize: 12, marginBottom: 10 }}>
+                          <span style={{ color: C.textMuted }}>Pays :</span><span style={{ fontWeight: 600 }}>{billingInfo.pays || "—"}</span>
+                          {hasVat && <><span style={{ color: C.textMuted }}>N° TVA :</span><span style={{ fontFamily: "monospace", fontSize: 11 }}>{billingInfo.vat}</span></>}
+                          <span style={{ color: C.textMuted }}>Cycle :</span><span style={{ fontWeight: 600 }}>{pricingBilling === "yearly" ? "Annuel (-10%)" : "Mensuel"}</span>
+                          <span style={{ color: C.textMuted }}>Employés :</span><span style={{ fontWeight: 600 }}>{subEmployeeCount}</span>
+                        </div>
+                        <div style={{ borderTop: `1px dashed ${C.pink}30`, paddingTop: 10 }}>
+                          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Vous serez facturé :</div>
+                          <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>{fmt(totalTtc)} <span style={{ fontSize: 13, fontWeight: 400, color: C.textMuted }}>{periodLbl}</span></div>
+                          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
+                            HT : {fmt(totalInCurr)}{tvaRate > 0 && ` · + TVA ${tvaRate}% : ${fmt(tvaAmount)}`}{!tvaRate && (isEU && hasVat ? " · 0% — autoliquidation EU" : !isSwissClient ? " · 0% — export hors-EU" : "")}
+                          </div>
+                          {(chargeCurr === "USD" || chargeCurr === "GBP" || chargeCurr === "CAD" || chargeCurr === "AUD" || chargeCurr === "JPY") && (
+                            <div style={{ fontSize: 10, color: C.textMuted, marginTop: 6, fontStyle: "italic" }}>
+                              ℹ️ Stripe convertira votre paiement en CHF lors du versement (taux Stripe ~1%).
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* ── Actions ── */}
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
                     <button onClick={() => setBillingModalOpen(false)} style={{ padding: "12px 20px", fontSize: 13, background: "none", border: `1px solid ${C.border}`, borderRadius: 8, cursor: "pointer", color: C.text, fontFamily: font }}>Annuler</button>
-                    <button onClick={doSubscribe} style={{ padding: "12px 28px", fontSize: 14, fontWeight: 600, background: C.pink, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: font }}>
-                      Confirmer la souscription
+                    <button onClick={doSubscribe} style={{ padding: "12px 28px", fontSize: 14, fontWeight: 600, background: paymentMethod === "stripe" ? "#635BFF" : C.pink, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontFamily: font }}>
+                      {paymentMethod === "stripe" ? "🔒 Payer via Stripe Checkout →" : "✓ Confirmer la souscription"}
                     </button>
                   </div>
                 </div>
@@ -1490,7 +1646,7 @@ export function createAdminInlinePages(ctx: any) {
                               const { aiUsageData, setAiUsageData } = ctx;
                               if (!aiUsageData && !ctx._aiUsageLoaded) {
                                 ctx._aiUsageLoaded = true;
-                                import('../api/endpoints').then(m => m.apiFetch?.('/ai/quota') || fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1'}/ai/quota`, { headers: { 'X-Tenant': localStorage.getItem('illizeo_tenant_id') || 'illizeo', Authorization: `Bearer ${localStorage.getItem('illizeo_token')}` } }).then(r => r.json()))
+                                import('../api/client').then((m: any) => m.apiFetch?.('/ai/quota') || fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1'}/ai/quota`, { headers: { 'X-Tenant': localStorage.getItem('illizeo_tenant_id') || 'illizeo', Authorization: `Bearer ${localStorage.getItem('illizeo_token')}` } }).then(r => r.json()))
                                   .then((d: any) => ctx.setAiUsageData?.(d)).catch(() => {});
                               }
 
@@ -1900,19 +2056,20 @@ export function createAdminInlinePages(ctx: any) {
                     }
                     return (
                     <div>
-                      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 0, padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight }}>
-                        <span>Facture</span><span>Plan</span><span>Statut</span><span>Date</span><span>Montant TTC</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 90px", gap: 0, padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight }}>
+                        <span>Facture</span><span>Plan</span><span>Statut</span><span>Date</span><span>Montant TTC</span><span></span>
                       </div>
                       {invoicesList.length === 0 && <div style={{ padding: "30px 0", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Aucune facture</div>}
                       {invoicesList.map((inv: any) => {
                         const st = STATUS_LABELS[inv.status] || STATUS_LABELS.draft;
                         return (
-                        <div key={inv.id} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", gap: 0, padding: "12px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13 }}>
+                        <div key={inv.id} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 90px", gap: 0, padding: "12px 0", borderBottom: `1px solid ${C.border}`, alignItems: "center", fontSize: 13 }}>
                           <span style={{ color: C.blue, fontWeight: 500 }}>{inv.invoice_number}</span>
                           <span style={{ fontSize: 12, color: C.textMuted }}>{inv.plan?.nom || "—"}</span>
                           <span style={{ padding: "2px 8px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: st.bg, color: st.color, justifySelf: "start" }}>{st.label}</span>
                           <span style={{ color: C.textMuted }}>{fmtDate(inv.date_emission)}</span>
                           <span style={{ fontWeight: 600 }}>{inv.montant_ttc} {inv.currency?.toUpperCase()}</span>
+                          <button onClick={async () => { try { await downloadInvoicePdf(inv.id, inv.invoice_number); } catch (e: any) { addToast_admin(e?.message || "Téléchargement échoué"); } }} style={{ padding: "4px 10px", border: `1px solid ${C.border}`, borderRadius: 6, background: C.white, cursor: "pointer", fontSize: 11, color: C.text, fontWeight: 500 }} title="Télécharger PDF">PDF ↓</button>
                         </div>
                         );
                       })}
@@ -2412,6 +2569,7 @@ Tout changement dans la liste des personnes autorisées doit être notifié à I
   let _sectionDragTo: number | null = null;
   // Sections order stored in state-like closure
   const SECTION_DEFS_DEFAULT = [
+    { key: "identity", label: t('fields.identity') || (lang === "fr" ? "Identité" : "Identity"), icon: UserCheck, color: "#26A69A" },
     { key: "personal", label: t('fields.personal'), icon: Users, color: "#E41076" },
     { key: "contract", label: t('fields.contract'), icon: FileSignature, color: "#1A73E8" },
     { key: "job", label: t('fields.job'), icon: ClipboardList, color: "#E65100" },
@@ -2422,6 +2580,50 @@ Tout changement dans la liste des personnes autorisées doit être notifié à I
   const renderAdminFields = () => {
     // Sort fields by ordre within each section
     const sortedFieldConfig = [...fieldConfig].sort((a, b) => (a.ordre || 0) - (b.ordre || 0));
+    // Inline panel state — which field is currently editing roles ?
+    // ctx est recréé à chaque render donc on utilise une variable de module
+    // qui persiste entre les renders.
+    const expandedId = _expandedFieldRoleId;
+    const toggleExpanded = (id: number) => {
+      _expandedFieldRoleId = _expandedFieldRoleId === id ? null : id;
+      setFieldConfig([...fieldConfig]);
+    };
+    // Rôles configurables (les rôles privilégiés super_admin/admin/admin_rh bypass toujours)
+    const ROLE_OPTIONS = [
+      { slug: "hrbp", label: "HRBP" },
+      { slug: "manager", label: "Manager" },
+      { slug: "collaborateur", label: "Collaborateur" },
+      { slug: "auditeur", label: "Auditeur" },
+    ];
+    const toggleRole = async (fc: any, kind: "visible_roles" | "editable_roles", slug: string) => {
+      const current: string[] = Array.isArray(fc[kind]) ? fc[kind] : [];
+      const adding = !current.includes(slug);
+      const next = adding ? [...current, slug] : current.filter(s => s !== slug);
+      // editable_roles est toujours un sous-ensemble de visible_roles
+      const patch: any = { [kind]: next.length > 0 ? next : null };
+      if (kind === "visible_roles" && !adding) {
+        // Si on retire un rôle de view, on le retire aussi de edit
+        const editCurrent: string[] = Array.isArray(fc.editable_roles) ? fc.editable_roles : [];
+        if (editCurrent.includes(slug)) {
+          const newEdit = editCurrent.filter(s => s !== slug);
+          patch.editable_roles = newEdit.length > 0 ? newEdit : null;
+        }
+      }
+      // Optimistic UI : on applique tout de suite la patch côté local
+      setFieldConfig(prev => prev.map(f => f.id === fc.id ? { ...f, ...patch } : f));
+      try {
+        const updated = await apiUpdateFieldConfig(fc.id, patch);
+        setFieldConfig(prev => prev.map(f => f.id === fc.id ? { ...f, ...updated } : f));
+        const roleLabel: Record<string, string> = { hrbp: "HRBP", manager: "Manager", collaborateur: "Collaborateur", auditeur: "Auditeur" };
+        const action = adding ? "ajouté" : "retiré";
+        const target = kind === "visible_roles" ? "Voir" : "Éditer";
+        addToast_admin(`✓ ${fc.label} — ${roleLabel[slug] || slug} ${action} (${target})`);
+      } catch (e) {
+        // rollback en cas d'erreur API
+        setFieldConfig(prev => prev.map(f => f.id === fc.id ? { ...f, [kind]: current, editable_roles: fc.editable_roles } : f));
+        addToast_admin(`Échec de l'enregistrement — ${(e as any)?.message || "réessayez"}`);
+      }
+    };
 
     return (
           <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
@@ -2508,15 +2710,18 @@ Tout changement dans la liste des personnes autorisées doit être notifié à I
                       {t('fields.drop_here') || "Glissez un champ ici"}
                     </div>
                   )}
-                  {sortedFieldConfig.filter(f => f.section === section.key).map((fc, i, arr) => (
-                    <div key={fc.id}
+                  {sortedFieldConfig.filter(f => f.section === section.key).map((fc, i, arr) => {
+                    const hasRestrictions = (Array.isArray(fc.visible_roles) && fc.visible_roles.length > 0) || (Array.isArray(fc.editable_roles) && fc.editable_roles.length > 0);
+                    return (
+                    <div key={fc.id} style={{ borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                    <div
                       data-field-drag={`${section.key}-${i}`}
                       draggable
                       onDragStart={() => handleFieldDragStart(section.key, i)}
                       onDragOver={(e) => handleFieldDragOver(e, section.key, i)}
                       onDragEnd={() => { document.querySelectorAll('[data-field-drag]').forEach(el => { (el as HTMLElement).style.borderTopColor = 'transparent'; }); }}
                       onDrop={handleFieldDrop}
-                      style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none", borderTop: "2px solid transparent", transition: "border-color .15s", cursor: "grab" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderTop: "2px solid transparent", transition: "border-color .15s", cursor: "grab" }}>
                       {/* Drag handle */}
                       <div style={{ display: "flex", flexDirection: "column", gap: 2, padding: "4px 2px", flexShrink: 0, color: C.textMuted }}>
                         <div style={{ width: 12, display: "flex", flexWrap: "wrap", gap: 2 }}>
@@ -2528,9 +2733,12 @@ Tout changement dans la liste des personnes autorisées doit être notifié à I
                           <span style={{ fontSize: 13, fontWeight: 500 }}>{lang !== "fr" && fc.label_en ? fc.label_en : fc.label}</span>
                           <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, background: C.bg, color: C.textMuted, fontWeight: 600 }}>{fc.field_type || "text"}</span>
                           {fc.field_type === "list" && fc.list_values?.length > 0 && <span style={{ fontSize: 9, color: C.textMuted }}>({fc.list_values.join(", ")})</span>}
+                          {hasRestrictions && <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, background: C.amberLight, color: C.amber, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}><ShieldCheck size={9} /> Restreint</span>}
                         </div>
                         <div style={{ fontSize: 10, color: C.textMuted }}>{lang === "fr" ? fc.label_en || fc.field_key : fc.label || fc.field_key}</div>
                       </div>
+                      {/* Bouton Rôles retiré : la gestion des permissions par champ se fait désormais
+                          dans la page Rôles & Permissions → onglet Champs (matrice par rôle). */}
                       <button onClick={() => { setTranslateFieldId(fc.id); setTranslateEN(fc.label_en || ""); }} style={{ background: "none", border: "none", cursor: "pointer", color: C.blue, padding: 2 }} title="Traduire"><Globe size={14} /></button>
                       <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.textLight, cursor: "pointer" }}>
                         <input type="checkbox" checked={fc.obligatoire} onChange={async () => {
@@ -2556,7 +2764,45 @@ Tout changement dans la liste des personnes autorisées doit être notifié à I
                         }} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted, padding: 2 }}><X size={14} /></button>
                       )}
                     </div>
-                  ))}
+                    {/* Panel inline retiré : la gestion des permissions par rôle se fait
+                        désormais dans Rôles & Permissions → onglet Champs (matrice par rôle). */}
+                    {false && expandedId === fc.id && (
+                      <div style={{ padding: "14px 18px", background: C.bg, borderTop: `1px solid ${C.border}` }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                          <ShieldCheck size={14} color={C.pink} />
+                          <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>Visibilité par rôle</span>
+                          <span style={{ fontSize: 10, color: C.textMuted }}>— Super admin, Admin et Admin RH ont toujours accès complet.</span>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+                          {ROLE_OPTIONS.map(r => {
+                            const visibleArr = Array.isArray(fc.visible_roles) ? fc.visible_roles : null;
+                            const editableArr = Array.isArray(fc.editable_roles) ? fc.editable_roles : null;
+                            // null = pas de restriction → tout le monde voit/édite
+                            const isVisible = visibleArr === null ? true : visibleArr.includes(r.slug);
+                            const isEditable = editableArr === null ? true : editableArr.includes(r.slug);
+                            return (
+                              <div key={r.slug} style={{ padding: "10px 12px", background: C.white, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 8 }}>{r.label}</div>
+                                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: C.textLight, cursor: "pointer", marginBottom: 4 }}>
+                                  <input type="checkbox" checked={isVisible} onChange={() => toggleRole(fc, "visible_roles", r.slug)} style={{ accentColor: C.blue }} />
+                                  Voir
+                                </label>
+                                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: isVisible ? C.textLight : C.textMuted, cursor: isVisible ? "pointer" : "not-allowed", opacity: isVisible ? 1 : 0.4 }}>
+                                  <input type="checkbox" checked={isEditable && isVisible} disabled={!isVisible} onChange={() => toggleRole(fc, "editable_roles", r.slug)} style={{ accentColor: C.green }} />
+                                  Éditer
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ marginTop: 10, fontSize: 10, color: C.textMuted, lineHeight: 1.5 }}>
+                          ℹ️ Si aucune case "Voir" n'est cochée pour un rôle donné, ce rôle ne verra simplement pas le champ. Le collaborateur lui-même voit toujours ses propres données (sauf édition restreinte).
+                        </div>
+                      </div>
+                    )}
+                    </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
@@ -2735,6 +2981,16 @@ Tout changement dans la liste des personnes autorisées doit être notifié à I
           <div style={{ flex: 1, padding: "24px 32px", overflow: "auto", maxWidth: 800 }}>
             <h1 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 8px" }}>{t('admin.appearance')}</h1>
             <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 28px" }}>{t('settings.appearance_desc')}</p>
+
+            {/* ── Logo entreprise (emails) ────────────────────── */}
+            <LogoUploadCard
+              customLogoFull={customLogoFull}
+              setCustomLogoFull={setCustomLogoFull}
+              themeColor={themeColor}
+              addToast={addToast_admin}
+              C={C}
+              sBtn={sBtn}
+            />
 
             {/* ── Langues ────────────────────────────────────── */}
             <div style={sSection}>
