@@ -110,7 +110,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
     npsTab, setNpsTab, npsPanelMode, setNpsPanelMode, npsPanelData, setNpsPanelData, npsSelectedSurvey, setNpsSelectedSurvey,
     badges, setBadges, badgeTemplates, setBadgeTemplates, myBadges, setMyBadges, badgeTplPanel, setBadgeTplPanel,
     empSurveys, setEmpSurveys, empNpsAnswers, setEmpNpsAnswers, showNotifDropdown, setShowNotifDropdown, empCampaigns, setEmpCampaigns,
-    empCooptations, setEmpCooptations, empCooptForm, setEmpCooptForm, notifConfig, setNotifConfig, equipTypes, setEquipTypes,
+    empCooptations, setEmpCooptations, empCooptForm, setEmpCooptForm, notifConfig, setNotifConfig, notifRegistry, equipTypes, setEquipTypes,
     equipments, setEquipments, equipStats, setEquipStats, equipPanel, setEquipPanel, equipFilter, setEquipFilter,
     equipTab, setEquipTab, equipPackages, setEquipPackages, pkgPanel, setPkgPanel, signDocs, setSignDocs,
     signPanel, setSignPanel, signAcks, setSignAcks, signSelectedDoc, setSignSelectedDoc, myPendingSigs, setMyPendingSigs,
@@ -337,6 +337,8 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                   onChange={(updated: any) => setWfPanelData(updated)}
                   groups={GROUPES}
                   users={adminUsers}
+                  actions={ACTION_TEMPLATES}
+                  integrations={(integrations || []).reduce((acc: any, i: any) => { acc[i.provider] = i; return acc; }, {})}
                 />
               </div>
 
@@ -566,8 +568,8 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                   <div>
                     <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
                       {/* Email header */}
-                      <div style={{ background: C.pink, padding: "20px 24px", textAlign: "center" }}>
-                        <img src={customLogoFull || ILLIZEO_FULL_LOGO_URI} alt="Logo" style={{ height: 28, objectFit: "contain", filter: "brightness(10)" }} />
+                      <div style={{ background: C.white, padding: "24px 24px 12px", textAlign: "center", borderBottom: `1px solid ${C.border}` }}>
+                        <img src={customLogoFull || ILLIZEO_FULL_LOGO_URI} alt="Logo" style={{ height: 44, maxWidth: 240, width: "auto", objectFit: "contain", display: "inline-block" }} />
                       </div>
                       {/* Email subject */}
                       <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.border}`, background: C.bg }}>
@@ -577,9 +579,12 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                         </div>
                       </div>
                       {/* Email body */}
-                      <div style={{ padding: "24px", fontSize: 14, lineHeight: 1.7, color: C.text, minHeight: 200, whiteSpace: "pre-wrap" }}>
-                        {(tplPanelData.contenu || t('tpl.no_content')).replace(/\{\{prenom\}\}/g, "Jean").replace(/\{\{nom\}\}/g, "Dupont").replace(/\{\{date_debut\}\}/g, "01/06/2026").replace(/\{\{site\}\}/g, "Genève").replace(/\{\{poste\}\}/g, "Chef de Projet").replace(/\{\{parcours_nom\}\}/g, "Onboarding Standard").replace(/\{\{manager\}\}/g, "Mehdi Kessler").replace(/\{\{nb_docs_manquants\}\}/g, "3").replace(/\{\{date_limite\}\}/g, "15/06/2026").replace(/\{\{lien\}\}/g, "https://app.illizeo.com").replace(/\{\{action_nom\}\}/g, "Compléter le dossier").replace(/\{\{document_nom\}\}/g, "Pièce d'identité").replace(/\{\{collab_nom\}\}/g, "Jean Dupont").replace(/\{\{montant\}\}/g, "500 CHF").replace(/\{\{annees\}\}/g, "1").replace(/\{\{date_depart\}\}/g, "30/06/2026").replace(/\{\{email\}\}/g, "jean.dupont@illizeo.com").replace(/\{\{date_fin_essai\}\}/g, "01/09/2026").replace(/\{\{candidat_nom\}\}/g, "Marc Dupont").replace(/\{\{departement\}\}/g, "Tech").replace(/\{\{adresse\}\}/g, "Rue du Marché 10, Genève")}
-                      </div>
+                      <div
+                        style={{ padding: "24px", fontSize: 14, lineHeight: 1.7, color: C.text, minHeight: 200 }}
+                        dangerouslySetInnerHTML={{
+                          __html: (tplPanelData.contenu || t('tpl.no_content')).replace(/\{\{prenom\}\}/g, "Jean").replace(/\{\{nom\}\}/g, "Dupont").replace(/\{\{date_debut\}\}/g, "01/06/2026").replace(/\{\{site\}\}/g, "Genève").replace(/\{\{poste\}\}/g, "Chef de Projet").replace(/\{\{parcours_nom\}\}/g, "Onboarding Standard").replace(/\{\{manager\}\}/g, "Mehdi Kessler").replace(/\{\{nb_docs_manquants\}\}/g, "3").replace(/\{\{date_limite\}\}/g, "15/06/2026").replace(/\{\{lien\}\}/g, "https://app.illizeo.com").replace(/\{\{action_nom\}\}/g, "Compléter le dossier").replace(/\{\{document_nom\}\}/g, "Pièce d'identité").replace(/\{\{collab_nom\}\}/g, "Jean Dupont").replace(/\{\{montant\}\}/g, "500 CHF").replace(/\{\{annees\}\}/g, "1").replace(/\{\{date_depart\}\}/g, "30/06/2026").replace(/\{\{email\}\}/g, "jean.dupont@illizeo.com").replace(/\{\{date_fin_essai\}\}/g, "01/09/2026").replace(/\{\{candidat_nom\}\}/g, "Marc Dupont").replace(/\{\{departement\}\}/g, "Tech").replace(/\{\{adresse\}\}/g, "Rue du Marché 10, Genève"),
+                        }}
+                      />
                       {/* Email footer */}
                       <div style={{ padding: "16px 24px", borderTop: `1px solid ${C.border}`, background: C.bg, textAlign: "center", fontSize: 11, color: C.textMuted }}>
                         {t('tpl.footer_auto')}<br />
@@ -747,93 +752,130 @@ export function createAdminWorkflowsTemplates(ctx: any) {
 
   
     // ─── NOTIFICATIONS ─────────────────────────────────────────
-    const NOTIF_TYPES = [
-      { key: "anniversaire", label: t('notifcfg.birthday'), icon: Gift },
-      { key: "fin_contrat", label: t('notifcfg.contract_end'), icon: FileSignature },
-      { key: "fin_essai", label: t('notifcfg.trial_end'), icon: Clock },
-      { key: "nouveau_questionnaire", label: t('notifcfg.new_survey'), icon: ListChecks },
-      { key: "nouvelle_tache", label: t('notifcfg.new_task'), icon: ClipboardCheck },
-      { key: "relance_retard", label: t('notifcfg.late_reminder'), icon: AlertTriangle },
-      { key: "piece_a_valider", label: t('notifcfg.doc_to_validate'), icon: FileUp },
-      { key: "piece_completee", label: t('notifcfg.doc_complete'), icon: CheckCircle },
-      { key: "piece_refusee", label: t('notifcfg.doc_refused'), icon: XCircle },
-      { key: "arrivees_semaine", label: t('notifcfg.weekly_arrivals'), icon: CalendarDays },
-      { key: "nouvelle_recrue", label: t('notifcfg.new_hire'), icon: UserPlus },
-      { key: "questionnaire_complete", label: t('notifcfg.survey_complete'), icon: CheckCircle },
-      { key: "invitation_utilisateur", label: t('notifcfg.user_invitation'), icon: Mail },
-      { key: "delegation", label: t('notifcfg.delegation'), icon: ArrowRight },
-      // New notifications
-      { key: "nouveau_message", label: t('notifcfg.new_message'), icon: MessageSquare },
-      { key: "document_valide", label: t('notifcfg.doc_validated'), icon: CheckCircle2 },
-      { key: "badge_obtenu", label: t('notifcfg.badge_earned'), icon: Award },
-      { key: "cooptation_statut", label: t('notifcfg.cooptation_status'), icon: Handshake },
-      { key: "parcours_termine", label: t('notifcfg.path_completed'), icon: Trophy },
-      { key: "signature_requise", label: t('notifcfg.signature_required'), icon: PenTool },
-      { key: "rappel_pre_arrivee", label: t('notifcfg.pre_arrival_reminder'), icon: Rocket },
-      { key: "feedback_buddy", label: t('notifcfg.buddy_feedback'), icon: Hand },
-      { key: "mobilite_interne", label: t('notifcfg.internal_mobility'), icon: Route },
-      { key: "retour_conge", label: t('notifcfg.return_from_leave'), icon: Heart },
-      { key: "resume_hebdo", label: t('notifcfg.weekly_summary'), icon: CalendarCheck },
-      { key: "nps_enquete", label: t('notifcfg.nps_survey'), icon: Star },
-    ];
-    const toggleNotif = (key: string, channel: "email" | "push" | "inapp") => {
+    // Source of truth: backend NotificationRegistry (App\Support\NotificationRegistry).
+    // Fetched on mount via getNotificationsRegistry() and stored on window for sync access.
+    const CATEGORY_META: Record<string, { label: string; icon: any; color: string }> = {
+      onboarding:    { label: "Parcours d'onboarding",    icon: Rocket,      color: C.blue },
+      documents:     { label: "Documents & signatures",   icon: FileUp,      color: "#7B5EA7" },
+      communication: { label: "Communication",            icon: MessageSquare, color: C.amber },
+      facturation:   { label: "Facturation & IA",         icon: BadgeDollarSign, color: C.green },
+      gamification:  { label: "Engagement",               icon: Trophy,      color: C.pink },
+      cooptation:    { label: "Cooptation",               icon: Handshake,   color: C.green },
+      workflow:      { label: "Workflows",                icon: Zap,         color: C.amber },
+      dossier:       { label: "Dossier collaborateur",    icon: ClipboardCheck, color: C.blue },
+    };
+
+    const toggleNotif = (key: string, channel: "email" | "inapp", entry: any) => {
       setNotifConfig(prev => {
-        const next = { ...prev, [key]: { ...prev[key], [channel]: !prev[key]?.[channel] } };
+        const current = prev[key] || { email: !!entry.default?.email, push: false, inapp: !!entry.default?.inapp };
+        const next = { ...prev, [key]: { ...current, [channel]: !current[channel] } };
         localStorage.setItem("illizeo_notif_config", JSON.stringify(next));
         updateCompanySettings({ notif_config: JSON.stringify(next) }).then(() => addToast_admin(t('toast.saved'))).catch(() => addToast_admin(t('toast.error')));
         return next;
       });
     };
 
+    const renderNotifications_admin = () => {
+      const registry: any[] = notifRegistry || [];
 
-    const renderNotifications_admin = () => (
-      <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.notif_config')}</h1>
-        </div>
-        <p style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>{t('notifcfg.subtitle')}</p>
+      // Group by category, preserving registry order within each group
+      const groups: Record<string, any[]> = {};
+      const groupOrder: string[] = [];
+      for (const entry of registry) {
+        const cat = entry.category || "autre";
+        if (!groups[cat]) { groups[cat] = []; groupOrder.push(cat); }
+        groups[cat].push(entry);
+      }
 
-        <div className="iz-card" style={{ ...sCard, overflow: "hidden", padding: 0 }}>
-          {/* Header */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 80px 80px 80px", gap: 0, padding: "12px 20px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
-            <span>{t('notifcfg.notification')}</span><span style={{ textAlign: "center" }}>Email</span><span style={{ textAlign: "center" }}>Push</span><span style={{ textAlign: "center" }}>In-app</span>
+      const renderRow = (n: any, isLast: boolean) => {
+        const cfg = notifConfig[n.key] || { email: !!n.default?.email, push: false, inapp: !!n.default?.inapp };
+        const supportsEmail = (n.channels || []).includes("email");
+        const supportsInapp = (n.channels || []).includes("inapp");
+        const audienceLabel: Record<string, string> = { collaborateur: "Collaborateur", rh: "Équipe RH", admin: "Admin", tous: "Tous" };
+        return (
+          <div key={n.key} style={{ display: "grid", gridTemplateColumns: "2fr 100px 100px", gap: 0, padding: "14px 20px", borderBottom: isLast ? "none" : `1px solid ${C.border}`, alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: C.text, marginBottom: 2 }}>{n.label}</div>
+              <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.4 }}>{n.description}</div>
+              {n.audience && <div style={{ display: "inline-block", marginTop: 4, fontSize: 10, padding: "2px 8px", borderRadius: 4, background: C.bg, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>{audienceLabel[n.audience] || n.audience}</div>}
+            </div>
+            {/* In-app toggle */}
+            <div style={{ textAlign: "center" }}>
+              {supportsInapp ? (
+                <div onClick={() => toggleNotif(n.key, "inapp", n)} style={{ width: 38, height: 20, borderRadius: 10, background: cfg.inapp ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s", display: "inline-block" }}>
+                  <div style={{ width: 16, height: 16, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: cfg.inapp ? 20 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                </div>
+              ) : <span style={{ fontSize: 11, color: C.textMuted }}>—</span>}
+            </div>
+            {/* Email toggle */}
+            <div style={{ textAlign: "center" }}>
+              {supportsEmail ? (
+                <div onClick={() => toggleNotif(n.key, "email", n)} style={{ width: 38, height: 20, borderRadius: 10, background: cfg.email ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s", display: "inline-block" }}>
+                  <div style={{ width: 16, height: 16, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: cfg.email ? 20 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+                </div>
+              ) : <span style={{ fontSize: 11, color: C.textMuted }}>—</span>}
+            </div>
           </div>
-          {NOTIF_TYPES.map((n, i) => {
-            const cfg = notifConfig[n.key] || { email: true, push: false, inapp: true };
-            return (
-            <div key={n.key} style={{ display: "grid", gridTemplateColumns: "2fr 80px 80px 80px", gap: 0, padding: "12px 20px", borderBottom: i < NOTIF_TYPES.length - 1 ? `1px solid ${C.border}` : "none", alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <n.icon size={15} color={C.textMuted} />
-                <span style={{ fontSize: 13 }}>{n.label}</span>
-              </div>
-              {(["email", "push", "inapp"] as const).map(ch => (
-                <div key={ch} style={{ textAlign: "center" }}>
-                  <div onClick={() => toggleNotif(n.key, ch)} style={{ width: 38, height: 20, borderRadius: 10, background: cfg[ch] ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s", display: "inline-block" }}>
-                    <div style={{ width: 16, height: 16, borderRadius: "50%", background: C.white, position: "absolute", top: 2, left: cfg[ch] ? 20 : 2, transition: "all .2s", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
+        );
+      };
+
+      return (
+        <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.notif_config')}</h1>
+          </div>
+          <p style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>
+            Activez ou désactivez les notifications par canal. Les modifications s'appliquent à tous les utilisateurs de l'espace.
+          </p>
+
+          {registry.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: C.textMuted, fontSize: 13 }}>Chargement…</div>
+          ) : (
+            groupOrder.map(cat => {
+              const meta = CATEGORY_META[cat] || { label: cat, icon: Bell, color: C.textMuted };
+              const entries = groups[cat];
+              return (
+                <div key={cat} style={{ marginBottom: 24 }}>
+                  <h2 style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: "0 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
+                    <meta.icon size={16} color={meta.color} /> {meta.label}
+                  </h2>
+                  <div className="iz-card" style={{ ...sCard, overflow: "hidden", padding: 0 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "2fr 100px 100px", gap: 0, padding: "10px 20px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                      <span>Notification</span>
+                      <span style={{ textAlign: "center" }}>In-app</span>
+                      <span style={{ textAlign: "center" }}>Email</span>
+                    </div>
+                    {entries.map((n, i) => renderRow(n, i === entries.length - 1))}
                   </div>
                 </div>
-              ))}
-            </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
-      </div>
-    );
+      );
+    };
   
     // ─── ENTREPRISE ────────────────────────────────────────────
-    const BLOCK_TYPES = [
-      { type: "hero", label: t('block.hero'), icon: Clapperboard },
-      { type: "text", label: t('block.text'), icon: FileText },
-      { type: "mission", label: t('block.mission'), icon: Target },
-      { type: "stats", label: t('block.key_figures'), icon: BarChart3 },
-      { type: "values", label: t('block.values'), icon: Star },
-      { type: "video", label: t('block.videos'), icon: Play },
-      { type: "team", label: t('block.team'), icon: Users },
-      { type: "office_tour", label: "Tour des bureaux", icon: MapPin },
-      { type: "culture_quiz", label: "Quiz culture", icon: BookMarked },
-      { type: "gamification_quests", label: "Quêtes gamification", icon: Trophy },
-      { type: "journey_milestones", label: "Jalons parcours 100j", icon: Award },
+    // Each block is tagged with the admin page it belongs to so we can split
+    // the editor across 3 pages : entreprise (par défaut), bureaux, gamification.
+    const ALL_BLOCK_TYPES = [
+      { type: "hero",                label: t('block.hero'),         icon: Clapperboard, page: "entreprise" },
+      { type: "text",                label: t('block.text'),         icon: FileText,     page: "entreprise" },
+      { type: "mission",             label: t('block.mission'),      icon: Target,       page: "entreprise" },
+      { type: "stats",               label: t('block.key_figures'),  icon: BarChart3,    page: "entreprise" },
+      { type: "values",              label: t('block.values'),       icon: Star,         page: "entreprise" },
+      { type: "video",               label: t('block.videos'),       icon: Play,         page: "entreprise" },
+      { type: "team",                label: t('block.team'),         icon: Users,        page: "entreprise" },
+      { type: "culture_quiz",        label: "Quiz culture",          icon: BookMarked,   page: "entreprise" },
+      { type: "office_tour",         label: "Tour des bureaux",      icon: MapPin,       page: "bureaux" },
+      { type: "gamification_quests", label: "Quêtes gamification",   icon: Trophy,       page: "gamification" },
+      { type: "journey_milestones",  label: "Jalons parcours 100j",  icon: Award,        page: "gamification" },
     ];
+    // For backwards compatibility (lookup of existing block metadata)
+    const BLOCK_TYPES = ALL_BLOCK_TYPES;
+    // The page entreprise editor only exposes the 8 types tagged "entreprise"
+    const ENTREPRISE_BLOCK_TYPES = ALL_BLOCK_TYPES.filter(t => t.page === "entreprise");
+    const ENTREPRISE_TYPE_SET = new Set(ENTREPRISE_BLOCK_TYPES.map(t => t.type));
 
     // Defaults used to seed a freshly-created block so the editor isn't empty.
     // For culture_quiz, mirror the 5 starter questions that the employee view falls back to.
@@ -892,18 +934,31 @@ export function createAdminWorkflowsTemplates(ctx: any) {
       addToast_admin(t('toast.order_saved') || "Ordre enregistré");
     };
 
-    const renderEntreprise_admin = () => {
+    // Shared renderer used by 3 admin pages. The pageFilter determines which
+    // block types are listed here vs delegated to other admin pages.
+    //   - "entreprise" : 8 page-entreprise types (default)
+    //   - "bureaux"    : office_tour
+    //   - "gamification" : gamification_quests + journey_milestones
+    const renderBlocksEditor = (pageFilter: "entreprise" | "bureaux" | "gamification", pageTitle: string, pageDesc?: string) => {
       const editBlock = companyBlocks.find(b => b.id === editingBlockId);
+      const allowedTypes = ALL_BLOCK_TYPES.filter(t => t.page === pageFilter);
+      const allowedTypeSet = new Set(allowedTypes.map(t => t.type));
+      const visibleBlocks = companyBlocks.filter(b => allowedTypeSet.has(b.type));
       return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{t('admin.company_page')}</h1>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: pageDesc ? 6 : 20 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>{pageTitle}</h1>
         </div>
+        {pageDesc && <p style={{ fontSize: 12, color: C.textLight, margin: "0 0 20px" }}>{pageDesc}</p>}
 
         {/* Add block tiles */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8, marginBottom: 20 }}>
-          {BLOCK_TYPES.map(bt => {
+          {allowedTypes.map(bt => {
             const BtIcon = bt.icon;
+            // Singleton types (1 bloc max) : on désactive le tile si un bloc du type existe déjà
+            const isSingleton = ["office_tour", "gamification_quests"].includes(bt.type);
+            const alreadyExists = isSingleton && companyBlocks.some(b => b.type === bt.type);
+            if (alreadyExists) return null;
             return (
               <button key={bt.type} className="iz-sidebar-item" onClick={async () => {
                 const defaults = BLOCK_DEFAULTS[bt.type] || {};
@@ -923,7 +978,10 @@ export function createAdminWorkflowsTemplates(ctx: any) {
 
         {/* Blocks list — drag & drop reorderable */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {companyBlocks.map((block, idx) => {
+          {visibleBlocks.map((block) => {
+            // Use real companyBlocks index for drag-drop so the reorder logic
+            // (which operates on companyBlocks, not the filtered list) stays correct.
+            const idx = companyBlocks.findIndex(b => b.id === block.id);
             const bt = BLOCK_TYPES.find(t => t.type === block.type);
             const BIcon = bt?.icon || FileText;
             return (
@@ -954,7 +1012,7 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center" }}><BIcon size={16} color={C.pink} /></div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{(lang !== "fr" && block.translations?.titre?.[lang]) || block.titre || bt?.label || block.type}</div>
-                  <div style={{ fontSize: 11, color: C.textLight }}>{bt?.label} · {t('block.order')}: {block.ordre}</div>
+                  <div style={{ fontSize: 11, color: C.textLight }}>{bt?.label}{["office_tour", "gamification_quests"].includes(block.type) ? "" : ` · ${t('block.order')}: ${block.ordre}`}</div>
                 </div>
                 <div onClick={async () => { await apiUpdateBlock(block.id, { actif: !block.actif }); setCompanyBlocks(prev => prev.map(b => b.id === block.id ? { ...b, actif: !b.actif } : b)); addToast_admin(block.actif ? t('block.disabled') : t('block.enabled')); }}
                   style={{ width: 40, height: 22, borderRadius: 11, background: block.actif ? C.green : C.border, cursor: "pointer", position: "relative", transition: "all .2s", flexShrink: 0 }}>
@@ -1007,10 +1065,13 @@ export function createAdminWorkflowsTemplates(ctx: any) {
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.content')}</label>
                   <TranslatableField value={editBlock.contenu || ""} onChange={v => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, contenu: v } : b))} currentLang={lang} activeLangs={activeLanguages} translations={contentTranslations.contenu} onTranslationsChange={tr => setTr("contenu", tr)} style={{ ...sInput, resize: "vertical" }} multiline rows={4} />
                 </div>
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.order')}</label>
-                  <input type="number" value={editBlock.ordre} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, ordre: Number(e.target.value) } : b))} style={{ ...sInput, width: 80 }} />
-                </div>
+                {/* Ordre n'a de sens que pour les blocs multiples — masqué pour les singletons */}
+                {!["office_tour", "gamification_quests"].includes(editBlock.type) && (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6 }}>{t('common.order')}</label>
+                    <input type="number" value={editBlock.ordre} onChange={e => setCompanyBlocks(prev => prev.map(b => b.id === editBlock.id ? { ...b, ordre: Number(e.target.value) } : b))} style={{ ...sInput, width: 80 }} />
+                  </div>
+                )}
                 {/* Mission highlight (Positive Innovation–style annotation) */}
                 {editBlock.type === "mission" && (
                   <div style={{ marginBottom: 16, padding: 14, border: `1px solid ${C.border}`, borderRadius: 8, background: C.pinkBg + "30" }}>
@@ -1268,11 +1329,19 @@ export function createAdminWorkflowsTemplates(ctx: any) {
       );
     };
 
-  
+    // Page wrappers around the shared blocks editor
+    const renderEntreprise_admin = () => renderBlocksEditor("entreprise", t('admin.company_page'));
+    const renderAdminBureaux = () => renderBlocksEditor("bureaux", lang === "fr" ? "Bureaux" : "Offices", lang === "fr"
+      ? "Configurez le tour des bureaux que vos collaborateurs découvriront depuis leur page Bureaux."
+      : "Configure the office tour that employees will discover from their Offices page.");
+    const renderGamificationBlocks = () => renderBlocksEditor("gamification", lang === "fr" ? "Quêtes & jalons" : "Quests & milestones", lang === "fr"
+      ? "Quêtes de gamification et jalons de parcours 100j affichés sur le dashboard collaborateur."
+      : "Gamification quests and journey milestones displayed on the collaborateur dashboard.");
+
     // ─── MESSAGERIE ────────────────────────────────────────────
 
     const renderMessagerie_admin = () => renderMessagerie();
-  
+
     // ─── NPS ───────────────────────────────────────────────────
 
   return {
@@ -1281,6 +1350,8 @@ export function createAdminWorkflowsTemplates(ctx: any) {
     renderEquipes,
     renderNotifications_admin,
     renderEntreprise_admin,
+    renderAdminBureaux,
+    renderGamificationBlocks,
     renderMessagerie_admin,
   };
 }
