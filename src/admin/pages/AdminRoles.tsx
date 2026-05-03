@@ -7,6 +7,7 @@ import {
 import {
   getRoles, createRole as apiCreateRole, updateRole as apiUpdateRole, deleteRole as apiDeleteRole,
   assignRoleUser, removeRoleUser, duplicateRole as apiDuplicateRole, getPermissionLogs,
+  updateFieldConfig as apiUpdateFieldConfig,
 } from '../../api/endpoints';
 
 export function createAdminRoles(ctx: any) {
@@ -19,26 +20,15 @@ export function createAdminRoles(ctx: any) {
     visibleRoleIds, setVisibleRoleIds, rolesDropdownOpen, setRolesDropdownOpen, effectivePermUserId, setEffectivePermUserId,
     permissionLogs, setPermissionLogs, securitySubTab, setSecuritySubTab,
     auditVisibleCount, setAuditVisibleCount,
+    fieldConfig, setFieldConfig,
     addToast_admin, showConfirm, showPrompt,
+    permRegistry,
   } = ctx;
 
   return function renderAdminRoles() {
-    const PERM_MODULES = [
-      { key: "parcours", label: t('perm.parcours'), section: "management" },
-      { key: "collaborateurs", label: t('perm.collaborateurs'), section: "management" },
-      { key: "documents", label: t('perm.documents'), section: "management" },
-      { key: "equipements", label: t('perm.equipements'), section: "content" },
-      { key: "nps", label: t('perm.nps'), section: "content" },
-      { key: "workflows", label: t('perm.workflows'), section: "automation" },
-      { key: "company_page", label: t('perm.company_page'), section: "content" },
-      { key: "cooptation", label: t('perm.cooptation'), section: "content" },
-      { key: "contrats", label: t('perm.contrats'), section: "content" },
-      { key: "signatures", label: t('perm.signatures'), section: "content" },
-      { key: "gamification", label: t('perm.gamification'), section: "content" },
-      { key: "integrations", label: t('perm.integrations'), section: "settings" },
-      { key: "settings", label: t('perm.settings'), section: "settings" },
-      { key: "reports", label: t('perm.reports'), section: "settings" },
-    ];
+    // Source of truth: backend PermissionRegistry, fetched into ctx.permRegistry.
+    // Falls back to an empty list while loading — the UI shows a skeleton.
+    const PERM_MODULES: { key: string; area: string; section: string; label: string }[] = permRegistry?.modules ?? [];
     const PERM_LEVELS = ["admin", "edit", "view", "none"] as const;
     const PERM_LEVEL_META: Record<string, { label: string; color: string; bg: string }> = {
       admin: { label: t('roles.perm_admin'), color: "#E53935", bg: "#FFEBEE" },
@@ -46,7 +36,25 @@ export function createAdminRoles(ctx: any) {
       view: { label: t('roles.perm_view'), color: "#1A73E8", bg: "#E3F2FD" },
       none: { label: t('roles.perm_none'), color: C.textMuted, bg: C.bg },
     };
-    const SECTIONS: Record<string, string> = { management: "Management", automation: "Automation", content: "Content", settings: "Settings" };
+    const AREAS: Record<string, { label: string; color: string }> = {
+      admin: { label: lang === "fr" ? "Espace admin" : "Admin area", color: "#7B5EA7" },
+      employe: { label: lang === "fr" ? "Espace collaborateur" : "Employee area", color: "#1A73E8" },
+    };
+    // Sections come from the registry as well; fall back to the legacy labels
+    // for the few cases where the backend hasn't been deployed yet.
+    const SECTIONS: Record<string, string> = permRegistry?.sections ?? {
+      admin_gestion:      lang === "fr" ? "Gestion" : "Management",
+      admin_automation:   lang === "fr" ? "Automatisation" : "Automation",
+      admin_content:      lang === "fr" ? "Contenu" : "Content",
+      admin_integrations: lang === "fr" ? "Intégrations & Services" : "Integrations & Services",
+      admin_security:     lang === "fr" ? "Sécurité & Paramètres" : "Security & Settings",
+      emp_workspace:      lang === "fr" ? "Mon espace" : "My workspace",
+      emp_dossier:        lang === "fr" ? "Mon dossier" : "My records",
+      emp_engagement:     lang === "fr" ? "Engagement & Découverte" : "Engagement & Discovery",
+      emp_communication:  lang === "fr" ? "Communication" : "Communication",
+    };
+    const SECTION_TO_AREA: Record<string, string> = {};
+    PERM_MODULES.forEach((m: any) => { SECTION_TO_AREA[m.section] = m.area; });
 
     const reloadRoles = () => { getRoles().then(setAdminRoles).catch(() => {}); };
     const selectedRole = adminRoles.find(r => r.id === selectedRoleId);
@@ -64,6 +72,79 @@ export function createAdminRoles(ctx: any) {
         setAdminRoles(prev => prev.map(r => r.id === roleId ? { ...r, permissions: newPerms } : r));
       } catch { addToast_admin(t('toast.error')); }
     };
+
+    // ── Field-level permissions ──────────────────────────────
+    // Fields are stored in `collaborateur_field_configs` (same model as the
+    // "Champs collaborateur" admin page). Each field has visible_roles and
+    // editable_roles arrays of role *slugs*. The matrix shows them as another
+    // permission area so the admin doesn't have to jump between two pages.
+    // Adding/removing a field on the Champs page reflects here automatically.
+    const FIELD_SECTION_LABELS: Record<string, string> = {
+      identity: lang === "fr" ? "Identité"        : "Identity",
+      personal: lang === "fr" ? "Données perso"    : "Personal",
+      contract: lang === "fr" ? "Contrat"          : "Contract",
+      job:      lang === "fr" ? "Poste"            : "Job",
+      position: lang === "fr" ? "Position"         : "Position",
+      org:      lang === "fr" ? "Organisation"     : "Org",
+    };
+    // Only show 3 levels for fields (no `admin` — fields don't have admin actions).
+    const FIELD_LEVELS = ["edit", "view", "none"] as const;
+
+    const getFieldLevel = (fc: any, roleSlug: string): "edit" | "view" | "none" => {
+      const visible = Array.isArray(fc.visible_roles) ? fc.visible_roles : [];
+      const editable = Array.isArray(fc.editable_roles) ? fc.editable_roles : [];
+      if (editable.includes(roleSlug)) return "edit";
+      if (visible.includes(roleSlug)) return "view";
+      return "none";
+    };
+
+    const cycleFieldPerm = async (fc: any, roleSlug: string, currentLevel: "edit" | "view" | "none") => {
+      const idx = FIELD_LEVELS.indexOf(currentLevel);
+      const next = FIELD_LEVELS[(idx + 1) % FIELD_LEVELS.length];
+      const visible: string[] = Array.isArray(fc.visible_roles) ? [...fc.visible_roles] : [];
+      const editable: string[] = Array.isArray(fc.editable_roles) ? [...fc.editable_roles] : [];
+      const removeFrom = (arr: string[], slug: string) => arr.filter(s => s !== slug);
+      const addOnce = (arr: string[], slug: string) => arr.includes(slug) ? arr : [...arr, slug];
+
+      let newVisible = visible;
+      let newEditable = editable;
+      if (next === "none") {
+        newVisible = removeFrom(visible, roleSlug);
+        newEditable = removeFrom(editable, roleSlug);
+      } else if (next === "view") {
+        newVisible = addOnce(visible, roleSlug);
+        newEditable = removeFrom(editable, roleSlug);
+      } else {
+        newVisible = addOnce(visible, roleSlug);
+        newEditable = addOnce(editable, roleSlug);
+      }
+      const patch = {
+        visible_roles: newVisible.length ? newVisible : null,
+        editable_roles: newEditable.length ? newEditable : null,
+      };
+      // Optimistic update
+      setFieldConfig((prev: any[]) => prev.map(f => f.id === fc.id ? { ...f, ...patch } : f));
+      try {
+        const updated = await apiUpdateFieldConfig(fc.id, patch);
+        setFieldConfig((prev: any[]) => prev.map(f => f.id === fc.id ? { ...f, ...updated } : f));
+      } catch {
+        // rollback
+        setFieldConfig((prev: any[]) => prev.map(f => f.id === fc.id ? { ...f, visible_roles: visible, editable_roles: editable } : f));
+        addToast_admin(t('toast.error'));
+      }
+    };
+
+    const fieldsBySection: Record<string, any[]> = {};
+    const fieldSectionOrder: string[] = [];
+    const sortedFields = [...(fieldConfig || [])].sort((a: any, b: any) => (a.ordre || 0) - (b.ordre || 0));
+    for (const fc of sortedFields) {
+      const sec = fc.section || "personal";
+      if (!fieldsBySection[sec]) { fieldsBySection[sec] = []; fieldSectionOrder.push(sec); }
+      fieldsBySection[sec].push(fc);
+    }
+    const filteredFields = !permMatrixFilter
+      ? sortedFields
+      : sortedFields.filter((f: any) => (f.label || "").toLowerCase().includes(permMatrixFilter.toLowerCase()));
 
     return (
       <div style={{ flex: 1, padding: "24px 32px", overflow: "auto" }}>
@@ -114,9 +195,9 @@ export function createAdminRoles(ctx: any) {
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: selectedRole.couleur }} />
               <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0, color: selectedRole.couleur }}>{selectedRole.nom}</h2>
               <div style={{ marginLeft: "auto", display: "flex", gap: 0 }}>
-                {(["scope", "members", "security", "history"] as const).map(tab => (
+                {(["scope", "members", "fields", "security", "history"] as const).map(tab => (
                   <button key={tab} onClick={() => setRoleTab(tab)} style={{ padding: "8px 16px", fontSize: 12, fontWeight: roleTab === tab ? 600 : 400, color: roleTab === tab ? C.pink : C.textLight, background: "none", border: "none", borderBottom: roleTab === tab ? `2px solid ${C.pink}` : "2px solid transparent", cursor: "pointer", fontFamily: font }}>
-                    {tab === "scope" ? t('roles.scope') : tab === "members" ? `${t('roles.members')} (${selectedRole.users_count || 0})` : tab === "security" ? t('roles.security') : t('roles.history')}
+                    {tab === "scope" ? t('roles.scope') : tab === "members" ? `${t('roles.members')} (${selectedRole.users_count || 0})` : tab === "fields" ? (lang === "fr" ? "Champs" : "Fields") : tab === "security" ? t('roles.security') : t('roles.history')}
                   </button>
                 ))}
               </div>
@@ -186,6 +267,30 @@ export function createAdminRoles(ctx: any) {
                       { key: "n1_manager", label: lang === "fr" ? "Mes N-1 (Manager)" : "My reports (Manager)", Icon: Users, color: "#0D47A1", dynamic: true },
                       { key: "population_rh", label: lang === "fr" ? "Ma population RH" : "My HR population", Icon: Users, color: "#2E7D32", dynamic: true },
                     ];
+                    // Liste les valeurs disponibles dans l'instance pour chaque type de critère
+                    const COLLABS_LIST: any[] = ctx.COLLABORATEURS || [];
+                    const GROUPES_LIST: any[] = ctx.GROUPES || [];
+                    const getCriterionOptions = (key: string): { value: string; label: string }[] => {
+                      const distinct = (field: string) => {
+                        const set = new Set<string>();
+                        COLLABS_LIST.forEach((c: any) => { const v = c?.[field]; if (v) set.add(String(v)); });
+                        return Array.from(set).sort().map(v => ({ value: v, label: v }));
+                      };
+                      switch (key) {
+                        case "societe":      return distinct("entite_juridique");
+                        case "sous_societe": return distinct("business_unit");
+                        case "departement":  return distinct("departement");
+                        case "bureau":       return distinct("site");
+                        case "poste":        return distinct("poste");
+                        case "equipe":       return GROUPES_LIST.filter((g: any) => (g.type || "").toLowerCase().includes("equipe") || (g.type || "").toLowerCase() === "team").map((g: any) => ({ value: String(g.id), label: g.nom }));
+                        case "employe":      return COLLABS_LIST.map((c: any) => ({ value: String(c.id), label: `${c.prenom} ${c.nom}${c.poste ? ` — ${c.poste}` : ""}` }));
+                        default: return [];
+                      }
+                    };
+                    const updateCriterionValues = (gid: number, key: string, values: string[]) => {
+                      const updated = scopeGroups.map((g: any) => g.id === gid ? { ...g, criteria: g.criteria.map((c: any) => c.key === key ? { ...c, values } : c) } : g);
+                      saveScope(updated, "custom");
+                    };
                     const scopeGroups: any[] = (selectedRole as any).scope_groups || [];
                     const isGlobal = selectedRole.scope_type === "global" && scopeGroups.length === 0;
 
@@ -266,17 +371,51 @@ export function createAdminRoles(ctx: any) {
                                         </div>
                                         {meta.dynamic ? (
                                           <div style={{ fontSize: 11, color: C.textMuted }}>
-                                            {criterion.key === "n1_manager" ? (lang === "fr" ? "Chaque membre voit uniquement ses subordonnés directs (champ Manager du Job Information)" : "Each member sees only their direct reports (Manager field in Job Information)") :
-                                            (lang === "fr" ? "Chaque membre voit uniquement sa population RH assignée (champ HR Manager du Job Relationship)" : "Each member sees only their assigned HR population (HR Manager field in Job Relationship)")}
+                                            {criterion.key === "n1_manager" ? (lang === "fr" ? "Chaque membre voit uniquement ses subordonnés directs (champ Manager dans Informations de poste)" : "Each member sees only their direct reports (Manager field in Position info)") :
+                                            (lang === "fr" ? "Chaque membre voit uniquement sa population RH assignée (champ HRBP dans Informations de poste)" : "Each member sees only their assigned HR population (HRBP field in Position info)")}
                                           </div>
-                                        ) : (
-                                          <div>
-                                            <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 4 }}>{lang === "fr" ? "Toutes" : "All"}</div>
-                                            <select style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
-                                              <option value="">{lang === "fr" ? "Sélectionner..." : "Select..."}</option>
-                                            </select>
-                                          </div>
-                                        )}
+                                        ) : (() => {
+                                          const opts = getCriterionOptions(criterion.key);
+                                          const selected: string[] = Array.isArray(criterion.values) ? criterion.values : [];
+                                          const lookup: Record<string, string> = {};
+                                          opts.forEach(o => { lookup[o.value] = o.label; });
+                                          const remaining = opts.filter(o => !selected.includes(o.value));
+                                          const allSelected = selected.length === 0;
+                                          return (
+                                            <div>
+                                              <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 6 }}>
+                                                {allSelected
+                                                  ? (lang === "fr" ? "Toutes" : "All")
+                                                  : `${selected.length} ${lang === "fr" ? "sélectionné" + (selected.length > 1 ? "s" : "") : "selected"}`}
+                                                {opts.length > 0 && <span style={{ color: C.textMuted }}> · {opts.length} {lang === "fr" ? "disponible" + (opts.length > 1 ? "s" : "") : "available"}</span>}
+                                              </div>
+                                              {selected.length > 0 && (
+                                                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+                                                  {selected.map(v => (
+                                                    <span key={v} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 12, background: meta.color + "15", color: meta.color, fontSize: 11, fontWeight: 500 }}>
+                                                      {lookup[v] || v}
+                                                      <button onClick={() => updateCriterionValues(group.id, criterion.key, selected.filter(x => x !== v))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: meta.color }}><X size={10} /></button>
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              )}
+                                              {remaining.length > 0 ? (
+                                                <select value="" onChange={e => { if (e.target.value) updateCriterionValues(group.id, criterion.key, [...selected, e.target.value]); }} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                                                  <option value="">{lang === "fr" ? `+ Ajouter ${meta.label.toLowerCase()}...` : `+ Add ${meta.label.toLowerCase()}...`}</option>
+                                                  {remaining.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                </select>
+                                              ) : opts.length === 0 ? (
+                                                <div style={{ fontSize: 10, color: C.textMuted, fontStyle: "italic", padding: "6px 8px", background: C.bg, borderRadius: 6 }}>
+                                                  {lang === "fr" ? `Aucune valeur ${meta.label.toLowerCase()} disponible dans cette instance.` : `No ${meta.label.toLowerCase()} values available in this instance.`}
+                                                </div>
+                                              ) : (
+                                                <div style={{ fontSize: 10, color: C.textMuted, fontStyle: "italic" }}>
+                                                  {lang === "fr" ? "Toutes les valeurs sont sélectionnées." : "All values selected."}
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
                                       </div>
                                     );
                                   })}
@@ -395,9 +534,45 @@ export function createAdminRoles(ctx: any) {
                                       </div>
                                       <button onClick={() => removeExclCriterion(group.id, criterion.key)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}><X size={12} color={C.textMuted} /></button>
                                     </div>
-                                    <select style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
-                                      <option value="">{lang === "fr" ? "Sélectionner..." : "Select..."}</option>
-                                    </select>
+                                    {(() => {
+                                      const COLLABS_E: any[] = ctx.COLLABORATEURS || [];
+                                      const GROUPES_E: any[] = ctx.GROUPES || [];
+                                      const distinctE = (field: string) => { const s = new Set<string>(); COLLABS_E.forEach((c: any) => { const v = c?.[field]; if (v) s.add(String(v)); }); return Array.from(s).sort().map(v => ({ value: v, label: v })); };
+                                      const optsE: { value: string; label: string }[] = (criterion.key === "societe" ? distinctE("entite_juridique")
+                                        : criterion.key === "sous_societe" ? distinctE("business_unit")
+                                        : criterion.key === "departement" ? distinctE("departement")
+                                        : criterion.key === "bureau" ? distinctE("site")
+                                        : criterion.key === "poste" ? distinctE("poste")
+                                        : criterion.key === "equipe" ? GROUPES_E.filter((g: any) => (g.type || "").toLowerCase().includes("equipe") || (g.type || "").toLowerCase() === "team").map((g: any) => ({ value: String(g.id), label: g.nom }))
+                                        : criterion.key === "employe" ? COLLABS_E.map((c: any) => ({ value: String(c.id), label: `${c.prenom} ${c.nom}` }))
+                                        : []);
+                                      const selectedE: string[] = Array.isArray(criterion.values) ? criterion.values : [];
+                                      const lookupE: Record<string, string> = {}; optsE.forEach(o => { lookupE[o.value] = o.label; });
+                                      const remainingE = optsE.filter(o => !selectedE.includes(o.value));
+                                      const setValuesE = (vals: string[]) => saveExcl(exclGroups.map((g: any) => g.id === group.id ? { ...g, criteria: g.criteria.map((c: any) => c.key === criterion.key ? { ...c, values: vals } : c) } : g));
+                                      return (
+                                        <div>
+                                          {selectedE.length > 0 && (
+                                            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+                                              {selectedE.map(v => (
+                                                <span key={v} style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 12, background: meta.color + "15", color: meta.color, fontSize: 11, fontWeight: 500 }}>
+                                                  {lookupE[v] || v}
+                                                  <button onClick={() => setValuesE(selectedE.filter(x => x !== v))} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1, color: meta.color }}><X size={10} /></button>
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                          {remainingE.length > 0 ? (
+                                            <select value="" onChange={e => { if (e.target.value) setValuesE([...selectedE, e.target.value]); }} style={{ ...sInput, fontSize: 12, cursor: "pointer" }}>
+                                              <option value="">{lang === "fr" ? `+ Ajouter ${meta.label.toLowerCase()}...` : `+ Add ${meta.label.toLowerCase()}...`}</option>
+                                              {remainingE.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                            </select>
+                                          ) : optsE.length === 0 ? (
+                                            <div style={{ fontSize: 10, color: C.textMuted, fontStyle: "italic", padding: "6px 8px", background: C.bg, borderRadius: 6 }}>{lang === "fr" ? "Aucune valeur disponible." : "No values available."}</div>
+                                          ) : null}
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
                                 );
                               })}
@@ -504,10 +679,10 @@ export function createAdminRoles(ctx: any) {
                               <Landmark size={14} color={autoManagersEnabled ? "#4CAF50" : C.textMuted} />
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>Managers (Job Information)</span>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{lang === "fr" ? "Managers (Informations de poste)" : "Managers (Position info)"}</span>
                                   {autoManagersEnabled && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "#4CAF5015", color: "#4CAF50", fontWeight: 600 }}>{managers.length} {lang === "fr" ? "résolu(s)" : "resolved"}</span>}
                                 </div>
-                                <div style={{ fontSize: 10, color: C.textMuted }}>{lang === "fr" ? "Toute personne assignée comme Manager dans le profil d'un employé" : "Anyone assigned as Manager in an employee profile"}</div>
+                                <div style={{ fontSize: 10, color: C.textMuted }}>{lang === "fr" ? "Toute personne assignée comme Manager dans le profil d'un employé (champ Manager dans Informations de poste)" : "Anyone assigned as Manager in an employee profile (Manager field in Position info)"}</div>
                               </div>
                             </div>
                             {autoManagersEnabled && managers.length > 0 && (
@@ -543,10 +718,10 @@ export function createAdminRoles(ctx: any) {
                               <Users size={14} color={autoHREnabled ? "#4CAF50" : C.textMuted} />
                               <div style={{ flex: 1 }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>HR Managers (Job Relationship)</span>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{lang === "fr" ? "HRBP (Informations de poste)" : "HRBP (Position info)"}</span>
                                   {autoHREnabled && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "#4CAF5015", color: "#4CAF50", fontWeight: 600 }}>{hrManagers.length} {lang === "fr" ? "résolu(s)" : "resolved"}</span>}
                                 </div>
-                                <div style={{ fontSize: 10, color: C.textMuted }}>{lang === "fr" ? "Toute personne assignée comme HR Manager dans le profil de l'employé" : "Anyone assigned as HR Manager in an employee profile"}</div>
+                                <div style={{ fontSize: 10, color: C.textMuted }}>{lang === "fr" ? "Toute personne assignée comme HRBP dans le profil de l'employé (champ HRBP dans Informations de poste)" : "Anyone assigned as HRBP in an employee profile (HRBP field in Position info)"}</div>
                               </div>
                             </div>
                             {autoHREnabled && hrManagers.length > 0 && (
@@ -735,6 +910,135 @@ export function createAdminRoles(ctx: any) {
                 </div>
               )}
 
+              {/* -- FIELDS TAB — Permissions par champ pour ce rôle -- */}
+              {roleTab === "fields" && (() => {
+                const allFields = [...(fieldConfig || [])].sort((a: any, b: any) => (a.section || "").localeCompare(b.section || "") || (a.ordre || 0) - (b.ordre || 0));
+                const SECTIONS_FIELDS: Record<string, string> = {
+                  identity: lang === "fr" ? "Identité" : "Identity",
+                  personal: lang === "fr" ? "Informations personnelles" : "Personal info",
+                  contract: lang === "fr" ? "Informations contractuelles" : "Contract info",
+                  job: lang === "fr" ? "Informations métier" : "Job info",
+                  position: lang === "fr" ? "Informations de poste" : "Position info",
+                  org: lang === "fr" ? "Organisation" : "Organization",
+                };
+                const roleSlug = selectedRole.slug || "";
+                // Niveau actuel = "edit" (dans editable_roles), "view" (dans visible_roles), sinon "none"
+                const getLevel = (fc: any): "none" | "view" | "edit" => {
+                  const editArr = Array.isArray(fc.editable_roles) ? fc.editable_roles : null;
+                  const viewArr = Array.isArray(fc.visible_roles) ? fc.visible_roles : null;
+                  // null = pas de restriction → tout le monde voit/édite
+                  const canEdit = editArr === null ? true : editArr.includes(roleSlug);
+                  const canView = viewArr === null ? true : viewArr.includes(roleSlug);
+                  if (canEdit) return "edit";
+                  if (canView) return "view";
+                  return "none";
+                };
+                const cycleFieldPerm = async (fc: any) => {
+                  const current = getLevel(fc);
+                  const next: "none" | "view" | "edit" = current === "none" ? "view" : current === "view" ? "edit" : "none";
+                  // Build new arrays for THIS field, applying the change for THIS role only
+                  const allRoles = ["hrbp", "manager", "collaborateur", "auditeur"];
+                  const visibleArr: string[] = Array.isArray(fc.visible_roles) ? [...fc.visible_roles] : [...allRoles];
+                  const editableArr: string[] = Array.isArray(fc.editable_roles) ? [...fc.editable_roles] : [...allRoles];
+                  // Remove current role from both
+                  const newVisible = visibleArr.filter((s: string) => s !== roleSlug);
+                  const newEditable = editableArr.filter((s: string) => s !== roleSlug);
+                  if (next === "view") newVisible.push(roleSlug);
+                  if (next === "edit") { newVisible.push(roleSlug); newEditable.push(roleSlug); }
+                  const patch: any = {
+                    visible_roles: newVisible.length > 0 ? newVisible : null,
+                    editable_roles: newEditable.length > 0 ? newEditable : null,
+                  };
+                  // Optimistic
+                  setFieldConfig((prev: any[]) => prev.map(f => f.id === fc.id ? { ...f, ...patch } : f));
+                  try {
+                    const updated = await apiUpdateFieldConfig(fc.id, patch);
+                    setFieldConfig((prev: any[]) => prev.map(f => f.id === fc.id ? { ...f, ...updated } : f));
+                    addToast_admin(`✓ ${fc.label} → ${next === "none" ? (lang === "fr" ? "Aucun" : "None") : next === "view" ? (lang === "fr" ? "Voir" : "View") : (lang === "fr" ? "Éditer" : "Edit")}`);
+                  } catch {
+                    addToast_admin(lang === "fr" ? "Échec — réessayer" : "Failed — retry");
+                  }
+                };
+                const LEVEL_META: Record<string, { label: string; bg: string; color: string }> = {
+                  none: { label: lang === "fr" ? "Aucun" : "None", bg: C.bg, color: C.textMuted },
+                  view: { label: lang === "fr" ? "Voir" : "View", bg: "#E3F2FD", color: "#1A73E8" },
+                  edit: { label: lang === "fr" ? "Éditer" : "Edit", bg: "#FFF8E1", color: "#F9A825" },
+                };
+                const sectionsOrdered = ["identity", "personal", "contract", "job", "position", "org"];
+                // Stats par niveau
+                const stats = { none: 0, view: 0, edit: 0 };
+                allFields.forEach((fc: any) => { stats[getLevel(fc)]++; });
+                return (
+                  <div style={{ marginBottom: 24 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <div>
+                        <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>{lang === "fr" ? "Permissions par champ" : "Field-level permissions"}</h3>
+                        <p style={{ fontSize: 11, color: C.textMuted, margin: "4px 0 0" }}>
+                          {lang === "fr" ? `Pour le rôle ${selectedRole.nom}. Cliquez sur un niveau pour le changer (Aucun → Voir → Éditer → Aucun).` : `For role ${selectedRole.nom}. Click a level to change it.`}
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <span style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: LEVEL_META.edit.bg, color: LEVEL_META.edit.color }}>{stats.edit} {lang === "fr" ? "Éditer" : "Edit"}</span>
+                        <span style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: LEVEL_META.view.bg, color: LEVEL_META.view.color }}>{stats.view} {lang === "fr" ? "Voir" : "View"}</span>
+                        <span style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: LEVEL_META.none.bg, color: LEVEL_META.none.color }}>{stats.none} {lang === "fr" ? "Aucun" : "None"}</span>
+                      </div>
+                    </div>
+                    {(roleSlug === "super_admin" || roleSlug === "admin" || roleSlug === "admin_rh") && (
+                      <div style={{ padding: "12px 16px", background: "#1A73E810", borderRadius: 8, marginBottom: 16, fontSize: 12, color: "#1A73E8", display: "flex", alignItems: "center", gap: 8 }}>
+                        <ShieldCheck size={14} />
+                        {lang === "fr" ? `Le rôle ${selectedRole.nom} bypasse toutes les restrictions de champ. Les niveaux affichés ici sont indicatifs.` : `Role ${selectedRole.nom} bypasses all field restrictions. Levels shown are informational.`}
+                      </div>
+                    )}
+                    {sectionsOrdered.map(sKey => {
+                      const sectionFields = allFields.filter((f: any) => f.section === sKey);
+                      if (sectionFields.length === 0) return null;
+                      return (
+                        <div key={sKey} style={{ marginBottom: 16 }}>
+                          <div style={{ padding: "8px 12px", background: C.bg, borderRadius: 6, fontSize: 11, fontWeight: 700, color: C.textLight, textTransform: "uppercase", letterSpacing: .5, marginBottom: 6 }}>
+                            {SECTIONS_FIELDS[sKey] || sKey} <span style={{ color: C.textMuted, fontWeight: 400 }}>({sectionFields.length})</span>
+                          </div>
+                          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
+                            {sectionFields.map((fc: any, idx: number) => {
+                              const level = getLevel(fc);
+                              const meta = LEVEL_META[level];
+                              const inactif = fc.actif === false;
+                              return (
+                                <div key={fc.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderBottom: idx < sectionFields.length - 1 ? `1px solid ${C.border}` : "none", background: inactif ? C.bg : C.white, opacity: inactif ? 0.55 : 1 }}>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                      <span style={{ fontSize: 13, fontWeight: 500, color: C.text }}>{lang !== "fr" && fc.label_en ? fc.label_en : fc.label}</span>
+                                      {inactif && (
+                                        <span style={{ padding: "1px 6px", borderRadius: 3, fontSize: 9, fontWeight: 700, background: C.textMuted + "20", color: C.textMuted, textTransform: "uppercase", letterSpacing: .3 }}>
+                                          {lang === "fr" ? "Inactif" : "Inactive"}
+                                        </span>
+                                      )}
+                                      {fc.obligatoire && (
+                                        <span style={{ padding: "1px 6px", borderRadius: 3, fontSize: 9, fontWeight: 700, background: C.red + "15", color: C.red, textTransform: "uppercase", letterSpacing: .3 }}>
+                                          {lang === "fr" ? "Obligatoire" : "Required"}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>{fc.field_key}</div>
+                                  </div>
+                                  <button onClick={() => cycleFieldPerm(fc)} title={inactif ? (lang === "fr" ? "Champ inactif — modifier la perm reste possible mais le champ n'apparaît pas dans le profil" : "Inactive field — permission editable but field doesn't appear on profile") : ""} style={{ padding: "6px 14px", borderRadius: 6, fontSize: 11, fontWeight: 600, background: meta.bg, color: meta.color, border: "none", cursor: "pointer", fontFamily: font, minWidth: 70 }}>
+                                    {meta.label}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {allFields.length === 0 && (
+                      <div style={{ padding: "32px 20px", textAlign: "center", color: C.textMuted, fontSize: 12, fontStyle: "italic" }}>
+                        {lang === "fr" ? "Aucun champ collaborateur configuré." : "No collaborator field configured."}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* -- SECURITY TAB (2FA only — password policy is in Paramètres > Sécurité) -- */}
               {roleTab === "security" && (() => {
                 return (
@@ -819,7 +1123,7 @@ export function createAdminRoles(ctx: any) {
                   getPermissionLogs().then((res: any) => {
                     const data = res.data || res;
                     const arr = Array.isArray(data) ? data : [];
-                    arr._loaded = true;
+                    (arr as any)._loaded = true;
                     setPermissionLogs(arr);
                   }).catch(() => { const empty: any = []; empty._loaded = true; setPermissionLogs(empty); });
                 }
@@ -1041,9 +1345,22 @@ export function createAdminRoles(ctx: any) {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(SECTIONS).map(([sKey, sLabel]) => {
+                {Object.entries(AREAS).flatMap(([areaKey, areaMeta]) => {
+                  // Sections appartenant à cette area, dans l'ordre de SECTIONS
+                  const areaSections = Object.entries(SECTIONS).filter(([sKey]) => SECTION_TO_AREA[sKey] === areaKey);
+                  const areaModulesCount = filteredModules.filter(m => (m as any).area === areaKey).length;
+                  if (areaModulesCount === 0) return [];
+                  // Header d'area (gros bandeau coloré)
+                  const areaHeader = (
+                    <tr key={`area-${areaKey}`}>
+                      <td colSpan={displayedRoles.length + 1} style={{ padding: "12px 16px", fontWeight: 700, fontSize: 12, color: areaMeta.color, background: areaMeta.color + "10", borderTop: `2px solid ${areaMeta.color}40`, textTransform: "uppercase", letterSpacing: .8 }}>
+                        ▸ {areaMeta.label} <span style={{ fontWeight: 400, color: C.textMuted, marginLeft: 6 }}>· {areaModulesCount} {lang === "fr" ? "modules" : "modules"}</span>
+                      </td>
+                    </tr>
+                  );
+                  return [areaHeader, ...areaSections.flatMap(([sKey, sLabel]) => {
                   const sectionModules = filteredModules.filter(m => m.section === sKey);
-                  if (sectionModules.length === 0) return null;
+                  if (sectionModules.length === 0) return [];
                   return [
                     <tr key={`section-${sKey}`}>
                       <td colSpan={displayedRoles.length + 1} style={{ padding: "8px 16px", fontWeight: 700, fontSize: 11, color: C.textLight, textTransform: "uppercase", letterSpacing: .5, background: C.bg, borderTop: `1px solid ${C.border}` }}>{sLabel}</td>
@@ -1066,7 +1383,52 @@ export function createAdminRoles(ctx: any) {
                       </tr>
                     )),
                   ];
+                })];
                 })}
+                {/* ─── CHAMPS COLLABORATEUR (synced with the Champs admin page) ─── */}
+                {filteredFields.length > 0 && (() => {
+                  const fieldsAreaColor = "#26A69A";
+                  return [
+                    <tr key="area-fields">
+                      <td colSpan={displayedRoles.length + 1} style={{ padding: "12px 16px", fontWeight: 700, fontSize: 12, color: fieldsAreaColor, background: fieldsAreaColor + "10", borderTop: `2px solid ${fieldsAreaColor}40`, textTransform: "uppercase", letterSpacing: .8 }}>
+                        ▸ {lang === "fr" ? "Champs collaborateur" : "Collaborator fields"} <span style={{ fontWeight: 400, color: C.textMuted, marginLeft: 6 }}>· {filteredFields.length} {lang === "fr" ? "champs" : "fields"}</span>
+                      </td>
+                    </tr>,
+                    ...fieldSectionOrder.flatMap(secKey => {
+                      const fieldsInSection = (fieldsBySection[secKey] || []).filter((fc: any) =>
+                        !permMatrixFilter || (fc.label || "").toLowerCase().includes(permMatrixFilter.toLowerCase())
+                      );
+                      if (fieldsInSection.length === 0) return [];
+                      const secLabel = FIELD_SECTION_LABELS[secKey] || secKey;
+                      return [
+                        <tr key={`field-section-${secKey}`}>
+                          <td colSpan={displayedRoles.length + 1} style={{ padding: "8px 16px", fontWeight: 700, fontSize: 11, color: C.textLight, textTransform: "uppercase", letterSpacing: .5, background: C.bg, borderTop: `1px solid ${C.border}` }}>{secLabel}</td>
+                        </tr>,
+                        ...fieldsInSection.map((fc: any) => (
+                          <tr key={`field-${fc.id}`} style={{ borderBottom: `1px solid ${C.border}` }}>
+                            <td style={{ padding: "10px 16px", fontWeight: 500, position: "sticky", left: 0, background: C.white, zIndex: 1 }}>
+                              {fc.label}
+                              <span style={{ fontSize: 9, color: C.textMuted, marginLeft: 8, fontFamily: "monospace" }}>{fc.field_key || fc.slug}</span>
+                            </td>
+                            {displayedRoles.map(role => {
+                              const level = getFieldLevel(fc, role.slug);
+                              const meta = PERM_LEVEL_META[level];
+                              return (
+                                <td key={role.id} style={{ padding: "6px 8px", textAlign: "center" }}>
+                                  <button onClick={() => cycleFieldPerm(fc, role.slug, level)}
+                                    title={lang === "fr" ? "Cliquer pour cycler — Éditer / Voir / Aucun" : "Click to cycle — Edit / View / None"}
+                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: 10, fontWeight: 600, background: meta.bg, color: meta.color, border: "none", cursor: "pointer", fontFamily: font, transition: "all .15s", minWidth: 55 }}>
+                                    {meta.label}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        )),
+                      ];
+                    }),
+                  ];
+                })()}
               </tbody>
             </table>
           </div>
