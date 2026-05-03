@@ -227,6 +227,7 @@ export function createAdminSidebarComponent(ctx: any) {
       ]},
       { section: t('admin.content'), items: [
         { id: "admin_entreprise" as AdminPage, label: t('admin.company_page'), icon: Building2 },
+        { id: "admin_bureaux" as AdminPage, label: lang === "fr" ? "Bureaux" : "Offices", icon: MapPin },
         { id: "admin_quotes" as AdminPage, label: "Citations du jour", icon: BookOpen },
         { id: "admin_recurring_meetings" as AdminPage, label: "RDV récurrents", icon: CalendarClock },
         { id: "admin_equipements" as AdminPage, label: t('admin.equipment'), icon: Laptop },
@@ -259,11 +260,20 @@ export function createAdminSidebarComponent(ctx: any) {
     const renderSidebar_admin = () => (
       <div style={{ width: sidebarW, minHeight: "100vh", background: C.white, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, transition: "width .2s ease", overflow: "hidden" }}>
         {/* Logo + toggle */}
-        <div style={{ padding: collapsed ? "16px 0" : "16px 16px", display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "space-between", height: 56 }}>
+        <div style={{ padding: collapsed ? "16px 0" : "16px 16px", display: "flex", alignItems: "center", justifyContent: collapsed ? "center" : "flex-start", gap: 10, height: 56 }}>
           {collapsed ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}><IllizeoLogo size={28} /></div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <IllizeoLogo size={22} />
+              </div>
+            </div>
           ) : (
-            <div style={{ color: C.pink }}><IllizeoLogoFull height={22} /></div>
+            <>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: C.pinkBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <IllizeoLogo size={22} />
+              </div>
+              <div style={{ color: C.pink, lineHeight: 1 }}><IllizeoLogoFull height={20} /></div>
+            </>
           )}
         </div>
         {/* Expand/collapse toggle */}
@@ -341,6 +351,8 @@ export function createAdminSidebarComponent(ctx: any) {
             { id: "plans" as const, label: t('sa.plans_modules'), icon: Package },
             { id: "subscriptions" as const, label: t('sa.subscriptions'), icon: FileSignature },
             { id: "stripe" as const, label: "Stripe", icon: CircleDollarSign },
+            { id: "coupons" as const, label: "Coupons", icon: Tag },
+            { id: "reporting" as const, label: "Reporting MRR", icon: TrendingUp },
             { id: "ai" as const, label: "IA & Claude", icon: Sparkles },
             { id: "ai_protection" as const, label: "Protection IA", icon: ShieldCheck },
           ]).map(item => (
@@ -851,29 +863,39 @@ export function createAdminSidebarComponent(ctx: any) {
               </div>
 
               {/* ── Live Keys ── */}
-              <div className="iz-card" style={{ ...sCard, marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: saStripe?.live_configured ? C.green : C.textMuted }} />
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>Clés Production</span>
-                  <span style={{ fontSize: 10, color: C.textMuted }}>(live)</span>
-                </div>
-                {saStripe?.live_configured ? (
-                  <>
-                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "6px 16px", fontSize: 13, marginBottom: 14 }}>
-                      <span style={{ color: C.textMuted }}>Publishable Key</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>pk_live_•••••••••</span>
-                      <span style={{ color: C.textMuted }}>Secret Key</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>sk_live_•••••••••</span>
-                      <span style={{ color: C.textMuted }}>Webhook Secret</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>whsec_•••••••••</span>
+              {(() => {
+                const live = saStripe?.live;
+                const allValid = live?.key_valid && live?.secret_valid && live?.webhook_valid;
+                const someInvalid = saStripe?.live_configured && !allValid;
+                return (
+                <div className="iz-card" style={{ ...sCard, marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: allValid ? C.green : someInvalid ? C.red : C.textMuted }} />
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>Clés Production</span>
+                    <span style={{ fontSize: 10, color: C.textMuted }}>(live)</span>
+                    {someInvalid && <span style={{ padding: "2px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: C.red + "15", color: C.red }}>⚠ Clé invalide</span>}
+                  </div>
+
+                  {/* Aperçu des clés stockées */}
+                  {saStripe?.live_configured && (
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 60px", gap: "6px 16px", fontSize: 13, marginBottom: 14, alignItems: "center" }}>
+                      <span style={{ color: C.textMuted }}>Publishable Key</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, color: live?.key_valid ? C.text : C.red }}>{live?.key_preview || "pk_live_•••"}</span>
+                      <span style={{ fontSize: 14 }}>{live?.key_valid ? "✅" : "❌"}</span>
+
+                      <span style={{ color: C.textMuted }}>Secret Key</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, color: live?.secret_valid ? C.text : C.red }}>{live?.secret_preview || "sk_live_•••"}</span>
+                      <span style={{ fontSize: 14 }}>{live?.secret_valid ? "✅" : "❌"}</span>
+
+                      <span style={{ color: C.textMuted }}>Webhook Secret</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, color: live?.webhook_valid ? C.text : C.red }}>{live?.webhook_preview || "whsec_•••"}</span>
+                      <span style={{ fontSize: 14 }}>{live?.webhook_valid ? "✅" : "❌"}</span>
                     </div>
-                    <button onClick={() => showConfirm("Supprimer les clés production Stripe ?", async () => {
-                      try {
-                        await superAdminUpdateStripeConfig({ stripe_key: "", stripe_secret: "", stripe_webhook_secret: "" });
-                        loadSA();
-                        addToast_admin("Clés production supprimées");
-                      } catch { addToast_admin(t('toast.error')); }
-                    })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 11, padding: "4px 12px" }}>Supprimer clés live</button>
-                  </>
-                ) : (
-                  <>
+                  )}
+
+                  {/* Inputs pour modifier ou créer */}
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: saStripe?.live_configured ? `1px dashed ${C.border}` : "none" }}>
+                    {saStripe?.live_configured && <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>Modifier une ou plusieurs clés (laisser vide pour conserver l'existant) :</div>}
                     {[
                       { key: "stripe_key", label: "Publishable Key", placeholder: "pk_live_..." },
                       { key: "stripe_secret", label: "Secret Key", placeholder: "sk_live_..." },
@@ -881,46 +903,77 @@ export function createAdminSidebarComponent(ctx: any) {
                     ].map(field => (
                       <div key={field.key} style={{ marginBottom: 10 }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>{field.label}</label>
-                        <input id={`sa-${field.key}`} type="password" placeholder={field.placeholder} style={sInput} />
+                        <input id={`sa-${field.key}`} type="text" placeholder={field.placeholder} style={{ ...sInput, fontFamily: "monospace", fontSize: 12 }} autoComplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" data-form-type="other" />
                       </div>
                     ))}
-                    <button onClick={async () => {
-                      const data: any = {};
-                      ["stripe_key", "stripe_secret", "stripe_webhook_secret"].forEach(k => {
-                        const el = document.getElementById(`sa-${k}`) as HTMLInputElement;
-                        if (el?.value) data[k] = el.value;
-                      });
-                      if (Object.keys(data).length === 0) { addToast_admin("Aucune clé saisie"); return; }
-                      try { await superAdminUpdateStripeConfig(data); loadSA(); addToast_admin("Clés production enregistrées"); } catch { addToast_admin(t('toast.error')); }
-                    }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12 }}>Enregistrer clés live</button>
-                  </>
-                )}
-              </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <button onClick={async () => {
+                        const data: any = {};
+                        const expectedPrefixes: Record<string, string> = { stripe_key: "pk_live_", stripe_secret: "sk_live_", stripe_webhook_secret: "whsec_" };
+                        const errors: string[] = [];
+                        ["stripe_key", "stripe_secret", "stripe_webhook_secret"].forEach(k => {
+                          const el = document.getElementById(`sa-${k}`) as HTMLInputElement;
+                          if (el?.value) {
+                            const v = el.value.trim();
+                            if (!v.startsWith(expectedPrefixes[k])) {
+                              errors.push(`${k.replace("stripe_", "").replace("_", " ")} doit commencer par ${expectedPrefixes[k]} (reçu : ${v.substring(0, 8)}...)`);
+                            } else {
+                              data[k] = v;
+                              el.value = "";
+                            }
+                          }
+                        });
+                        if (errors.length > 0) { addToast_admin(`⚠ ${errors.join(" · ")}`); return; }
+                        if (Object.keys(data).length === 0) { addToast_admin("Aucune clé saisie"); return; }
+                        try { await superAdminUpdateStripeConfig(data); await loadSA(); addToast_admin(`✓ ${Object.keys(data).length} clé(s) enregistrée(s)`); } catch { addToast_admin(t('toast.error')); }
+                      }} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 12 }}>{saStripe?.live_configured ? "Mettre à jour" : "Enregistrer clés live"}</button>
+                      {saStripe?.live_configured && (
+                        <button onClick={() => showConfirm("Supprimer TOUTES les clés production Stripe ?", async () => {
+                          try {
+                            await superAdminUpdateStripeConfig({ stripe_key: "", stripe_secret: "", stripe_webhook_secret: "" });
+                            loadSA();
+                            addToast_admin("Clés production supprimées");
+                          } catch { addToast_admin(t('toast.error')); }
+                        })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 11, padding: "4px 12px" }}>Supprimer toutes</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                );
+              })()}
 
               {/* ── Test Keys ── */}
-              <div className="iz-card" style={{ ...sCard }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: saStripe?.test_configured ? "#FF9800" : C.textMuted }} />
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>Clés Test</span>
-                  <span style={{ fontSize: 10, color: C.textMuted }}>(sandbox)</span>
-                </div>
-                {saStripe?.test_configured ? (
-                  <>
-                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "6px 16px", fontSize: 13, marginBottom: 14 }}>
-                      <span style={{ color: C.textMuted }}>Publishable Key</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>pk_test_•••••••••</span>
-                      <span style={{ color: C.textMuted }}>Secret Key</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>sk_test_•••••••••</span>
-                      <span style={{ color: C.textMuted }}>Webhook Secret</span><span style={{ fontFamily: "monospace", fontSize: 12 }}>whsec_•••••••••</span>
+              {(() => {
+                const test = saStripe?.test;
+                const allValid = test?.key_valid && test?.secret_valid && test?.webhook_valid;
+                const someInvalid = saStripe?.test_configured && !allValid;
+                return (
+                <div className="iz-card" style={{ ...sCard }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: allValid ? "#FF9800" : someInvalid ? C.red : C.textMuted }} />
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>Clés Test</span>
+                    <span style={{ fontSize: 10, color: C.textMuted }}>(sandbox)</span>
+                    {someInvalid && <span style={{ padding: "2px 8px", borderRadius: 8, fontSize: 10, fontWeight: 700, background: C.red + "15", color: C.red }}>⚠ Clé invalide</span>}
+                  </div>
+
+                  {saStripe?.test_configured && (
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr 60px", gap: "6px 16px", fontSize: 13, marginBottom: 14, alignItems: "center" }}>
+                      <span style={{ color: C.textMuted }}>Publishable Key</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, color: test?.key_valid ? C.text : C.red }}>{test?.key_preview || "pk_test_•••"}</span>
+                      <span style={{ fontSize: 14 }}>{test?.key_valid ? "✅" : "❌"}</span>
+
+                      <span style={{ color: C.textMuted }}>Secret Key</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, color: test?.secret_valid ? C.text : C.red }}>{test?.secret_preview || "sk_test_•••"}</span>
+                      <span style={{ fontSize: 14 }}>{test?.secret_valid ? "✅" : "❌"}</span>
+
+                      <span style={{ color: C.textMuted }}>Webhook Secret</span>
+                      <span style={{ fontFamily: "monospace", fontSize: 11, color: test?.webhook_valid ? C.text : C.red }}>{test?.webhook_preview || "whsec_•••"}</span>
+                      <span style={{ fontSize: 14 }}>{test?.webhook_valid ? "✅" : "❌"}</span>
                     </div>
-                    <button onClick={() => showConfirm("Supprimer les clés test Stripe ?", async () => {
-                      try {
-                        await superAdminUpdateStripeConfig({ stripe_test_key: "", stripe_test_secret: "", stripe_test_webhook_secret: "" });
-                        loadSA();
-                        addToast_admin("Clés test supprimées");
-                      } catch { addToast_admin(t('toast.error')); }
-                    })} style={{ ...sBtn("outline"), color: "#FF9800", borderColor: "#FF9800", fontSize: 11, padding: "4px 12px" }}>Supprimer clés test</button>
-                  </>
-                ) : (
-                  <>
+                  )}
+
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: saStripe?.test_configured ? `1px dashed ${C.border}` : "none" }}>
+                    {saStripe?.test_configured && <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 8 }}>Modifier une ou plusieurs clés (laisser vide pour conserver l'existant) :</div>}
                     {[
                       { key: "stripe_test_key", label: "Publishable Key", placeholder: "pk_test_..." },
                       { key: "stripe_test_secret", label: "Secret Key", placeholder: "sk_test_..." },
@@ -928,23 +981,246 @@ export function createAdminSidebarComponent(ctx: any) {
                     ].map(field => (
                       <div key={field.key} style={{ marginBottom: 10 }}>
                         <label style={{ fontSize: 11, fontWeight: 600, color: C.text, display: "block", marginBottom: 4 }}>{field.label}</label>
-                        <input id={`sa-${field.key}`} type="password" placeholder={field.placeholder} style={sInput} />
+                        <input id={`sa-${field.key}`} type="text" placeholder={field.placeholder} style={{ ...sInput, fontFamily: "monospace", fontSize: 12 }} autoComplete="off" data-1p-ignore="true" data-bwignore="true" data-lpignore="true" data-form-type="other" />
                       </div>
                     ))}
-                    <button onClick={async () => {
-                      const data: any = {};
-                      ["stripe_test_key", "stripe_test_secret", "stripe_test_webhook_secret"].forEach(k => {
-                        const el = document.getElementById(`sa-${k}`) as HTMLInputElement;
-                        if (el?.value) data[k] = el.value;
-                      });
-                      if (Object.keys(data).length === 0) { addToast_admin("Aucune clé saisie"); return; }
-                      try { await superAdminUpdateStripeConfig(data); loadSA(); addToast_admin("Clés test enregistrées"); } catch { addToast_admin(t('toast.error')); }
-                    }} style={{ ...sBtn("outline"), borderColor: "#FF9800", color: "#FF9800", fontSize: 12, fontWeight: 600 }}>Enregistrer clés test</button>
-                  </>
-                )}
-              </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <button onClick={async () => {
+                        const data: any = {};
+                        const expectedPrefixes: Record<string, string> = { stripe_test_key: "pk_test_", stripe_test_secret: "sk_test_", stripe_test_webhook_secret: "whsec_" };
+                        const errors: string[] = [];
+                        ["stripe_test_key", "stripe_test_secret", "stripe_test_webhook_secret"].forEach(k => {
+                          const el = document.getElementById(`sa-${k}`) as HTMLInputElement;
+                          if (el?.value) {
+                            const v = el.value.trim();
+                            if (!v.startsWith(expectedPrefixes[k])) {
+                              errors.push(`${k.replace("stripe_test_", "").replace("_", " ")} doit commencer par ${expectedPrefixes[k]} (reçu : ${v.substring(0, 8)}...)`);
+                            } else {
+                              data[k] = v;
+                              el.value = "";
+                            }
+                          }
+                        });
+                        if (errors.length > 0) { addToast_admin(`⚠ ${errors.join(" · ")}`); return; }
+                        if (Object.keys(data).length === 0) { addToast_admin("Aucune clé saisie"); return; }
+                        try { await superAdminUpdateStripeConfig(data); await loadSA(); addToast_admin(`✓ ${Object.keys(data).length} clé(s) enregistrée(s)`); } catch { addToast_admin(t('toast.error')); }
+                      }} style={{ ...sBtn("outline"), borderColor: "#FF9800", color: "#FF9800", fontSize: 12, fontWeight: 600 }}>{saStripe?.test_configured ? "Mettre à jour" : "Enregistrer clés test"}</button>
+                      {saStripe?.test_configured && (
+                        <button onClick={() => showConfirm("Supprimer TOUTES les clés test Stripe ?", async () => {
+                          try {
+                            await superAdminUpdateStripeConfig({ stripe_test_key: "", stripe_test_secret: "", stripe_test_webhook_secret: "" });
+                            loadSA();
+                            addToast_admin("Clés test supprimées");
+                          } catch { addToast_admin(t('toast.error')); }
+                        })} style={{ ...sBtn("outline"), color: C.red, borderColor: C.red, fontSize: 11, padding: "4px 12px" }}>Supprimer toutes</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                );
+              })()}
             </div>
           )}
+
+          {/* ─── COUPONS ─────────────────────────────────── */}
+          {saTab === "coupons" && (() => {
+            const coupons: any[] = ctx.saCoupons || [];
+            const setCoupons = (v: any) => ctx.setSaCoupons?.(v);
+            const couponForm = ctx.saCouponForm || { name: "", discount_type: "percent", percent_off: 10, amount_off: 1000, currency: "chf", duration: "once", duration_in_months: 3, max_redemptions: undefined, redeem_by: "", promo_code: "", code_max_redemptions: undefined, code_expires_at: "" };
+            const setCouponForm = (v: any) => ctx.setSaCouponForm?.(v);
+
+            if (!ctx._couponsLoaded) {
+              ctx._couponsLoaded = true;
+              import('../api/endpoints').then(ep => ep.superAdminListCoupons().then(setCoupons).catch(() => setCoupons([])));
+            }
+
+            const reload = () => {
+              import('../api/endpoints').then(ep => ep.superAdminListCoupons().then(setCoupons).catch(() => setCoupons([])));
+            };
+
+            const handleCreate = async () => {
+              try {
+                const ep = await import('../api/endpoints');
+                const payload: any = {
+                  name: couponForm.name,
+                  discount_type: couponForm.discount_type,
+                  duration: couponForm.duration,
+                };
+                if (couponForm.discount_type === "percent") payload.percent_off = Number(couponForm.percent_off);
+                else { payload.amount_off = Number(couponForm.amount_off); payload.currency = couponForm.currency; }
+                if (couponForm.duration === "repeating") payload.duration_in_months = Number(couponForm.duration_in_months);
+                if (couponForm.max_redemptions) payload.max_redemptions = Number(couponForm.max_redemptions);
+                if (couponForm.redeem_by) payload.redeem_by = couponForm.redeem_by;
+                if (couponForm.promo_code) payload.promo_code = couponForm.promo_code;
+                if (couponForm.code_max_redemptions) payload.code_max_redemptions = Number(couponForm.code_max_redemptions);
+                if (couponForm.code_expires_at) payload.code_expires_at = couponForm.code_expires_at;
+                await ep.superAdminCreateCoupon(payload);
+                addToast_admin?.(`Coupon ${payload.name} créé`);
+                setCouponForm({ ...couponForm, name: "", promo_code: "" });
+                reload();
+              } catch (e: any) {
+                let msg = "Erreur création coupon"; try { const p = JSON.parse(e?.message || ""); msg = p?.error || p?.message || msg; } catch {}
+                addToast_admin?.(msg);
+              }
+            };
+
+            return (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                  <h1 style={{ fontSize: 22, fontWeight: 600, margin: 0 }}>Coupons & codes promo</h1>
+                  <span style={{ fontSize: 11, color: C.textMuted }}>{coupons.length} coupon{coupons.length > 1 ? "s" : ""}</span>
+                </div>
+
+                {/* Create form */}
+                <div className="iz-card" style={{ ...sCard, padding: 20, marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Créer un nouveau coupon</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+                    <input value={couponForm.name} onChange={e => setCouponForm({ ...couponForm, name: e.target.value })} placeholder="Nom interne (ex. Summer 2026)" style={{ ...sInput, fontSize: 13 }} />
+                    <select value={couponForm.discount_type} onChange={e => setCouponForm({ ...couponForm, discount_type: e.target.value })} style={{ ...sInput, fontSize: 13 }}>
+                      <option value="percent">% de réduction</option>
+                      <option value="amount">Montant fixe</option>
+                    </select>
+                    {couponForm.discount_type === "percent" ? (
+                      <input type="number" value={couponForm.percent_off} onChange={e => setCouponForm({ ...couponForm, percent_off: e.target.value })} min={1} max={100} placeholder="% off" style={{ ...sInput, fontSize: 13 }} />
+                    ) : (
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <input type="number" value={couponForm.amount_off} onChange={e => setCouponForm({ ...couponForm, amount_off: e.target.value })} min={1} placeholder="cts" style={{ ...sInput, fontSize: 13, flex: 1 }} />
+                        <select value={couponForm.currency} onChange={e => setCouponForm({ ...couponForm, currency: e.target.value })} style={{ ...sInput, fontSize: 13, width: 70 }}>
+                          <option value="chf">CHF</option><option value="eur">EUR</option><option value="usd">USD</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 10 }}>
+                    <select value={couponForm.duration} onChange={e => setCouponForm({ ...couponForm, duration: e.target.value })} style={{ ...sInput, fontSize: 13 }}>
+                      <option value="once">Une seule fois</option>
+                      <option value="repeating">N mois</option>
+                      <option value="forever">Toujours</option>
+                    </select>
+                    {couponForm.duration === "repeating" && (
+                      <input type="number" value={couponForm.duration_in_months} onChange={e => setCouponForm({ ...couponForm, duration_in_months: e.target.value })} min={1} placeholder="Nb mois" style={{ ...sInput, fontSize: 13 }} />
+                    )}
+                    <input type="number" value={couponForm.max_redemptions || ""} onChange={e => setCouponForm({ ...couponForm, max_redemptions: e.target.value })} placeholder="Max utilisations (optionnel)" style={{ ...sInput, fontSize: 13 }} />
+                    <input type="date" value={couponForm.redeem_by || ""} onChange={e => setCouponForm({ ...couponForm, redeem_by: e.target.value })} style={{ ...sInput, fontSize: 13 }} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10, marginBottom: 14, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                    <input value={couponForm.promo_code} onChange={e => setCouponForm({ ...couponForm, promo_code: e.target.value.toUpperCase() })} placeholder="Code promo (ex. SUMMER25)" style={{ ...sInput, fontSize: 13 }} />
+                    <input type="number" value={couponForm.code_max_redemptions || ""} onChange={e => setCouponForm({ ...couponForm, code_max_redemptions: e.target.value })} placeholder="Max usage code" style={{ ...sInput, fontSize: 13 }} />
+                    <input type="date" value={couponForm.code_expires_at || ""} onChange={e => setCouponForm({ ...couponForm, code_expires_at: e.target.value })} style={{ ...sInput, fontSize: 13 }} />
+                  </div>
+                  <button onClick={handleCreate} disabled={!couponForm.name} className="iz-btn-pink" style={{ ...sBtn("pink"), fontSize: 13, padding: "10px 24px", opacity: couponForm.name ? 1 : 0.5 }}>+ Créer le coupon</button>
+                </div>
+
+                {/* List */}
+                <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr 80px", padding: "10px 16px", background: C.bg, borderBottom: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
+                    <span>Coupon</span><span>Réduction</span><span>Durée</span><span>Codes promo</span><span>Utilisations</span><span></span>
+                  </div>
+                  {coupons.length === 0 && <div style={{ padding: "30px 16px", textAlign: "center", fontSize: 13, color: C.textMuted }}>Aucun coupon. Créez-en un pour offrir des réductions à vos prospects.</div>}
+                  {coupons.map((c: any) => (
+                    <div key={c.id} style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 1fr 1fr 80px", alignItems: "center", gap: 8 }}>
+                        <div><b>{c.name || c.id}</b><div style={{ fontSize: 11, color: C.textMuted }}>{c.id}</div></div>
+                        <span>{c.percent_off ? `${c.percent_off}%` : `${(c.amount_off || 0) / 100} ${(c.currency || "").toUpperCase()}`}</span>
+                        <span>{c.duration === "once" ? "1 fois" : c.duration === "repeating" ? `${c.duration_in_months} mois` : "Toujours"}</span>
+                        <span>{c.promotion_codes.length === 0 ? <span style={{ color: C.textMuted }}>—</span> : c.promotion_codes.map((p: any) => <span key={p.id} style={{ display: "inline-block", marginRight: 4, padding: "1px 6px", background: p.active ? C.greenLight : C.bg, color: p.active ? C.green : C.textMuted, borderRadius: 4, fontSize: 11, fontWeight: 600 }}>{p.code}</span>)}</span>
+                        <span>{c.times_redeemed}{c.max_redemptions ? `/${c.max_redemptions}` : ""}</span>
+                        <button onClick={async () => {
+                          if (!confirm(`Supprimer le coupon ${c.name || c.id} ?`)) return;
+                          try { const ep = await import('../api/endpoints'); await ep.superAdminDeleteCoupon(c.id); reload(); addToast_admin?.("Coupon supprimé"); } catch { addToast_admin?.("Erreur suppression"); }
+                        }} style={{ background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 12 }}>Supprimer</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ─── REPORTING MRR / ARR / CHURN ────────────────── */}
+          {saTab === "reporting" && (() => {
+            const report = ctx.saReport;
+            const setReport = (v: any) => ctx.setSaReport?.(v);
+            if (!ctx._reportLoaded) {
+              ctx._reportLoaded = true;
+              import('../api/endpoints').then(ep => ep.superAdminGetRevenueReport().then(setReport).catch(() => setReport(null)));
+            }
+
+            if (!report) return <div style={{ padding: 40, textAlign: "center", color: C.textMuted }}>Chargement du reporting...</div>;
+
+            return (
+              <div>
+                <h1 style={{ fontSize: 22, fontWeight: 600, marginBottom: 20 }}>Reporting Revenue</h1>
+
+                {/* KPIs */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+                  {[
+                    { label: "MRR", value: `${report.mrr.toLocaleString()} CHF`, icon: TrendingUp, color: C.pink },
+                    { label: "ARR", value: `${report.arr.toLocaleString()} CHF`, icon: Banknote, color: C.green },
+                    { label: "ARPU", value: `${report.arpu} CHF/sub`, icon: Building2, color: C.blue },
+                    { label: "Churn 30j", value: `${report.churn_rate_30d}%`, icon: TrendingUp, color: report.churn_rate_30d > 5 ? C.red : C.amber },
+                  ].map((k, i) => (
+                    <div key={i} className="iz-card" style={{ ...sCard, padding: 18, display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: k.color + "20", display: "flex", alignItems: "center", justifyContent: "center" }}><k.icon size={18} color={k.color} /></div>
+                      <div><div style={{ fontSize: 22, fontWeight: 700 }}>{k.value}</div><div style={{ fontSize: 11, color: C.textMuted }}>{k.label}</div></div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Other KPIs */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
+                  {[
+                    { label: "Subs actifs", value: report.active_subs },
+                    { label: "Tenants total", value: report.total_tenants },
+                    { label: "Collaborateurs", value: report.total_collaborateurs },
+                    { label: "Revenue 30j", value: `${report.revenue_last_30d.toLocaleString()} CHF` },
+                  ].map((k, i) => (
+                    <div key={i} className="iz-card" style={{ ...sCard, padding: 14 }}>
+                      <div style={{ fontSize: 18, fontWeight: 600 }}>{k.value}</div>
+                      <div style={{ fontSize: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: 1 }}>{k.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Evolution chart */}
+                <div className="iz-card" style={{ ...sCard, padding: 20, marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Évolution sur 12 mois</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 160, marginBottom: 10 }}>
+                    {(() => {
+                      const max = Math.max(...report.evolution.map((e: any) => e.mrr), 1);
+                      return report.evolution.map((m: any, i: number) => {
+                        const h = (m.mrr / max) * 140;
+                        return (
+                          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }} title={`${m.label}: ${m.mrr} CHF — ${m.subs_count} subs (${m.new_subs} nouveaux, ${m.churned} churned)`}>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: C.text }}>{Math.round(m.mrr)}</div>
+                            <div style={{ width: "100%", height: h || 2, background: i === report.evolution.length - 1 ? C.pink : C.blue, borderRadius: "4px 4px 0 0", transition: "height .3s" }} />
+                            <div style={{ fontSize: 10, color: C.textMuted }}>{m.label}</div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* Breakdown by plan */}
+                <div className="iz-card" style={{ ...sCard, padding: 0, overflow: "hidden" }}>
+                  <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}`, fontSize: 13, fontWeight: 600 }}>Répartition par plan</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", padding: "10px 20px", background: C.bg, fontSize: 11, fontWeight: 600, color: C.textLight, textTransform: "uppercase" }}>
+                    <span>Plan</span><span>Subs</span><span>Collabs</span><span>MRR</span><span>%</span>
+                  </div>
+                  {report.by_plan.sort((a: any, b: any) => b.mrr - a.mrr).map((p: any) => (
+                    <div key={p.slug} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr", padding: "12px 20px", borderTop: `1px solid ${C.border}`, fontSize: 13 }}>
+                      <span><b>{p.nom}</b>{p.addon_type === "ai" && <span style={{ marginLeft: 8, fontSize: 10, padding: "1px 6px", background: C.amberLight, color: C.amber, borderRadius: 4 }}>IA</span>}</span>
+                      <span>{p.subs_count}</span>
+                      <span>{p.collaborateurs}</span>
+                      <span>{p.mrr.toLocaleString()} CHF</span>
+                      <span>{report.mrr > 0 ? `${Math.round((p.mrr / report.mrr) * 100)}%` : "0%"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {saTab === "ai" && (() => {
             const [aiConfig, setAiConfig] = [ctx.saAiConfig || { api_key: "", model: "claude-opus-4-6", key_set: false }, ctx.setSaAiConfig || (() => {})];

@@ -47,6 +47,8 @@ const ADMIN_PAGE_TO_SLUG: Record<AdminPage, string> = {
   admin_templates_profil: "templates-profil",
   admin_quotes: "citations",
   admin_recurring_meetings: "rdv-recurrents",
+  admin_bureaux: "bureaux",
+  admin_feedback_hub: "feedback-hub",
 };
 
 const EMPLOYEE_PAGE_TO_SLUG: Record<DashboardPage, string> = {
@@ -67,6 +69,8 @@ const EMPLOYEE_PAGE_TO_SLUG: Record<DashboardPage, string> = {
   mes_signatures: "mes-signatures",
   formations: "formations",
   bureaux: "bureaux",
+  badges: "badges",
+  mon_materiel: "mon-materiel",
 };
 
 // Build reverse maps
