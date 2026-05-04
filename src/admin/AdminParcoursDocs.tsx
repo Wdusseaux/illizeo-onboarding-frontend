@@ -625,14 +625,26 @@ export function createAdminParcoursDocs(ctx: any) {
                               ctx.setParcoursCatMap?.(Object.fromEntries(cats.map(c => [c.slug, c.id])));
                             }
                             const created = await apiCreateParcours({ nom: aiResult.nom, categorie_id: catId, status: "brouillon" });
-                            // Create phases
+                            // Create phases — collect them by name so we can link actions to their phase below.
+                            const phaseByName: Record<string, number> = {};
                             for (const ph of aiResult.phases || []) {
-                              await apiCreatePhase({ nom: ph.nom, delai_debut: ph.delaiDebut, delai_fin: ph.delaiFin, couleur: "#4CAF50", parcours_ids: [created.id] });
+                              const createdPhase = await apiCreatePhase({ nom: ph.nom, delai_debut: ph.delaiDebut, delai_fin: ph.delaiFin, couleur: "#4CAF50", parcours_ids: [created.id] });
+                              if (createdPhase?.id) phaseByName[ph.nom] = createdPhase.id;
                             }
-                            // Create actions — map type slugs to action_type_id
-                            const typeMap: Record<string, number> = { document: 1, formulaire: 2, formation: 3, questionnaire: 4, tache: 5, signature: 6, lecture: 7, rdv: 8, message: 9, entretien: 10, checklist_it: 11, passation: 12, visite: 13 };
+                            // Create actions — pass action_type_slug so the backend resolves the
+                            // tenant-specific action_type_id (slugs like "document", "formation"
+                            // are stable; numeric IDs vary per tenant). Link each action to its
+                            // phase by name.
                             for (const a of aiResult.actions || []) {
-                              await apiCreateAction({ titre: a.titre, action_type_id: typeMap[a.type] || 5, delai_relatif: a.delaiRelatif, obligatoire: a.obligatoire, description: a.description || "", parcours_id: created.id });
+                              await apiCreateAction({
+                                titre: a.titre,
+                                action_type_slug: a.type,
+                                phase_id: phaseByName[a.phase] || null,
+                                delai_relatif: a.delaiRelatif,
+                                obligatoire: a.obligatoire,
+                                description: a.description || "",
+                                parcours_id: created.id,
+                              } as any);
                             }
                             refetchParcours(); refetchPhases(); refetchActions();
                             ctx.setAiParcoursModal(false); ctx.setAiParcoursResult(null); ctx.setAiParcoursPrompt("");
