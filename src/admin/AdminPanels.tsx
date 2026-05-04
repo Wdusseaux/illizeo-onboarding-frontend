@@ -1354,8 +1354,24 @@ export function createAdminPanels(ctx: any) {
                   <button onClick={() => setParcoursPanelMode("closed")} style={{ ...sBtn("outline"), fontSize: 13 }}>{t('common.cancel')}</button>
                   <button disabled={parcoursPanelLoading || !parcoursPanelData.nom.trim()} onClick={async () => {
                     setParcoursPanelLoading(true);
-                    const catIdMap: Record<string, number> = { onboarding: 1, offboarding: 2, crossboarding: 3, reboarding: 4 };
-                    const payload: Record<string, any> = { nom: parcoursPanelData.nom.trim(), categorie_id: catIdMap[parcoursPanelData.categorie], status: parcoursPanelData.status, translations: buildTranslationsPayload() };
+                    // Resolve the tenant's real categorie_id from slug (cached at app load).
+                    let catIdMap: Record<string, number> = ctx.parcoursCatMap || {};
+                    let catId = catIdMap[parcoursPanelData.categorie];
+                    if (!catId) {
+                      try {
+                        const { getParcoursCategories } = await import('../api/endpoints');
+                        const cats = await getParcoursCategories();
+                        catIdMap = Object.fromEntries(cats.map(c => [c.slug, c.id]));
+                        ctx.setParcoursCatMap?.(catIdMap);
+                        catId = catIdMap[parcoursPanelData.categorie] || cats[0]?.id;
+                      } catch {}
+                    }
+                    if (!catId) {
+                      addToast_admin("Aucune catégorie de parcours configurée pour ce tenant.");
+                      setParcoursPanelLoading(false);
+                      return;
+                    }
+                    const payload: Record<string, any> = { nom: parcoursPanelData.nom.trim(), categorie_id: catId, status: parcoursPanelData.status, translations: buildTranslationsPayload() };
                     try {
                       if (parcoursPanelMode === "create") {
                         await apiCreateParcours(payload);

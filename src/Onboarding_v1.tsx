@@ -8,7 +8,7 @@ const _BUILD_VERSION = "2.1.0";
 import {
   getCollaborateurs, getParcours, getActions, getGroupes, getPhases,
   getWorkflows, getEmailTemplates, getContrats, getDocumentCategories, createDocumentTemplate,
-  getNotificationsConfig, getNotificationsRegistry, getPermissionsRegistry,
+  getNotificationsConfig, getNotificationsRegistry, getPermissionsRegistry, getParcoursCategories,
   getConversations, getMessages as apiGetMessages, sendMessage as apiSendMessage, getAvailableUsers,
   getUserNotifications, markNotifRead, markAllNotifsRead, getNotifUnreadCount,
   getCompanyBlocks, getAllCompanyBlocks, updateCompanyBlock as apiUpdateBlock, createCompanyBlock as apiCreateBlock, deleteCompanyBlock as apiDeleteBlock,
@@ -296,6 +296,9 @@ export default function OnboardingModule() {
   });
   const [notifRegistry, setNotifRegistry] = useState<any[]>([]);
   const [permRegistry, setPermRegistry] = useState<{ modules: any[]; sections: Record<string, string>; levels: string[] } | null>(null);
+  // Real parcours category IDs for the current tenant (slug → id). Loaded
+  // lazily and used wherever we need to send categorie_id to POST /parcours.
+  const [parcoursCatMap, setParcoursCatMap] = useState<Record<string, number>>({});
 
   // Equipment Management
   const [equipTypes, setEquipTypes] = useState<EquipmentType[]>([]);
@@ -987,6 +990,24 @@ export default function OnboardingModule() {
     getPermissionsRegistry().then(setPermRegistry).catch(() => {});
   }, [auth.isAuthenticated, auth.isAdmin, permRegistry]);
 
+  // Parcours category map — IDs are tenant-specific so we resolve them
+  // dynamically and cache slug → id. Avoids a previous bug where the FE
+  // hardcoded { onboarding: 1, ... } and POST /parcours rejected with
+  // "categorie id is invalid" on tenants where the seed order differed.
+  useEffect(() => {
+    if (!auth.isAuthenticated || !auth.isAdmin) return;
+    if (Object.keys(parcoursCatMap).length > 0) return;
+    getParcoursCategories()
+      .then(cats => {
+        const map: Record<string, number> = {};
+        for (const c of cats) {
+          if (c.slug) map[c.slug] = c.id;
+        }
+        setParcoursCatMap(map);
+      })
+      .catch(() => {});
+  }, [auth.isAuthenticated, auth.isAdmin, parcoursCatMap]);
+
   // ─── Hydrate profileForm à l'ouverture du ProfileModal ─────
   // Lit auth.user pour name/email et fetch les prefs notifs depuis le backend.
   // Comme ça les inputs du modal "Mon compte" sont pré-remplis avec la vraie
@@ -1277,6 +1298,7 @@ export default function OnboardingModule() {
     notifConfig, setNotifConfig,
     notifRegistry, setNotifRegistry,
     permRegistry, setPermRegistry,
+    parcoursCatMap, setParcoursCatMap,
     equipTypes, setEquipTypes,
     equipments, setEquipments,
     equipStats, setEquipStats,

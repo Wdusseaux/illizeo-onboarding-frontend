@@ -154,6 +154,17 @@ export async function getParcours() {
   return raw.map(transformParcours);
 }
 
+// Tenant-specific parcours category IDs — never hardcode them client-side.
+export interface ParcoursCategorie {
+  id: number;
+  slug: "onboarding" | "offboarding" | "crossboarding" | "reboarding" | string;
+  nom: string;
+}
+
+export async function getParcoursCategories() {
+  return apiFetch<ParcoursCategorie[]>('/parcours-categories');
+}
+
 export async function createParcours(data: Record<string, any>) {
   return apiFetch<ApiParcours>('/parcours', { method: 'POST', body: JSON.stringify(data) });
 }

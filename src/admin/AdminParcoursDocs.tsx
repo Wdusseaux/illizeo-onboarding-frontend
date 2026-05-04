@@ -609,9 +609,22 @@ export function createAdminParcoursDocs(ctx: any) {
                         <button onClick={() => ctx.setAiParcoursResult(null)} style={sBtn("outline")}>Modifier le prompt</button>
                         <button onClick={async () => {
                           try {
-                            // Create parcours
-                            const catMap: Record<string, number> = { onboarding: 1, offboarding: 2, crossboarding: 3, reboarding: 4 };
-                            const created = await apiCreateParcours({ nom: aiResult.nom, categorie_id: catMap[aiResult.categorie] || 1, status: "brouillon" });
+                            // Resolve the tenant's actual categorie_id from slug. Fall back to
+                            // a fresh fetch if the cached map hasn't loaded yet (rare race).
+                            const catMap: Record<string, number> = ctx.parcoursCatMap || {};
+                            let catId = catMap[aiResult.categorie];
+                            if (!catId) {
+                              const { getParcoursCategories } = await import('../api/endpoints');
+                              const cats = await getParcoursCategories();
+                              const found = cats.find(c => c.slug === aiResult.categorie) || cats[0];
+                              if (!found) {
+                                addToast_admin("Aucune catégorie de parcours configurée pour ce tenant.");
+                                return;
+                              }
+                              catId = found.id;
+                              ctx.setParcoursCatMap?.(Object.fromEntries(cats.map(c => [c.slug, c.id])));
+                            }
+                            const created = await apiCreateParcours({ nom: aiResult.nom, categorie_id: catId, status: "brouillon" });
                             // Create phases
                             for (const ph of aiResult.phases || []) {
                               await apiCreatePhase({ nom: ph.nom, delai_debut: ph.delaiDebut, delai_fin: ph.delaiFin, couleur: "#4CAF50", parcours_ids: [created.id] });
